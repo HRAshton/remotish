@@ -1,0 +1,71 @@
+{
+  "name": "remotish",
+  "version": "0.1.0-beta.10",
+  "private": true,
+  "license": "0BSD",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=22 <23 || >=24 <25"
+  },
+  "scripts": {
+    "build": "tsc -b --pretty false",
+    "clean": "tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist",
+    "vscode:types:update": "pnpm --dir apps/demo-web exec dts dev 1.138.0 && shx rm -f \"types/vscode-proposed/vscode.proposed.*.d.ts\" && shx mv \"apps/demo-web/vscode.proposed.*.d.ts\" types/vscode-proposed/",
+    "format": "biome format --write .",
+    "check:biome": "biome ci .",
+    "fix": "biome check --write .",
+    "lint:deps": "dependency-cruiser packages adapters apps --config dependency-cruiser.cjs --output-type err-long",
+    "lint:deadcode": "knip --config knip.json",
+    "lint:docs": "typedoc --options typedoc.json --emit none",
+    "lint:markdown": "remark . --quiet --frail --ignore-pattern \"docs/archive/**\"",
+    "lint": "pnpm check:biome && pnpm lint:deps && pnpm lint:deadcode && pnpm lint:docs && pnpm lint:markdown",
+    "test": "pnpm build && node --import ./tests/vscode-runtime/register-vscode-stub.mjs --test tests/adapter/*.test.mjs tests/unit/*.test.mjs tests/vscode/*.test.mjs tests/vscode-runtime/*.test.mjs tests/history/*.test.mjs tests/http/*.test.mjs tests/github/github-adapter.test.mjs tests/meta/*.test.mjs",
+    "test:unit": "pnpm build && node --import ./tests/vscode-runtime/register-vscode-stub.mjs --test tests/unit/*.test.mjs",
+    "test:adapter": "pnpm build && node --import ./tests/vscode-runtime/register-vscode-stub.mjs --test tests/adapter/*.test.mjs tests/http/*.test.mjs tests/github/github-adapter.test.mjs",
+    "test:github-live": "pnpm build && cross-env REMOTISH_LIVE_GITHUB=1 node --test tests/github/github-live.test.mjs",
+    "bundle:demo:extension": "esbuild apps/demo-web/src/extension.ts --bundle --platform=browser --format=cjs --external:vscode --outfile=apps/demo-web/dist/extension.js",
+    "bundle:demo:tests": "esbuild apps/demo-web/src/test/suite/index.ts --bundle --platform=browser --format=cjs --external:vscode --outfile=apps/demo-web/dist/test/suite/index.js",
+    "bundle:demo": "pnpm build && pnpm bundle:demo:extension",
+    "vscode:web": "pnpm bundle:demo && vscode-test-web --browserType=chromium --extensionDevelopmentPath=apps/demo-web --folder-uri=remotish://fixture-demo/",
+    "test:vscode-web": "pnpm build && pnpm bundle:demo:extension && pnpm bundle:demo:tests && vscode-test-web --browserType=chromium --headless=true --extensionDevelopmentPath=apps/demo-web --extensionTestsPath=apps/demo-web/dist/test/suite/index.js --folder-uri=remotish://fixture-demo/",
+    "release:version": "pnpm version --recursive --no-git-tag-version",
+    "release:source": "shx mkdir -p artifacts && git archive --format=tar.gz --output=artifacts/remotish-framework.tar.gz HEAD",
+    "ci": "pnpm build && pnpm lint && pnpm test && shx mkdir -p artifacts && pnpm sbom --sbom-format cyclonedx --sbom-spec-version 1.6 --sbom-type application --prod --lockfile-only --out artifacts/remotish.cdx.json",
+    "release:vsix": "shx rm -rf apps/demo-web/dist && pnpm bundle:demo && shx mkdir -p artifacts && pnpm --dir apps/demo-web exec vsce package --no-dependencies --allow-missing-repository --out ../../artifacts/remotish-demo.vsix",
+    "prepare:vscode-web-vsix": "node scripts/prepare-vsix-smoke.mjs artifacts/remotish-demo.vsix",
+    "test:vscode-web:vsix": "pnpm release:vsix && pnpm bundle:demo:tests && pnpm prepare:vscode-web-vsix && vscode-test-web --browserType=chromium --headless=true --extensionDevelopmentPath=artifacts/vsix-smoke/extension --extensionTestsPath=artifacts/vsix-smoke/extension/dist/test/suite/index.js --folder-uri=remotish://fixture-demo/ && shx rm -rf artifacts/vsix-smoke"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@remotish/adapter-fixture": "workspace:*",
+    "@remotish/adapter-github": "workspace:*",
+    "@remotish/adapter-http": "workspace:*",
+    "@remotish/adapter-sdk": "workspace:*",
+    "@remotish/core": "workspace:*",
+    "@remotish/vscode": "workspace:*",
+    "@remotish/vscode-history": "workspace:*",
+    "@types/vscode": "1.138.0",
+    "@vscode/dts": "0.4.1",
+    "@vscode/test-web": "0.0.80",
+    "@vscode/vsce": "4.0.0",
+    "cross-env": "10.1.0",
+    "dependency-cruiser": "18.3.1",
+    "esbuild": "0.28.2",
+    "knip": "6.36.0",
+    "remark-cli": "12.0.1",
+    "remark-validate-links": "13.1.0",
+    "shx": "0.4.0",
+    "typedoc": "0.28.20",
+    "typescript": "5.8.3"
+  },
+  "remarkConfig": {
+    "plugins": [
+      [
+        "remark-validate-links",
+        {
+          "repository": false
+        }
+      ]
+    ]
+  }
+}

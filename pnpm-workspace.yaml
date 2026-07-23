@@ -1,0 +1,14 @@
+packages:
+  - 'packages/*'
+  - 'adapters/*'
+  - 'apps/*'
+
+# pnpm is pinned by packageManager and CI; keep the lockfile focused on project dependencies.
+pmOnFail: ignore
+includeWorkspaceRoot: true
+allowBuilds:
+  '@playwright/browser-chromium': true
+  '@vscode/vsce-sign': true
+  esbuild: true
+
+minimumReleaseAge: 0 # TODO: Adjust this value once the initial release cycle stabilizes

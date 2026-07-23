@@ -1,0 +1,29 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/adapter-sdk"
+    },
+    {
+      "path": "./packages/adapter-fixture"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/vscode"
+    },
+    {
+      "path": "./packages/vscode-history"
+    },
+    {
+      "path": "./adapters/http-example"
+    },
+    {
+      "path": "./adapters/github"
+    },
+    {
+      "path": "./apps/demo-web"
+    }
+  ]
+}

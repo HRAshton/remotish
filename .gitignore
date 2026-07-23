@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.tsbuildinfo
+artifacts/
+coverage/
+.DS_Store
+build/
+.pnpm-store/
+.vscode-test-web/
+
+/*.md
+!README.md
+!CONTRIBUTING.md
+!SECURITY.md
+!THIRD_PARTY_NOTICES.md

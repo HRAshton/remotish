@@ -1,0 +1,40 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "packages/adapter-sdk/src/index.ts",
+    "packages/core/src/index.ts",
+    "packages/vscode/src/index.ts",
+    "packages/vscode-history/src/index.ts",
+    "packages/adapter-fixture/src/index.ts",
+    "adapters/http-example/src/index.ts",
+    "adapters/github/src/index.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "readme": "none",
+  "validation": {
+    "notDocumented": true,
+    "notExported": true,
+    "invalidLink": true
+  },
+  "intentionallyNotExported": [
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryProvider",
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryItemRefsChangeEvent",
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryItemRef",
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryItemChange",
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryItem",
+    "types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts:\"vscode\".SourceControlHistoryOptions"
+  ],
+  "requiredToBeDocumented": [
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Property",
+    "Method",
+    "Accessor",
+    "TypeAlias"
+  ],
+  "treatValidationWarningsAsErrors": true
+}
