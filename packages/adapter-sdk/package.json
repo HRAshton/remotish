@@ -1,0 +1,43 @@
+{
+  "name": "@remotish/adapter-sdk",
+  "version": "0.1.0-beta.10",
+  "type": "module",
+  "license": "0BSD",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "description": "Public TypeScript contract for building Remotish remote repository adapters.",
+  "keywords": [
+    "remotish",
+    "adapter",
+    "repository",
+    "vscode",
+    "code-oss",
+    "source-control"
+  ],
+  "homepage": "https://github.com/HRAshton/remotish#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HRAshton/remotish.git",
+    "directory": "packages/adapter-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/HRAshton/remotish/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22 <23 || >=24 <25"
+  }
+}
