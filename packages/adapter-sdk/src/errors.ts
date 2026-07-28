@@ -7,6 +7,7 @@ export type RemotishErrorCode =
   | 'OFFLINE'
   | 'UNSUPPORTED'
   | 'INVALID_REQUEST'
+  | 'CANCELLED'
   | 'UNKNOWN';
 
 /** Structured adapter error suitable for framework-level handling. */
