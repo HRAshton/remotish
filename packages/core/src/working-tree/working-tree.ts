@@ -5,7 +5,7 @@ import {
   type RepoPath,
   type RevisionId,
 } from '@remotish/adapter-sdk';
-import { Overlay, type OverlaySnapshot } from '../overlay/overlay.js';
+import { Overlay, type OverlaySnapshot } from './overlay.js';
 import type { FileStat, RepositoryReader } from '../repository/repository-reader.js';
 import { baseName, normalizePath } from '../util/path.js';
 import type { WorkingTreeChange } from './change.js';
