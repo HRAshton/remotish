@@ -1,5 +1,5 @@
 import type { Change, RepoPath, RevisionId } from '@remotish/adapter-sdk';
-import type { Overlay } from './overlay.js';
+import type { Overlay } from '../overlay/overlay.js';
 import type { RepositoryReader } from '../repository/repository-reader.js';
 import { cloneBytes, equalBytes } from '../util/bytes.js';
 import { normalizePath } from '../util/path.js';

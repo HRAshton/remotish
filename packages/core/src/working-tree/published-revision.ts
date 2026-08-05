@@ -1,5 +1,5 @@
 import type { RevisionId } from '@remotish/adapter-sdk';
-import type { Overlay } from './overlay.js';
+import type { Overlay } from '../overlay/overlay.js';
 import type { RepositoryReader } from '../repository/repository-reader.js';
 import { equalBytes } from '../util/bytes.js';
 

@@ -1,5 +1,5 @@
 import { RemotishError, type RepoPath, type RevisionId } from '@remotish/adapter-sdk';
-import type { Overlay } from './overlay.js';
+import type { Overlay } from '../overlay/overlay.js';
 import type { FileStat, RepositoryReader } from '../repository/repository-reader.js';
 import { equalBytes } from '../util/bytes.js';
 import { isSameOrChild, normalizePath, parentPath } from '../util/path.js';
