@@ -7,5 +7,3 @@ export type {
   RegisteredWorkspace,
   WorkspaceRegistryEvent,
 } from './workspaces/workspace-registry.js';
-export { PrototypeHistoryProvider } from './history/history-provider.js';
-export type { PrototypeTimelineItem } from './history/timeline-provider.js';

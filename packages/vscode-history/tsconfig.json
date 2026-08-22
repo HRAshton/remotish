@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "tsconfig.tsbuildinfo"
+  },
+  "references": [
+    {
+      "path": "../adapter-sdk"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../vscode"
+    }
+  ],
+  "include": ["src/**/*.ts"],
+  "files": [
+    "../../types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts",
+    "../../types/vscode-proposed/vscode.proposed.timeline.d.ts"
+  ]
+}
