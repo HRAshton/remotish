@@ -25,7 +25,7 @@ import {
   decodeDirectoryEntries,
   decodeRepositoryInfo,
 } from './http-json.js';
-import { encodeCommitRequest } from './protocol.js';
+import { encodeCommitRequest } from './wire.js';
 
 /** Connection options for the example HTTP repository protocol. */
 export interface HttpRemotishAdapterOptions {
