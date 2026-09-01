@@ -3,7 +3,7 @@ import { isRecord, type JsonDecoder } from './github-json.js';
 import type { GitHubAdapterOptions } from './types.js';
 
 /** Default deadline for one GitHub operation, including response body consumption. */
-const DEFAULT_GITHUB_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_GITHUB_REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Default maximum GitHub response size. Git blob payloads are base64 JSON, so this is larger than
