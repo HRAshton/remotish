@@ -1,0 +1,214 @@
+{
+  "name": "remotish-demo",
+  "displayName": "Remotish Demo",
+  "description": "Fixture-powered browser demo for the Remotish remote repository framework.",
+  "version": "0.1.0-beta.10",
+  "publisher": "hrashton",
+  "license": "0BSD",
+  "private": true,
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HRAshton/remotish.git"
+  },
+  "homepage": "https://github.com/HRAshton/remotish#readme",
+  "bugs": {
+    "url": "https://github.com/HRAshton/remotish/issues"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "browser": "./dist/extension.js",
+  "enabledApiProposals": [
+    "scmActionButton",
+    "scmHistoryProvider",
+    "timeline"
+  ],
+  "activationEvents": [
+    "onFileSystem:remotish",
+    "onFileSystem:remotish-base"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "remotish.commitAndPush",
+        "title": "Remotish: Commit & Push"
+      },
+      {
+        "command": "remotish.commitAndPushForceWithLease",
+        "title": "Remotish: Commit & Push (Force with Lease)"
+      },
+      {
+        "command": "remotish.amendAndPushForceWithLease",
+        "title": "Remotish: Amend & Push (Force with Lease)"
+      },
+      {
+        "command": "remotish.openFile",
+        "title": "Open File",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "remotish.stage",
+        "title": "Stage Changes",
+        "icon": "$(add)"
+      },
+      {
+        "command": "remotish.unstage",
+        "title": "Unstage Changes",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "remotish.stageAll",
+        "title": "Stage All Changes"
+      },
+      {
+        "command": "remotish.unstageAll",
+        "title": "Unstage All Changes"
+      },
+      {
+        "command": "remotish.revert",
+        "title": "Revert Changes",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "remotish.revertAll",
+        "title": "Revert All Changes",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "remotish.switchBranch",
+        "title": "Remotish: Switch Branch"
+      },
+      {
+        "command": "remotish.createBranch",
+        "title": "Remotish: Create Branch"
+      },
+      {
+        "command": "remotish.deleteBranch",
+        "title": "Remotish: Delete Branch"
+      },
+      {
+        "command": "remotish.refresh",
+        "title": "Remotish: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "remotish.demo.openFixture",
+        "title": "Remotish Demo: Open Fixture Repository"
+      }
+    ],
+    "menus": {
+      "scm/resourceState/context": [
+        {
+          "command": "remotish.openFile",
+          "group": "inline@1",
+          "when": "scmProvider == remotish"
+        },
+        {
+          "command": "remotish.stage",
+          "group": "inline@2",
+          "when": "scmProvider == remotish && scmResourceGroup == changes"
+        },
+        {
+          "command": "remotish.unstage",
+          "group": "inline@2",
+          "when": "scmProvider == remotish && scmResourceGroup == staged"
+        },
+        {
+          "command": "remotish.revert",
+          "group": "inline@3",
+          "when": "scmProvider == remotish && scmResourceGroup == changes"
+        }
+      ],
+      "scm/resourceGroup/context": [
+        {
+          "command": "remotish.stageAll",
+          "group": "1_modification",
+          "when": "scmProvider == remotish && scmResourceGroup == changes"
+        },
+        {
+          "command": "remotish.revertAll",
+          "group": "1_modification",
+          "when": "scmProvider == remotish && scmResourceGroup == changes"
+        },
+        {
+          "command": "remotish.unstageAll",
+          "group": "1_modification",
+          "when": "scmProvider == remotish && scmResourceGroup == staged"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "remotish.refresh",
+          "group": "navigation",
+          "when": "scmProvider == remotish"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "remotish.openFile",
+          "when": "false"
+        },
+        {
+          "command": "remotish.stage",
+          "when": "false"
+        },
+        {
+          "command": "remotish.unstage",
+          "when": "false"
+        },
+        {
+          "command": "remotish.stageAll",
+          "when": "false"
+        },
+        {
+          "command": "remotish.unstageAll",
+          "when": "false"
+        },
+        {
+          "command": "remotish.revert",
+          "when": "false"
+        },
+        {
+          "command": "remotish.revertAll",
+          "when": "false"
+        }
+      ]
+    },
+    "resourceLabelFormatters": [
+      {
+        "scheme": "remotish",
+        "formatting": {
+          "label": "${authority}${path}",
+          "separator": "/",
+          "workspaceSuffix": "Remotish"
+        }
+      },
+      {
+        "scheme": "remotish-base",
+        "formatting": {
+          "label": "${authority}${path}",
+          "separator": "/",
+          "workspaceSuffix": "Remotish"
+        }
+      }
+    ]
+  },
+  "dependencies": {
+    "@remotish/adapter-fixture": "workspace:*",
+    "@remotish/core": "workspace:*",
+    "@remotish/vscode": "workspace:*",
+    "@remotish/vscode-history": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty false"
+  }
+}
