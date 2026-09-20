@@ -149,13 +149,19 @@ export class RemotishProviderHost implements vscode.Disposable {
     provider.validateRepository(request.repository);
 
     const requestedBranch = request.branch?.trim();
-    const key = preparationKey(provider.id, request.repository, requestedBranch);
+    const key = preparationKey(
+      provider.id,
+      request.repository,
+      requestedBranch,
+      expectedWorkspaceId,
+    );
     let preparation = this.pendingPreparations.get(key);
     if (!preparation) {
       preparation = this.prepareCanonicalRepository(
         provider,
         request.repository,
         requestedBranch,
+        expectedWorkspaceId,
       );
       this.pendingPreparations.set(key, preparation);
     }
@@ -167,16 +173,6 @@ export class RemotishProviderHost implements vscode.Disposable {
       if (this.pendingPreparations.get(key) === preparation) {
         this.pendingPreparations.delete(key);
       }
-    }
-
-    // Restoration identity is caller-specific. A restoration request may safely share the same
-    // adapter/workspace preparation as a normal request without bypassing its expected authority.
-    if (expectedWorkspaceId !== undefined) {
-      await verifyStableWorkspaceId(
-        prepared.providerId,
-        prepared.repositoryId,
-        expectedWorkspaceId,
-      );
     }
 
     // Path is caller-specific and is never part of shared workspace preparation.
@@ -197,6 +193,7 @@ export class RemotishProviderHost implements vscode.Disposable {
     provider: RegisteredProvider,
     repository: Readonly<Record<string, string>>,
     requestedBranch: string | undefined,
+    expectedWorkspaceId: string | undefined,
   ): Promise<PreparedRepository> {
     // Identical descriptors/branches are coalesced before adapter construction. Different
     // descriptors can still resolve to one stable workspace ID, so final mutation/registration is
@@ -204,6 +201,13 @@ export class RemotishProviderHost implements vscode.Disposable {
     const adapter = await provider.createAdapter(repository);
     const candidate = await RemotishWorkspace.open(adapter, this.storage);
     const workspaceId = await createStableWorkspaceId(provider.id, candidate.repositoryInfo.id);
+    if (expectedWorkspaceId !== undefined) {
+      await verifyStableWorkspaceId(
+        provider.id,
+        candidate.repositoryInfo.id,
+        expectedWorkspaceId,
+      );
+    }
 
     const workspace = await this.serializeWorkspace(workspaceId, async () => {
       const existing = this.host.registry.get(workspaceId)?.workspace;
@@ -319,11 +323,12 @@ function preparationKey(
   providerId: string,
   repository: Readonly<Record<string, string>>,
   branch: string | undefined,
+  expectedWorkspaceId: string | undefined,
 ): string {
   const entries = Object.entries(repository).sort(([left], [right]) =>
     left < right ? -1 : left > right ? 1 : 0,
   );
-  return JSON.stringify([providerId, entries, branch ?? '']);
+  return JSON.stringify([providerId, entries, branch ?? '', expectedWorkspaceId ?? '']);
 }
 
 function requireCommand(value: unknown): RemotishRepositoryCommandV1 {
