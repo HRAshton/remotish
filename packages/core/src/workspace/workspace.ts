@@ -296,8 +296,35 @@ export class RemotishWorkspace {
   }
 
   deleteBranch(name: BranchName): Promise<void> {
-    return this.mutateRemote(async () => {
-      await this.branchService.delete(name);
+    return this.mutations.run(async () => {
+      this.requireNoPendingCommitPublication();
+      this.branchService.validateDelete(name);
+
+      // The target branch is clean, so persist its local removal before the irreversible remote
+      // deletion. If persistence fails, no remote mutation has happened and the snapshot is safe
+      // to restore.
+      const snapshot = this.branches.snapshot();
+      this.branches.remove(name);
+      try {
+        await this.saveSnapshot();
+      } catch (error) {
+        this.branches.restore(snapshot);
+        throw error;
+      }
+
+      try {
+        await this.branchService.deleteRemote(name);
+      } catch (error) {
+        this.branches.restore(snapshot);
+        try {
+          await this.saveSnapshot();
+        } catch {
+          // Durable state may temporarily omit a clean branch. The remote still owns it, so it can
+          // be reconstructed on demand without losing local work.
+        }
+        throw error;
+      }
+      this.emitChanged();
     });
   }
 

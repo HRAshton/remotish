@@ -305,6 +305,65 @@ test('workspace branches: deleting an inactive dirty branch preserves its local 
   assert.equal(decoder.decode(await workspace.readFile('README.md')), 'feature local work\n');
 });
 
+test('workspace branches: deletion is durable before the remote branch is removed', async () => {
+  const baseAdapter = new FixtureAdapter();
+  let remoteDeleted = false;
+  const adapter = new Proxy(baseAdapter, {
+    get(target, property, receiver) {
+      if (property === 'deleteBranch') {
+        return async (...args) => {
+          const result = await target.deleteBranch(...args);
+          remoteDeleted = true;
+          return result;
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const durable = new MemoryWorkspaceStorage();
+  let failSaves = false;
+  const storage = {
+    load(repositoryId) {
+      return durable.load(repositoryId);
+    },
+    async save(repositoryId, snapshot) {
+      if (failSaves) {
+        throw new Error('disk full');
+      }
+      if (remoteDeleted) {
+        throw new Error('unexpected persistence after remote deletion');
+      }
+      await durable.save(repositoryId, snapshot);
+    },
+    delete(repositoryId) {
+      return durable.delete(repositoryId);
+    },
+  };
+
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.switchBranch('feature/test');
+  await workspace.switchBranch('main');
+
+  failSaves = true;
+  await assert.rejects(workspace.deleteBranch('feature/test'), /disk full/u);
+  assert.equal(remoteDeleted, false);
+  assert.equal(
+    (await workspace.listBranches()).some((branch) => branch.name === 'feature/test'),
+    true,
+  );
+
+  failSaves = false;
+  await workspace.deleteBranch('feature/test');
+  assert.equal(remoteDeleted, true);
+
+  const restored = await RemotishWorkspace.open(baseAdapter, durable);
+  await assert.rejects(
+    restored.switchBranch('feature/test'),
+    (error) => error instanceof RemotishError && error.code === 'NOT_FOUND',
+  );
+});
+
 test('workspace refresh: clean workspace can advance, dirty workspace stays pinned', async () => {
   const cleanAdapter = new FixtureAdapter();
   const clean = await RemotishWorkspace.open(cleanAdapter);
