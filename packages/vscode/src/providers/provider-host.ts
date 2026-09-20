@@ -160,7 +160,9 @@ export class RemotishProviderHost implements vscode.Disposable {
     // borrow another caller's successful in-flight preparation.
     provider.validateRepository(request.repository);
 
-    const requestedBranch = request.branch?.trim();
+    // Canonical restoration uses core-persisted branch state as the source of truth.
+    // Provider-owned reconstruction data identifies the repository, not mutable state.
+    const requestedBranch = expectedWorkspaceId === undefined ? request.branch?.trim() : undefined;
     const key = preparationKey(
       provider.id,
       request.repository,
@@ -207,25 +209,35 @@ export class RemotishProviderHost implements vscode.Disposable {
     requestedBranch: string | undefined,
     expectedWorkspaceId: string | undefined,
   ): Promise<PreparedRepository> {
-    // Identical descriptors/branches are coalesced before adapter construction. Different
-    // descriptors can still resolve to one stable workspace ID, so final mutation/registration is
-    // additionally serialized by canonical workspace ID below.
+    // Resolve stable identity before opening shared persisted state. Different descriptors may map
+    // to one repository, so the canonical workspace lock must cover open/recovery as well as
+    // branch mutation and registration.
     const adapter = await provider.createAdapter(repository);
-    const candidate = await RemotishWorkspace.open(adapter, this.storage);
-    const workspaceId = await createStableWorkspaceId(provider.id, candidate.repositoryInfo.id);
+    if (typeof adapter.getRepository !== 'function') {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Provider ${provider.displayName} returned an adapter without getRepository().`,
+      );
+    }
+    const repositoryInfo = await adapter.getRepository();
+    const workspaceId = await createStableWorkspaceId(provider.id, repositoryInfo.id);
     if (expectedWorkspaceId !== undefined) {
-      await verifyStableWorkspaceId(provider.id, candidate.repositoryInfo.id, expectedWorkspaceId);
+      await verifyStableWorkspaceId(provider.id, repositoryInfo.id, expectedWorkspaceId);
     }
 
     const workspace = await this.serializeWorkspace(workspaceId, async () => {
       const existing = this.host.registry.get(workspaceId)?.workspace;
       if (existing) {
+        await this.persistRestoreMetadata(workspaceId, provider);
         if (requestedBranch && existing.branch !== requestedBranch) {
           await existing.switchBranch(requestedBranch);
         }
         return existing;
       }
 
+      const candidate = await RemotishWorkspace.open(adapter, this.storage);
+      await verifyStableWorkspaceId(provider.id, candidate.repositoryInfo.id, workspaceId);
+      await this.persistRestoreMetadata(workspaceId, provider);
       if (requestedBranch && candidate.branch !== requestedBranch) {
         await candidate.switchBranch(requestedBranch);
       }
@@ -234,13 +246,6 @@ export class RemotishProviderHost implements vscode.Disposable {
       return candidate;
     });
 
-    await this.context.globalState.update(`${HOST_RESTORE_PREFIX}${workspaceId}`, {
-      version: 1,
-      provider: provider.id,
-      providerDisplayName: provider.displayName,
-      extensionId: provider.extensionId,
-    } satisfies HostRestoreMetadataV1);
-
     return {
       providerId: provider.id,
       workspaceId,
@@ -248,6 +253,18 @@ export class RemotishProviderHost implements vscode.Disposable {
       branch: workspace.branch,
       uri: createWorkingUri(workspaceId).toString(),
     };
+  }
+
+  private async persistRestoreMetadata(
+    workspaceId: string,
+    provider: RegisteredProvider,
+  ): Promise<void> {
+    await this.context.globalState.update(`${HOST_RESTORE_PREFIX}${workspaceId}`, {
+      version: 1,
+      provider: provider.id,
+      providerDisplayName: provider.displayName,
+      extensionId: provider.extensionId,
+    } satisfies HostRestoreMetadataV1);
   }
 
   private async restoreWorkspace(workspaceId: string): Promise<void> {

@@ -282,6 +282,69 @@ test('concurrent identical preparation coalesces adapter work and keeps caller-s
   assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
 });
 
+test('concurrent alias descriptors serialize before opening canonical persisted state', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  let branchReads = 0;
+  vscode.__test.installExtension({
+    id: 'example.fixture-provider',
+    packageJSON: {
+      remotish: {
+        provider: true,
+        apiVersion: 1,
+        id: 'fixture-provider',
+        displayName: 'Fixture Provider',
+      },
+    },
+    async activate() {
+      return {
+        apiVersion: 1,
+        id: 'fixture-provider',
+        displayName: 'Fixture Provider',
+        validateRepository(repository) {
+          assert.match(repository.repository, /^alias-(?:a|b)$/u);
+        },
+        createAdapter() {
+          const target = new FixtureAdapter();
+          return new Proxy(target, {
+            get(current, property, receiver) {
+              if (property === 'getBranches') {
+                return async (...args) => {
+                  branchReads += 1;
+                  await new Promise((resolve) => setTimeout(resolve, 10));
+                  return current.getBranches(...args);
+                };
+              }
+              const value = Reflect.get(current, property, receiver);
+              return typeof value === 'function' ? value.bind(current) : value;
+            },
+          });
+        },
+      };
+    },
+  });
+
+  const context = createContext({ root: '/canonical-aliases' });
+  await activate(context);
+  t.after(() => disposeContext(context));
+
+  const [first, second] = await Promise.all([
+    vscode.commands.executeCommand(
+      REMOTISH_ENSURE_REPOSITORY_COMMAND,
+      request({ repository: { repository: 'alias-a' } }),
+    ),
+    vscode.commands.executeCommand(
+      REMOTISH_ENSURE_REPOSITORY_COMMAND,
+      request({ repository: { repository: 'alias-b' } }),
+    ),
+  ]);
+
+  assert.equal(first.workspaceId, second.workspaceId);
+  assert.equal(branchReads, 1);
+  assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
+});
+
 test('provider-owned descriptor validation is not bypassed by concurrent normalization', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
@@ -306,6 +369,31 @@ test('provider-owned descriptor validation is not bypassed by concurrent normali
   await valid;
 });
 
+test('routing metadata failure does not publish a canonical workspace', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  installFixtureProvider();
+  const globalState = createMemento();
+  const update = globalState.update.bind(globalState);
+  globalState.update = async (key, value) => {
+    if (key.startsWith('remotish.restore.v1.')) {
+      throw new Error('memento unavailable');
+    }
+    await update(key, value);
+  };
+
+  const context = createContext({ globalState, root: '/metadata-failure' });
+  await activate(context);
+  t.after(() => disposeContext(context));
+
+  await assert.rejects(
+    vscode.commands.executeCommand(REMOTISH_ENSURE_REPOSITORY_COMMAND, request()),
+    /memento unavailable/u,
+  );
+  assert.equal(vscode.__test.sourceControls.length, 1, 'only the bundled demo is registered');
+});
+
 test('canonical reload lazily restores provider state and preserves local overlay', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
@@ -324,6 +412,7 @@ test('canonical reload lazily restores provider state and preserves local overla
   records.set(prepared.workspaceId, {
     provider: 'fixture-provider',
     repository: { repository: 'demo' },
+    branch: 'main',
   });
 
   const firstFs = vscode.__test.fileSystemProviders.get('remotish').provider;
@@ -345,6 +434,8 @@ test('canonical reload lazily restores provider state and preserves local overla
   const secondFs = vscode.__test.fileSystemProviders.get('remotish').provider;
   const content = await secondFs.readFile(workingUri(prepared.workspaceId, '/README.md'));
   assert.equal(new TextDecoder().decode(content), 'persisted overlay\n');
+  const branchContent = await secondFs.readFile(workingUri(prepared.workspaceId, '/src/index.ts'));
+  assert.equal(new TextDecoder().decode(branchContent), "export const greeting = 'feature';\n");
   assert.equal(secondActivations.count, 1);
 });
 
