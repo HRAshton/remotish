@@ -44,6 +44,11 @@ test('packaged VSIX smoke includes a separately packaged web provider', async ()
   );
   assert.equal(providerManifest.browser, './dist/extension.js');
   assert.equal(providerManifest.main, undefined);
+  assert.deepEqual(
+    providerManifest.activationEvents,
+    [],
+    'fixture provider must stay packageable without acquiring eager activation events',
+  );
   assert.equal(providerManifest.extensionKind, undefined);
   assert.deepEqual(providerManifest.remotish, {
     provider: true,

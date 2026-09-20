@@ -9,6 +9,7 @@
     "vscode": "^1.138.0"
   },
   "browser": "./dist/extension.js",
+  "activationEvents": [],
   "capabilities": {
     "virtualWorkspaces": true
   },
