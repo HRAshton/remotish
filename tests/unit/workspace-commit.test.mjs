@@ -144,6 +144,84 @@ test('workspace guarded mutations reject if the selected branch or base changed'
   );
 });
 
+test('workspace mutations: persistence failure rolls back local state', async () => {
+  const storage = {
+    async load() {
+      return undefined;
+    },
+    async save() {
+      throw new Error('disk full');
+    },
+    async delete() {},
+  };
+  const workspace = await RemotishWorkspace.open(new FixtureAdapter(), storage);
+  const before = await workspace.readFile('README.md');
+  const events = [];
+  workspace.onDidChange((event) => events.push(event));
+
+  await assert.rejects(
+    workspace.writeFile('README.md', encoder.encode('changed'), {
+      create: false,
+      overwrite: true,
+    }),
+    /disk full/u,
+  );
+
+  assert.deepEqual(await workspace.readFile('README.md'), before);
+  assert.equal(workspace.hasChanges, false);
+  assert.deepEqual(events, []);
+});
+
+test('workspace amend: persistence failure after publication does not report failure', async () => {
+  const adapter = new FixtureAdapter();
+  const storage = {
+    async load() {
+      return undefined;
+    },
+    async save() {
+      throw new Error('disk full');
+    },
+    async delete() {},
+  };
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  const events = [];
+  workspace.onDidChange((event) => events.push(event));
+
+  const result = await workspace.amendAndPushForceWithLease(
+    'Published despite persistence failure',
+  );
+  assert.equal(result.status, 'success');
+  if (result.status !== 'success') {
+    return;
+  }
+
+  assert.equal(adapter.getBranchHead('main'), result.revision);
+  assert.equal(workspace.baseRevision, result.revision);
+  assert.deepEqual(events, [{ branch: 'main', baseRevision: result.revision }]);
+});
+
+test('workspace branches: persistence failure after creation does not report failure', async () => {
+  const adapter = new FixtureAdapter();
+  const storage = {
+    async load() {
+      return undefined;
+    },
+    async save() {
+      throw new Error('disk full');
+    },
+    async delete() {},
+  };
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+
+  const created = await workspace.createBranch('feature/persistence-failure');
+
+  assert.equal(workspace.branch, created.name);
+  assert.equal(
+    (await workspace.listBranches()).some((branch) => branch.name === created.name),
+    true,
+  );
+});
+
 test('workspace branches: create and delete are remote operations owned by core', async () => {
   const adapter = new FixtureAdapter();
   const workspace = await RemotishWorkspace.open(adapter);

@@ -168,7 +168,7 @@ export class RemotishWorkspace {
   }
 
   commitAndPush(message: string, selectedPaths?: readonly RepoPath[]): Promise<CommitResult> {
-    return this.mutateWithResult(() =>
+    return this.mutateCommit(() =>
       this.commitService.commitAndPush(this.branch, this.branches.current, message, selectedPaths),
     );
   }
@@ -179,7 +179,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateWithResult(() => {
+    return this.mutateCommit(() => {
       this.requireExpectedState(expectedState);
       return this.commitService.commitAndPushForceWithLease(
         this.branch,
@@ -196,7 +196,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateWithResult(() => {
+    return this.mutateCommit(() => {
       this.requireExpectedState(expectedState);
       return this.commitService.amendAndPushForceWithLease(
         this.branch,
@@ -229,13 +229,12 @@ export class RemotishWorkspace {
   }
 
   refreshRemoteHead(): Promise<RemoteHeadRefreshResult> {
-    return this.mutations.run(async () => {
-      const result = await this.branchService.refresh();
-      if (result.status === 'updated') {
-        await this.changed();
-      }
-      return result;
-    });
+    return this.mutations.run(() =>
+      this.runLocalMutation(
+        () => this.branchService.refresh(),
+        (result) => result.status === 'updated',
+      ),
+    );
   }
 
   createBranch(
@@ -243,14 +242,14 @@ export class RemotishWorkspace {
     switchTo = true,
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<Branch> {
-    return this.mutateWithResult(() => {
+    return this.mutateRemoteWithResult(() => {
       this.requireExpectedState(expectedState);
       return this.branchService.create(name, switchTo);
     });
   }
 
   deleteBranch(name: BranchName): Promise<void> {
-    return this.mutate(async () => {
+    return this.mutateRemote(async () => {
       await this.branchService.delete(name);
     });
   }
@@ -280,22 +279,66 @@ export class RemotishWorkspace {
   }
 
   private mutate(operation: () => Promise<void>): Promise<void> {
-    return this.mutations.run(async () => {
-      await operation();
-      await this.changed();
-    });
+    return this.mutations.run(() => this.runLocalMutation(operation));
   }
 
-  private mutateWithResult<T>(operation: () => Promise<T>): Promise<T> {
+  private mutateCommit(operation: () => Promise<CommitResult>): Promise<CommitResult> {
     return this.mutations.run(async () => {
       const result = await operation();
-      await this.changed();
+      if (result.status === 'success') {
+        await this.changedAfterRemoteSuccess();
+      }
       return result;
     });
   }
 
+  private mutateRemote(operation: () => Promise<void>): Promise<void> {
+    return this.mutations.run(async () => {
+      await operation();
+      await this.changedAfterRemoteSuccess();
+    });
+  }
+
+  private mutateRemoteWithResult<T>(operation: () => Promise<T>): Promise<T> {
+    return this.mutations.run(async () => {
+      const result = await operation();
+      await this.changedAfterRemoteSuccess();
+      return result;
+    });
+  }
+
+  private async runLocalMutation<T>(
+    operation: () => Promise<T>,
+    didChange: (result: T) => boolean = () => true,
+  ): Promise<T> {
+    const snapshot = this.branches.snapshot();
+    try {
+      const result = await operation();
+      if (didChange(result)) {
+        await this.changed();
+      }
+      return result;
+    } catch (error) {
+      this.branches.restore(snapshot);
+      throw error;
+    }
+  }
+
   private async changed(): Promise<void> {
     await this.saveSnapshot();
+    this.emitChanged();
+  }
+
+  private async changedAfterRemoteSuccess(): Promise<void> {
+    try {
+      await this.saveSnapshot();
+    } catch {
+      // The remote mutation is already published and cannot be rolled back safely.
+    }
+    this.emitChanged();
+  }
+
+  private emitChanged(): void {
     this.events.emit({ branch: this.branch, baseRevision: this.baseRevision });
   }
 

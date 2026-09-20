@@ -96,6 +96,17 @@ export class BranchWorkspaces {
     return { version: 1, selectedBranch: this._selectedBranch, branches };
   }
 
+  restore(snapshot: WorkspaceSnapshot): void {
+    this.workspaces.clear();
+    for (const [branch, branchSnapshot] of Object.entries(snapshot.branches)) {
+      this.workspaces.set(
+        branch,
+        this.createWorkspace(branch, branchSnapshot.baseRevision, branchSnapshot.overlay),
+      );
+    }
+    this._selectedBranch = snapshot.selectedBranch;
+  }
+
   private async ensureWorkspace(branch: BranchName): Promise<void> {
     if (this.workspaces.has(branch)) {
       return;
