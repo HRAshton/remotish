@@ -94,7 +94,10 @@ test('context-only SCM commands are hidden from the Command Palette', () => {
     'remotish.unstageAll',
     'remotish.revert',
     'remotish.revertAll',
+    'remotish.ensureRepository',
+    'remotish.openRepository',
   ]) {
     assert.equal(hidden.get(command), 'false', `${command} should be context-only`);
   }
+  assert.equal(hidden.has('remotish.refreshProviders'), false);
 });

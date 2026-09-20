@@ -195,6 +195,14 @@
         {
           "command": "remotish.revertAll",
           "when": "false"
+        },
+        {
+          "command": "remotish.ensureRepository",
+          "when": "false"
+        },
+        {
+          "command": "remotish.openRepository",
+          "when": "false"
         }
       ]
     },
