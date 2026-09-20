@@ -112,6 +112,38 @@ test('workspace amend: can rewrite only the commit message without working chang
   assert.equal(workspace.hasChanges, false);
 });
 
+test('workspace guarded mutations reject if the selected branch or base changed', async () => {
+  const adapter = new FixtureAdapter();
+  const workspace = await RemotishWorkspace.open(adapter);
+  const expectedState = { branch: workspace.branch, baseRevision: workspace.baseRevision };
+
+  await workspace.switchBranch('feature/test');
+
+  await assert.rejects(
+    workspace.amendAndPushForceWithLease('Do not rewrite feature', undefined, expectedState),
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+  await assert.rejects(
+    workspace.commitAndPushForceWithLease(
+      'Do not force feature',
+      'F2',
+      undefined,
+      expectedState,
+    ),
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+  await assert.rejects(
+    workspace.createBranch('feature/raced', true, expectedState),
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+
+  assert.equal(adapter.getBranchHead('feature/test'), 'F2');
+  assert.equal(
+    (await workspace.listBranches()).some((branch) => branch.name === 'feature/raced'),
+    false,
+  );
+});
+
 test('workspace branches: create and delete are remote operations owned by core', async () => {
   const adapter = new FixtureAdapter();
   const workspace = await RemotishWorkspace.open(adapter);

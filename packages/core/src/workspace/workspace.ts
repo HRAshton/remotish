@@ -177,30 +177,34 @@ export class RemotishWorkspace {
     message: string,
     expectedRevision: RevisionId,
     selectedPaths?: readonly RepoPath[],
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateWithResult(() =>
-      this.commitService.commitAndPushForceWithLease(
+    return this.mutateWithResult(() => {
+      this.requireExpectedState(expectedState);
+      return this.commitService.commitAndPushForceWithLease(
         this.branch,
         this.branches.current,
         message,
         expectedRevision,
         selectedPaths,
-      ),
-    );
+      );
+    });
   }
 
   amendAndPushForceWithLease(
     message: string,
     selectedPaths?: readonly RepoPath[],
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateWithResult(() =>
-      this.commitService.amendAndPushForceWithLease(
+    return this.mutateWithResult(() => {
+      this.requireExpectedState(expectedState);
+      return this.commitService.amendAndPushForceWithLease(
         this.branch,
         this.branches.current,
         message,
         selectedPaths,
-      ),
-    );
+      );
+    });
   }
 
   switchBranch(branch: BranchName): Promise<void> {
@@ -234,8 +238,15 @@ export class RemotishWorkspace {
     });
   }
 
-  createBranch(name: BranchName, switchTo = true): Promise<Branch> {
-    return this.mutateWithResult(() => this.branchService.create(name, switchTo));
+  createBranch(
+    name: BranchName,
+    switchTo = true,
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
+  ): Promise<Branch> {
+    return this.mutateWithResult(() => {
+      this.requireExpectedState(expectedState);
+      return this.branchService.create(name, switchTo);
+    });
   }
 
   deleteBranch(name: BranchName): Promise<void> {
@@ -251,6 +262,20 @@ export class RemotishWorkspace {
   private requireWritable(): void {
     if (!this.capabilities.commits) {
       throw new RemotishError('FORBIDDEN', 'This repository is read-only.');
+    }
+  }
+
+  private requireExpectedState(
+    expectedState: Readonly<{ branch: BranchName; baseRevision: RevisionId }> | undefined,
+  ): void {
+    if (!expectedState) {
+      return;
+    }
+    if (this.branch !== expectedState.branch || this.baseRevision !== expectedState.baseRevision) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Workspace changed from ${expectedState.branch}@${expectedState.baseRevision} to ${this.branch}@${this.baseRevision}. Retry the operation.`,
+      );
     }
   }
 

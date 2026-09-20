@@ -62,9 +62,11 @@ async function commitAndPushForceWithLease(
   const { workspace, input, stagedPaths } = requireScm(registry, scm, workspaceId);
   requireStagedChanges(stagedPaths);
   const message = requireMessage(input.value);
-  const expectedRevision = await currentRemoteRevision(workspace);
+  const expectedBranch = workspace.branch;
+  const expectedBaseRevision = workspace.baseRevision;
+  const expectedRevision = await currentRemoteRevision(workspace, expectedBranch);
   const confirmed = await vscode.window.showWarningMessage(
-    `Force push ${workspace.branch} with lease?`,
+    `Force push ${expectedBranch} with lease?`,
     {
       modal: true,
       detail: `The branch will be replaced only if its remote head is still ${expectedRevision}.`,
@@ -75,7 +77,10 @@ async function commitAndPushForceWithLease(
     return;
   }
   handleCommitResult(
-    await workspace.commitAndPushForceWithLease(message, expectedRevision, stagedPaths),
+    await workspace.commitAndPushForceWithLease(message, expectedRevision, stagedPaths, {
+      branch: expectedBranch,
+      baseRevision: expectedBaseRevision,
+    }),
     input,
   );
 }
@@ -86,19 +91,28 @@ async function amendAndPushForceWithLease(
   workspaceId: string,
 ): Promise<void> {
   const { workspace, input, stagedPaths } = requireScm(registry, scm, workspaceId);
-  const message = input.value.trim() || (await baseCommitMessage(workspace));
+  const expectedBranch = workspace.branch;
+  const expectedBaseRevision = workspace.baseRevision;
+  const message =
+    input.value.trim() || (await baseCommitMessage(workspace, expectedBaseRevision));
   const confirmed = await vscode.window.showWarningMessage(
-    `Amend ${workspace.branch} and force push with lease?`,
+    `Amend ${expectedBranch} and force push with lease?`,
     {
       modal: true,
-      detail: `This rewrites remote commit ${workspace.baseRevision} only if the branch still points to it.`,
+      detail: `This rewrites remote commit ${expectedBaseRevision} only if the branch still points to it.`,
     },
     'Amend & Push',
   );
   if (confirmed !== 'Amend & Push') {
     return;
   }
-  handleCommitResult(await workspace.amendAndPushForceWithLease(message, stagedPaths), input);
+  handleCommitResult(
+    await workspace.amendAndPushForceWithLease(message, stagedPaths, {
+      branch: expectedBranch,
+      baseRevision: expectedBaseRevision,
+    }),
+    input,
+  );
 }
 
 function requireScm(registry: WorkspaceRegistry, scm: ScmManager, workspaceId: string) {
@@ -127,13 +141,13 @@ function requireMessage(value: string): string {
 
 async function baseCommitMessage(
   workspace: ReturnType<WorkspaceRegistry['require']>['workspace'],
+  revision: string,
 ): Promise<string> {
-  const page = await workspace.getCommits({ revision: workspace.baseRevision, limit: 1 });
+  const page = await workspace.getCommits({ revision, limit: 1 });
   const commit =
-    page.commits.find((candidate) => candidate.revision === workspace.baseRevision) ??
-    page.commits[0];
+    page.commits.find((candidate) => candidate.revision === revision) ?? page.commits[0];
   if (!commit) {
-    throw new RemotishError('NOT_FOUND', `Commit ${workspace.baseRevision} could not be loaded.`);
+    throw new RemotishError('NOT_FOUND', `Commit ${revision} could not be loaded.`);
   }
   return commit.message;
 }
