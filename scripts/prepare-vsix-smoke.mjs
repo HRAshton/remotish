@@ -9,8 +9,8 @@ const extensionRoot = resolve(smokeRoot, 'extension');
 const providerArchiveRoot = resolve(smokeRoot, 'provider-archive');
 const providersRoot = resolve(smokeRoot, 'providers');
 const providerRoot = resolve(providersRoot, 'remotish-fixture-provider');
-const testBundle = resolve('apps/demo-web/dist/test/suite/index.js');
-const packagedTestBundle = resolve(extensionRoot, 'dist/test/suite/index.js');
+const testBundle = resolve('apps/demo-web/dist/test/suite/vsix.js');
+const packagedTestBundle = resolve(extensionRoot, 'dist/test/suite/vsix.js');
 
 rmSync(smokeRoot, { recursive: true, force: true });
 mkdirSync(smokeRoot, { recursive: true });
