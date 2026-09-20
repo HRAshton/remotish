@@ -124,12 +124,7 @@ test('workspace guarded mutations reject if the selected branch or base changed'
     (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
   );
   await assert.rejects(
-    workspace.commitAndPushForceWithLease(
-      'Do not force feature',
-      'F2',
-      undefined,
-      expectedState,
-    ),
+    workspace.commitAndPushForceWithLease('Do not force feature', 'F2', undefined, expectedState),
     (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
   );
   await assert.rejects(

@@ -93,8 +93,7 @@ async function amendAndPushForceWithLease(
   const { workspace, input, stagedPaths } = requireScm(registry, scm, workspaceId);
   const expectedBranch = workspace.branch;
   const expectedBaseRevision = workspace.baseRevision;
-  const message =
-    input.value.trim() || (await baseCommitMessage(workspace, expectedBaseRevision));
+  const message = input.value.trim() || (await baseCommitMessage(workspace, expectedBaseRevision));
   const confirmed = await vscode.window.showWarningMessage(
     `Amend ${expectedBranch} and force push with lease?`,
     {
