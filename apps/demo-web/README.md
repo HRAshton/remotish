@@ -1,32 +1,28 @@
 # Remotish Web Host Extension
 
-Installable browser-safe Remotish host extension with a fixture-powered demo workspace.
+Browser-safe Remotish host extension plus the fixture-powered smoke-test workspace.
 
-The packaged extension ID is `hrashton.remotish`. Activation returns the versioned provider API documented in [`docs/provider-extensions.md`](../../docs/provider-extensions.md), while the built-in fixture command keeps the browser/VSIX smoke-test composition available.
+The host discovers independently installed provider extensions from manifest metadata without activating them at startup. Providers consume only `@remotish/adapter-sdk`; provider → host bootstrap operations use the versioned `remotish.ensureRepository` and `remotish.openRepository` commands.
+
+The bundled fixture remains available for local and packaged VS Code Web smoke tests:
 
 ```text
-external provider wrapper ──registerProvider()──┐
-                                                ↓
-FixtureAdapter ────────────────────────→ Remotish host API
-                                                ↓
-                                       RemotishWorkspace
-                                                ↓
-                                       RemotishVsCodeHost
-                                                ↓
-                                       RemotishHistoryHost
+FixtureAdapter
+      ↓
+RemotishWorkspace
+      ↓
+RemotishProviderHost / RemotishVsCodeHost
+      ↓
+filesystem + SCM + history
 ```
 
-Run it from the repository root:
+Run from the repository root:
 
 ```sh
 corepack pnpm install --frozen-lockfile
 corepack pnpm vscode:web
 ```
 
-The demo workspace root remains `remotish://fixture-demo/`.
+The fixture workspace root is `remotish://fixture-demo/`. Production providers are discovered lazily and are not required to import `@remotish/vscode` or `@remotish/core`.
 
-`package.json` is the reference extension manifest for command/menu contributions, `resourceLabelFormatters`, virtual-workspace support and the proposal flags required by the controlled Code-OSS host.
-
-The production bundle is browser/WebWorker-oriented. CI tests both the source extension and the unpacked exact VSIX artifact through `@vscode/test-web`.
-
-See [Getting started](https://github.com/HRAshton/remotish/blob/main/docs/getting-started.md), [Provider extensions](../../docs/provider-extensions.md), and [VS Code integration](https://github.com/HRAshton/remotish/blob/main/docs/vscode-integration.md).
+See [Provider extensions](../../docs/provider-extensions.md), [Getting started](../../docs/getting-started.md), and [VS Code integration](../../docs/vscode-integration.md).

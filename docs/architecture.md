@@ -35,9 +35,9 @@ Dependency Cruiser enforces package-layer and circular-dependency rules. Knip ch
 
 ### `@remotish/adapter-sdk`
 
-Owns the public compatibility boundary: repository metadata, immutable file/tree reads, branches, history, commit-and-publish requests/results, capabilities, path normalization and structured adapter errors.
+Owns the public compatibility boundary: repository metadata, immutable file/tree reads, branches, history, commit-and-publish requests/results, capabilities, path normalization, structured adapter errors, and the versioned provider/request contract used by independently installed provider extensions.
 
-It has no VS Code dependency and no transport opinion.
+It has no VS Code or core dependency and no transport opinion.
 
 ### `@remotish/core`
 
@@ -63,7 +63,10 @@ Maps core behavior to stable/native editor primitives:
 - diff/quick-diff integration;
 - staging selection and revert commands;
 - branch controls and refresh;
-- VS Code-backed workspace storage implementations.
+- VS Code-backed workspace storage implementations;
+- manifest-only provider discovery and lazy provider activation;
+- versioned provider-to-host repository commands;
+- canonical workspace restoration and stable provider/repository identity verification.
 
 ### `@remotish/vscode-history`
 

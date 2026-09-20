@@ -1,154 +1,293 @@
 # Provider extensions
 
-The installable host extension is `hrashton.remotish`. Provider wrappers consume only the supported `@remotish/vscode/provider-api` surface; adapter libraries continue to depend only on `@remotish/adapter-sdk`.
+Remotish can discover independently installed repository providers without requiring the provider extension to import `@remotish/core` or `@remotish/vscode`.
 
-## Host API compatibility
+The supported public dependency for provider authors is `@remotish/adapter-sdk`.
 
-Provider API V1 is compatible only with host API version `1`. Adding optional members with unchanged semantics may remain V1; removing members, changing required arguments, or changing existing semantics requires a new API version.
-
-Provider wrappers must check the activation result before registration:
-
-```ts
-const extension = vscode.extensions.getExtension<RemotishExtensionApiV1>('hrashton.remotish');
-if (!extension) throw new Error('Remotish host extension is not installed.');
-const api = await extension.activate();
-if (api.version !== 1) throw new Error(`Unsupported Remotish host API version: ${api.version}`);
+```text
+provider adapter ────────┐
+                         ▼
+                 @remotish/adapter-sdk
+                         ▲
+                         │
+provider extension ──────┘
+        │
+        │ discovered and lazily activated by
+        ▼
+   Remotish host
+        │
+        ├── @remotish/core
+        └── @remotish/vscode
 ```
 
-## Registration
+A provider extension may use VS Code APIs internally for authentication, configuration, bootstrap URI handling, or repository selection. Those implementation details do not enter the SDK contract.
 
-A restoration-capable provider declares both the host dependency and activation for its own bootstrap scheme plus canonical Remotish reloads:
+## Provider contract
+
+`@remotish/adapter-sdk` exports `RemotishAdapterProviderV1` alongside `RemotishAdapter`:
+
+```ts
+import type {
+  RemotishAdapterProviderV1,
+  RemotishRepositoryRequest,
+} from '@remotish/adapter-sdk';
+
+export async function activate(
+  context: vscode.ExtensionContext,
+): Promise<RemotishAdapterProviderV1> {
+  const auth = createProviderAuthentication(context);
+
+  return {
+    apiVersion: 1,
+    id: 'bitbucket-cloud',
+    displayName: 'Bitbucket Cloud',
+
+    validateRepository(repository) {
+      const keys = Object.keys(repository).sort();
+      if (keys.join(',') !== 'repository,workspace') {
+        throw new Error('Expected workspace and repository only.');
+      }
+    },
+
+    createAdapter(repository) {
+      return new BitbucketAdapter({
+        workspace: repository.workspace,
+        repository: repository.repository,
+        authProvider: auth,
+      });
+    },
+
+    async restoreWorkspace(workspaceId): Promise<RemotishRepositoryRequest | undefined> {
+      return loadProviderOwnedRecord(context, workspaceId);
+    },
+  };
+}
+```
+
+The provider interface contains repository semantics only. It does not mention `vscode`, `ExtensionContext`, `RemotishWorkspace`, Remotish filesystem URIs, SCM, commands, or UI.
+
+Provider IDs are normalized to lower case and must remain stable across releases. The provider ID describes repository semantics; the VS Code extension ID identifies the installed implementation. Remotish keeps these identities separate and persists both when it needs routing information for restoration.
+
+## Declarative discovery marker
+
+A provider declares a small marker in its extension manifest:
 
 ```json
 {
-  "extensionDependencies": ["hrashton.remotish"],
-  "browser": "./dist/extension.js",
-  "activationEvents": [
-    "onFileSystem:remotish-example",
-    "onFileSystem:remotish"
-  ],
-  "capabilities": {
-    "virtualWorkspaces": true
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "bitbucket-cloud",
+    "displayName": "Bitbucket Cloud"
   }
 }
 ```
 
-Registration supplies the provider extension id, provider-specific descriptor validation, and adapter construction:
+Remotish reads this marker through `vscode.extensions.all`. Discovery does not call `activate()` and therefore does not trigger authentication.
+
+The marker is routing metadata, not a trust boundary. Adapter construction still requires validation of the extension activation result and provider-specific repository validation. Do not place credentials, network origins, executable paths, Git remotes, or other privileged configuration in discovery metadata.
+
+Two installed extensions may not claim the same provider ID. Remotish rejects the ambiguity instead of choosing based on extension enumeration or installation order.
+
+## Lazy activation
+
+Providers are activated only when they are needed, for example when:
+
+- a bootstrap request opens a repository for that provider;
+- a canonical workspace is restored after reload;
+- a future provider-specific picker needs runtime provider capabilities.
+
+After activation, Remotish validates:
+
+- `apiVersion`;
+- provider `id`;
+- `displayName`;
+- `validateRepository()`;
+- `createAdapter()`;
+- optional `restoreWorkspace()`.
+
+The activation result must use the same provider ID as the discovery marker. Unsupported API versions and malformed exports fail before repository access.
+
+## Provider-to-host commands
+
+Provider extensions do not need a Remotish TypeScript host API. Provider-to-Remotish operations use stable, versioned VS Code commands from the SDK:
 
 ```ts
-const registration = api.registerProvider({
-  id: 'example',
-  displayName: 'Example Repository',
-  extensionId: 'example.remotish-provider',
-  validateRepository(repository) {
-    const keys = Object.keys(repository).sort();
-    if (keys.join(',') !== 'organization,repository') {
-      throw new Error('Expected organization and repository only.');
-    }
-  },
-  createAdapter(repository) {
-    return new MyAdapter({
-      organization: repository.organization,
-      repository: repository.repository,
-    });
-  },
-});
-```
+import {
+  REMOTISH_ENSURE_REPOSITORY_COMMAND,
+  REMOTISH_OPEN_REPOSITORY_COMMAND,
+  REMOTISH_REPOSITORY_COMMAND_VERSION,
+} from '@remotish/adapter-sdk';
 
-Disposing this registration prevents new preparation/restoration through that provider. Existing registered workspaces remain alive for the current host session.
-
-## Prepare before navigating
-
-`ensureRepository()` prepares a workspace without calling `vscode.openFolder`. This separation is required so the provider can persist non-secret reconstruction data before navigation tears down the current workbench/extension-host context.
-
-```ts
-const result = await api.ensureRepository({
-  provider: 'example',
+const request = {
+  version: REMOTISH_REPOSITORY_COMMAND_VERSION,
+  provider: 'bitbucket-cloud',
   repository: {
-    organization: 'acme',
+    workspace: 'acme',
     repository: 'backend',
   },
   branch: 'feature/payments',
-});
+};
 
-await context.globalState.update(`workspace.${result.workspaceId}`, {
-  version: 1,
-  workspaceId: result.workspaceId,
-  provider: 'example',
-  repository: {
-    organization: 'acme',
-    repository: 'backend',
-  },
-  lastBranch: result.branch,
-});
-
-await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(result.uri), false);
+const prepared = await vscode.commands.executeCommand(
+  REMOTISH_ENSURE_REPOSITORY_COMMAND,
+  request,
+);
 ```
 
-`openRepository()` is a convenience operation implemented on top of `ensureRepository()`. Provider bootstrap flows should prefer the explicit sequence above when they need to persist reconstruction state.
+`remotish.ensureRepository` creates or restores the canonical workspace and returns its URI without navigating. This allows the provider to persist its own reconstruction record before `vscode.openFolder` tears down the current workbench context.
 
-Repeated or concurrent preparation of the same provider descriptor and branch is safe. Existing registrations are reused. An explicit branch overrides the selected branch; when no branch is supplied, an already selected or persisted branch is preserved.
+`remotish.openRepository` performs the same preparation and then opens the canonical repository root. The command always opens the root; a request `path` is returned separately as `resourceUri`.
 
-## Canonical URI and path semantics
+The V1 result shape is:
 
-`result.uri` is always the canonical repository root:
+```ts
+{
+  version: 1,
+  workspaceId: string,
+  repositoryId: string,
+  branch: string,
+  uri: string,
+  resourceUri?: string,
+}
+```
+
+Unknown command versions and unknown fields are rejected.
+
+## Provider-owned restoration data
+
+The provider owns non-secret information needed to reconstruct one repository. A provider might persist:
+
+```ts
+{
+  version: 1,
+  workspaceId: 'bitbucket-cloud-...',
+  provider: 'bitbucket-cloud',
+  repository: {
+    workspace: 'acme',
+    repository: 'backend',
+  },
+  lastBranch: 'feature/payments',
+}
+```
+
+Remotish does not persist that descriptor. The host persists only generic routing metadata needed to locate the responsible provider extension after restart.
+
+Authentication also remains provider-owned. Provider discovery must not open login UI. Authentication is acquired when repository access or restoration actually requires it.
+
+## Canonical restoration
+
+A canonical reload is provider-driven rather than relying on activation side effects:
+
+```text
+filesystem requests remotish://<workspace-id>/...
+        ↓
+Remotish has no active workspace with that id
+        ↓
+load generic workspace → provider routing metadata
+        ↓
+find marked provider extension
+        ↓
+lazily activate provider extension
+        ↓
+provider.restoreWorkspace(workspaceId)
+        ↓
+provider-owned repository descriptor
+        ↓
+provider.createAdapter(descriptor)
+        ↓
+RemotishWorkspace.open()
+        ↓
+recompute and verify stable workspace identity
+        ↓
+register workspace
+        ↓
+original filesystem request continues
+```
+
+If authentication fails or is cancelled, the restoration attempt fails but persisted Remotish overlay state is not deleted. A later filesystem request can retry restoration.
+
+If the provider extension is missing, Remotish reports that the provider is not installed or enabled. Installing the provider and retrying can restore the same workspace because local overlay state is retained independently.
+
+## Stable workspace identity
+
+Workspace identity remains branch-independent:
+
+```text
+lowercase(provider id) + NUL + stable adapter RepositoryInfo.id
+        ↓
+SHA-256
+        ↓
+<provider>-<first 32 lowercase hex characters>
+```
+
+Restoration always recomputes this value from the recreated adapter. If it differs from the requested canonical workspace authority, restoration fails before registration.
+
+Branch selection follows:
+
+```text
+explicit branch request
+        ↓
+persisted selected branch
+        ↓
+repository default branch
+```
+
+Each branch retains its own overlay state.
+
+## Static web bootstrap
+
+A provider may own a temporary bootstrap URI such as:
+
+```text
+remotish-bitbucket://open/?version=1&workspace=acme&repository=backend&branch=main
+```
+
+Its bootstrap extension parses and validates that provider-specific URI, authenticates when necessary, then invokes `remotish.ensureRepository`. After it persists its reconstruction record it invokes `remotish.openRepository` or opens the returned canonical root.
+
+The browser then operates on:
 
 ```text
 remotish://<stable-workspace-id>/
 ```
 
-Provider, repository, branch, credentials, and bootstrap data never remain in that URI. Branch is workspace state and is not part of the authority.
+Provider bootstrap data, credentials, and branch names are not embedded in the canonical authority.
 
-`request.path` is a non-secret resource hint only. It is returned as `result.resourceUri`; it is never passed as the workspace-folder root. Providers may persist/reveal that resource after navigation.
+A browser/static provider must use a `browser` extension entry point and support virtual workspaces. Repository-semantic code should remain browser-safe and must not depend on Node filesystem/process APIs, native modules, or the Git CLI.
 
-The workspace-ID algorithm is persisted format v1:
+## Refresh and dynamic installation
 
-```text
-lowercase(provider) + NUL + stable repository ID
-→ SHA-256
-→ <provider>-<first 32 lowercase hex characters>
-```
+`remotish.refreshProviders` forces a manifest rescan. Canonical restoration also rescans once when its persisted provider is not currently known, allowing a provider installed during the session to be used on retry.
 
-Compatible releases must preserve this format. Restoration supplies the persisted `workspaceId` as `expectedWorkspaceId`; if the recreated adapter reports a repository ID that hashes to a different authority, preparation fails before registration.
+Discovery caches only extension-host-lifetime metadata and activated provider instances. Provider objects are never serialized.
 
-## Static bootstrap and reload
+## Programmatic registration
 
-A provider owns a temporary bootstrap scheme such as:
+`@remotish/vscode` retains an internal `RemotishProviderHost.registerProvider()` path for tests, embedded products, and custom Code-OSS distributions. It is not the standard contract for independently installed provider extensions and `@remotish/vscode` is not a public provider-author dependency.
 
-```text
-remotish-example://open/?version=1&organization=acme&repository=backend&branch=main
-```
+## Provider descriptor security
 
-Serialized bootstrap requests must carry `version: 1`. Unknown versions fail explicitly. Bootstrap URLs contain repository selection only: no tokens, passwords, cookies, Authorization values, client secrets, publisher credentials, service origins, or arbitrary Git remotes.
-
-The canonical static flow is:
+Every provider validates its own descriptor before adapter creation. For a Bitbucket provider, a typical allowlist would be only:
 
 ```text
-provider bootstrap activation
-→ authenticate
-→ register provider
-→ ensureRepository()
-→ persist provider-owned descriptor
-→ open returned remotish:// URI
+workspace
+repository
 ```
 
-On reload of `remotish://<id>/`, both host and provider activate through the filesystem scheme. The host persists only generic `workspaceId → provider extension id` activation metadata; the provider owns the actual repository descriptor. The filesystem waits for restoration for a bounded period rather than immediately failing an unknown authority.
+Unknown provider-specific fields should be rejected. The generic host additionally rejects common secret-looking descriptor keys such as `token`, `password`, `authorization`, `client_secret`, and `private_key`.
 
-The provider activation path reads its persisted descriptor for the current canonical workspace, authenticates, registers itself, and calls:
+Descriptors are routed strictly by provider ID. One provider is never asked to interpret another provider's reconstruction record.
 
-```ts
-await api.ensureRepository({
-  ...persistedRequest,
-  expectedWorkspaceId: persisted.workspaceId,
-});
-```
+## Standard provider workflow
 
-A delayed registration unblocks only that workspace's pending filesystem requests. Timeouts/cancellation fail visibly, and a failed attempt does not poison later retries. Authentication failure or cancellation must not delete persisted Remotish overlay data.
+For an independently installable provider:
 
-Authentication is always reacquired normally. Knowledge of a workspace ID is never authorization.
+1. Depend on `@remotish/adapter-sdk`.
+2. Implement `RemotishAdapter`.
+3. Return `RemotishAdapterProviderV1` from the VS Code extension's `activate()`.
+4. Add the versioned Remotish discovery marker to the VSIX manifest.
+5. Keep repository reconstruction and authentication provider-owned.
+6. Use the versioned Remotish commands for bootstrap provider → host operations.
+7. Let Remotish own workspace construction, canonical identity, navigation, filesystem, SCM, branches, and history.
 
-## Provider bootstrap security
-
-Provider validation is responsible for allowed/required descriptor keys, maximum lengths, character constraints, and unknown keys. Untrusted bootstrap data may select repository identity only. API/auth/publisher origins and deployment allowlists belong to trusted extension configuration.
-
-Provider wrappers for static Code-OSS must be browser extensions and must not depend on Node filesystem/process/network modules, native modules, or Git CLI wrappers. Static deployments must support preinstalling the host and provider VSIX files without Marketplace access.
+The adapter package remains separately reusable without VS Code.
