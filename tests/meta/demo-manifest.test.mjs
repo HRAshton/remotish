@@ -9,6 +9,13 @@ const manifest = JSON.parse(
   await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
 );
 
+test('host manifest has the canonical extension identity', () => {
+  assert.equal(manifest.publisher, 'hrashton');
+  assert.equal(manifest.name, 'remotish');
+  assert.equal(manifest.browser, './dist/extension.js');
+  assert.equal(manifest.capabilities?.virtualWorkspaces, true);
+});
+
 test('demo manifest is WebWorker-compatible and uses automatic command activation', () => {
   assert.equal(Object.hasOwn(manifest, 'type'), false);
   assert.equal(

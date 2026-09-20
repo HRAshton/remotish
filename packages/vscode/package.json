@@ -11,6 +11,10 @@
     "./model": {
       "types": "./dist/model.d.ts",
       "default": "./dist/model.js"
+    },
+    "./provider-api": {
+      "types": "./dist/provider-api.d.ts",
+      "default": "./dist/provider-api.js"
     }
   },
   "files": [

@@ -17,6 +17,7 @@ If your backend is conventional HTTP, also inspect [`@remotish/adapter-http`](..
 ## VS Code / Code-OSS integrators
 
 - [VS Code integration](vscode-integration.md) - compose `RemotishWorkspace`, `RemotishVsCodeHost`, persistence and optional history.
+- [Provider extensions](provider-extensions.md) - register independently distributed adapters through the installed host API.
 - [Code-OSS integration](code-oss-integration.md) - stable vs proposed APIs, host-version constraints and Workspace Trust.
 - [Architecture](architecture.md) - package boundaries and runtime ownership.
 - [Troubleshooting](troubleshooting.md) - common integration and adapter failures.
@@ -34,6 +35,6 @@ If your backend is conventional HTTP, also inspect [`@remotish/adapter-http`](..
 | [`@remotish/adapter-fixture`](../packages/adapter-fixture/README.md) | Deterministic behavioral reference used by tests and the demo |
 | [`@remotish/adapter-http`](../adapters/http-example/README.md) | Minimal browser-first HTTP mapping |
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
-| [`apps/demo-web`](../apps/demo-web/README.md) | Complete VS Code Web composition |
+| [`apps/demo-web`](../apps/demo-web/README.md) | Installable browser host extension and fixture demo |
 
 Prototype-era planning documents are retained under [`docs/archive/`](archive/) for historical context only. They are not product documentation and should not be used as an implementation contract.
