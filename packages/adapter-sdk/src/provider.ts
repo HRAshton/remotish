@@ -6,6 +6,11 @@ export const REMOTISH_ADAPTER_PROVIDER_API_VERSION = 1 as const;
 /** Stable command payload/result version used for provider -> host operations. */
 export const REMOTISH_REPOSITORY_COMMAND_VERSION = 1 as const;
 
+/** Stable provider -> host command identifiers. */
+export const REMOTISH_ENSURE_REPOSITORY_COMMAND = 'remotish.ensureRepository' as const;
+export const REMOTISH_OPEN_REPOSITORY_COMMAND = 'remotish.openRepository' as const;
+export const REMOTISH_REFRESH_PROVIDERS_COMMAND = 'remotish.refreshProviders' as const;
+
 /** Provider-neutral repository descriptor used for bootstrap and restoration. */
 export interface RemotishRepositoryRequest {
   readonly provider: string;

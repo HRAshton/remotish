@@ -9,6 +9,8 @@ export type {
   ProviderDiscoveryState,
 } from './providers/provider-discovery.js';
 export { ProviderDiscovery } from './providers/provider-discovery.js';
+export type { RemotishProviderHostOptions } from './providers/provider-host.js';
+export { RemotishProviderHost } from './providers/provider-host.js';
 export type { RegisteredProvider } from './providers/provider-registry.js';
 export { ProviderRegistry } from './providers/provider-registry.js';
 export {
