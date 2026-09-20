@@ -251,7 +251,9 @@ A provider may own a temporary bootstrap URI such as:
 remotish-bitbucket://open/?version=1&workspace=acme&repository=backend&branch=main
 ```
 
-Its bootstrap extension parses and validates that provider-specific URI, authenticates when necessary, then invokes `remotish.ensureRepository`. After it persists its reconstruction record it invokes `remotish.openRepository` or opens the returned canonical root.
+Its bootstrap extension parses and validates that provider-specific URI, authenticates when necessary, then invokes `remotish.ensureRepository`. After it persists its reconstruction record, it opens the canonical `uri` returned by that call directly.
+
+`remotish.openRepository` is the one-step alternative when no provider work is required between preparation and navigation. Do not invoke it after a successful `remotish.ensureRepository` for the same repository, because `openRepository` performs repository preparation itself.
 
 The browser then operates on:
 
