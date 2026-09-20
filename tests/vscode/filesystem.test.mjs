@@ -96,7 +96,6 @@ test('vscode filesystem model: URI paths use the same repository path validation
   assert.equal(workingUriParts('fixture-demo', 'src\\index.ts').path, '/src/index.ts');
 });
 
-
 test('vscode filesystem model: cold read waits for workspace restoration', async () => {
   const workspace = await RemotishWorkspace.open(new FixtureAdapter());
   let registry;

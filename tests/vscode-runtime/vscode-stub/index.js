@@ -414,11 +414,13 @@ export const __test = {
       exports: undefined,
       async activate() {
         if (!activation) {
-          activation = Promise.resolve().then(activate).then((value) => {
-            extension.exports = value;
-            extension.isActive = true;
-            return value;
-          });
+          activation = Promise.resolve()
+            .then(activate)
+            .then((value) => {
+              extension.exports = value;
+              extension.isActive = true;
+              return value;
+            });
         }
         return activation;
       },

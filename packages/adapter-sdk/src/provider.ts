@@ -53,7 +53,5 @@ export interface RemotishAdapterProviderV1 {
   ): RemotishAdapter | Promise<RemotishAdapter>;
 
   /** Provider-owned reconstruction data for a previously opened canonical workspace. */
-  restoreWorkspace?(
-    workspaceId: string,
-  ): Promise<RemotishRepositoryRequest | undefined>;
+  restoreWorkspace?(workspaceId: string): Promise<RemotishRepositoryRequest | undefined>;
 }

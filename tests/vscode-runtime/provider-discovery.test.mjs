@@ -165,7 +165,9 @@ test('opening one repository lazily activates only its provider and opens the ca
   assert.equal(first.count, 1);
   assert.equal(second.count, 0);
   assert.equal(result.resourceUri.endsWith('/README.md'), true);
-  const opened = vscode.__test.externalCommands.find((item) => item.command === 'vscode.openFolder');
+  const opened = vscode.__test.externalCommands.find(
+    (item) => item.command === 'vscode.openFolder',
+  );
   assert.equal(opened?.args[0].toString(), result.uri);
   assert.equal(result.uri.endsWith('/'), true);
 });
@@ -355,7 +357,10 @@ test('provider missing on reload preserves overlay and permits retry after insta
   installFixtureProvider({ records });
   const firstContext = createContext({ globalState, root: '/missing-retry' });
   await activate(firstContext);
-  const prepared = await vscode.commands.executeCommand(REMOTISH_ENSURE_REPOSITORY_COMMAND, request());
+  const prepared = await vscode.commands.executeCommand(
+    REMOTISH_ENSURE_REPOSITORY_COMMAND,
+    request(),
+  );
   records.set(prepared.workspaceId, {
     provider: 'fixture-provider',
     repository: { repository: 'demo' },
@@ -395,7 +400,10 @@ test('authentication failure during restoration preserves state and later retry 
   installFixtureProvider({ records });
   const firstContext = createContext({ globalState, root: '/auth-retry' });
   await activate(firstContext);
-  const prepared = await vscode.commands.executeCommand(REMOTISH_ENSURE_REPOSITORY_COMMAND, request());
+  const prepared = await vscode.commands.executeCommand(
+    REMOTISH_ENSURE_REPOSITORY_COMMAND,
+    request(),
+  );
   records.set(prepared.workspaceId, {
     provider: 'fixture-provider',
     repository: { repository: 'demo' },

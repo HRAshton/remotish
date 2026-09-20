@@ -1,7 +1,7 @@
 import {
   REMOTISH_ADAPTER_PROVIDER_API_VERSION,
-  RemotishError,
   type RemotishAdapterProviderV1,
+  RemotishError,
 } from '@remotish/adapter-sdk';
 import type { Disposable } from '@remotish/core';
 
@@ -38,13 +38,22 @@ export class ProviderRegistry {
       );
     }
     if (typeof provider.validateRepository !== 'function') {
-      throw new RemotishError('INVALID_REQUEST', `Provider ${id} must define validateRepository().`);
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Provider ${id} must define validateRepository().`,
+      );
     }
     if (typeof provider.createAdapter !== 'function') {
       throw new RemotishError('INVALID_REQUEST', `Provider ${id} must define createAdapter().`);
     }
-    if (provider.restoreWorkspace !== undefined && typeof provider.restoreWorkspace !== 'function') {
-      throw new RemotishError('INVALID_REQUEST', `Provider ${id} restoreWorkspace must be a function.`);
+    if (
+      provider.restoreWorkspace !== undefined &&
+      typeof provider.restoreWorkspace !== 'function'
+    ) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Provider ${id} restoreWorkspace must be a function.`,
+      );
     }
     if (this.providers.has(id)) {
       throw new RemotishError('INVALID_REQUEST', `Provider ${id} is already registered.`);

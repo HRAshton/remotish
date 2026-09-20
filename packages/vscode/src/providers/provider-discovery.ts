@@ -1,7 +1,7 @@
 import {
   REMOTISH_ADAPTER_PROVIDER_API_VERSION,
-  RemotishError,
   type RemotishAdapterProviderV1,
+  RemotishError,
 } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
 import {
@@ -49,7 +49,11 @@ export class ProviderDiscovery {
       }
 
       const extensionId = extension.id.toLowerCase();
-      if (typeof raw.id !== 'string' || typeof raw.displayName !== 'string' || !raw.displayName.trim()) {
+      if (
+        typeof raw.id !== 'string' ||
+        typeof raw.displayName !== 'string' ||
+        !raw.displayName.trim()
+      ) {
         diagnostics.set(extensionId, {
           extensionId,
           state: 'malformed',
@@ -91,8 +95,7 @@ export class ProviderDiscovery {
         displayName: descriptor.displayName,
         extensionId,
         apiVersion,
-        state:
-          apiVersion === REMOTISH_ADAPTER_PROVIDER_API_VERSION ? 'available' : 'unsupported',
+        state: apiVersion === REMOTISH_ADAPTER_PROVIDER_API_VERSION ? 'available' : 'unsupported',
         ...(apiVersion === REMOTISH_ADAPTER_PROVIDER_API_VERSION
           ? {}
           : {
@@ -181,7 +184,9 @@ export class ProviderDiscovery {
   }
 }
 
-function readManifestObject(extension: vscode.Extension<unknown>): Record<string, unknown> | undefined {
+function readManifestObject(
+  extension: vscode.Extension<unknown>,
+): Record<string, unknown> | undefined {
   const raw = (extension.packageJSON as Record<string, unknown> | undefined)?.remotish;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return undefined;

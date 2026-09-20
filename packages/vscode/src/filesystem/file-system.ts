@@ -76,9 +76,7 @@ export class RepositoryFileSystem {
     return { resource, workspace: registration.workspace };
   }
 
-  private async requireWorking(
-    uri: RepositoryUriLike,
-  ): Promise<{
+  private async requireWorking(uri: RepositoryUriLike): Promise<{
     readonly resource: Extract<RepositoryResource, { view: 'working' }>;
     readonly workspace: RemotishWorkspace;
   }> {

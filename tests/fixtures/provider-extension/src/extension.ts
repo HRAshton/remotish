@@ -11,11 +11,7 @@ export async function activate(): Promise<RemotishAdapterProviderV1> {
     displayName: 'Fixture Provider',
     validateRepository(repository) {
       const keys = Object.keys(repository).sort();
-      if (
-        keys.length !== 1 ||
-        keys[0] !== 'repository' ||
-        repository.repository !== 'demo'
-      ) {
+      if (keys.length !== 1 || keys[0] !== 'repository' || repository.repository !== 'demo') {
         throw new Error('Fixture provider expects repository=demo only.');
       }
     },

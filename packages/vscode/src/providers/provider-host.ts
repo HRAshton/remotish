@@ -3,8 +3,8 @@ import {
   REMOTISH_OPEN_REPOSITORY_COMMAND,
   REMOTISH_REFRESH_PROVIDERS_COMMAND,
   REMOTISH_REPOSITORY_COMMAND_VERSION,
-  RemotishError,
   type RemotishAdapterProviderV1,
+  RemotishError,
   type RemotishRepositoryCommandV1,
   type RemotishRepositoryRequest,
   type RemotishRepositoryResultV1,
@@ -14,8 +14,12 @@ import * as vscode from 'vscode';
 import { createWorkingUri } from '../filesystem/provider.js';
 import { RemotishVsCodeHost } from '../host.js';
 import { StorageUriWorkspaceStorage } from '../persistence/storage-uri-workspace-storage.js';
-import { ProviderDiscovery, type DiscoveredProvider } from './provider-discovery.js';
-import { normalizeProviderId, ProviderRegistry, type RegisteredProvider } from './provider-registry.js';
+import { type DiscoveredProvider, ProviderDiscovery } from './provider-discovery.js';
+import {
+  normalizeProviderId,
+  ProviderRegistry,
+  type RegisteredProvider,
+} from './provider-registry.js';
 import { createStableWorkspaceId, verifyStableWorkspaceId } from './workspace-id.js';
 
 const HOST_RESTORE_PREFIX = 'remotish.restore.v1.';
@@ -210,11 +214,7 @@ export class RemotishProviderHost implements vscode.Disposable {
     const candidate = await RemotishWorkspace.open(adapter, this.storage);
     const workspaceId = await createStableWorkspaceId(provider.id, candidate.repositoryInfo.id);
     if (expectedWorkspaceId !== undefined) {
-      await verifyStableWorkspaceId(
-        provider.id,
-        candidate.repositoryInfo.id,
-        expectedWorkspaceId,
-      );
+      await verifyStableWorkspaceId(provider.id, candidate.repositoryInfo.id, expectedWorkspaceId);
     }
 
     const workspace = await this.serializeWorkspace(workspaceId, async () => {
@@ -318,7 +318,10 @@ export class RemotishProviderHost implements vscode.Disposable {
     return this.providers.get(normalized) ?? this.discovery.activate(normalized);
   }
 
-  private async serializeWorkspace<T>(workspaceId: string, operation: () => Promise<T>): Promise<T> {
+  private async serializeWorkspace<T>(
+    workspaceId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     const previous = this.preparationTails.get(workspaceId) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
     const settled = current.then(
@@ -355,7 +358,10 @@ function requireCommand(value: unknown): RemotishRepositoryCommandV1 {
   const input = value as Record<string, unknown>;
   for (const key of Object.keys(input)) {
     if (!['version', 'provider', 'repository', 'branch', 'path'].includes(key)) {
-      throw new RemotishError('INVALID_REQUEST', `Unknown Remotish repository command field: ${key}.`);
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Unknown Remotish repository command field: ${key}.`,
+      );
     }
   }
   if (input.version !== REMOTISH_REPOSITORY_COMMAND_VERSION) {
@@ -367,7 +373,11 @@ function requireCommand(value: unknown): RemotishRepositoryCommandV1 {
   if (typeof input.provider !== 'string' || !input.provider.trim()) {
     throw new RemotishError('INVALID_REQUEST', 'Remotish repository command requires provider.');
   }
-  if (!input.repository || typeof input.repository !== 'object' || Array.isArray(input.repository)) {
+  if (
+    !input.repository ||
+    typeof input.repository !== 'object' ||
+    Array.isArray(input.repository)
+  ) {
     throw new RemotishError(
       'INVALID_REQUEST',
       'Remotish repository command requires a repository descriptor object.',
