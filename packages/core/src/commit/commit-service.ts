@@ -10,6 +10,14 @@ import {
 import type { WorkingTree } from '../working-tree/working-tree.js';
 
 export type BeforeCommitPublish = (request: CommitRequest) => Promise<void>;
+export type AfterCommitPublish = (
+  result: Extract<CommitResult, { readonly status: 'success' }>,
+) => Promise<void>;
+
+export interface CommitExecutionResult {
+  readonly result: CommitResult;
+  readonly reconciliation: 'settled' | 'pending';
+}
 
 /** Builds adapter commit requests and advances only the published subset of a working tree on success. */
 export class CommitService {
@@ -21,8 +29,17 @@ export class CommitService {
     message: string,
     selectedPaths?: readonly RepoPath[],
     beforePublish?: BeforeCommitPublish,
-  ): Promise<CommitResult> {
-    return this.execute(branch, tree, message, { kind: 'normal' }, selectedPaths, beforePublish);
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
+    return this.execute(
+      branch,
+      tree,
+      message,
+      { kind: 'normal' },
+      selectedPaths,
+      beforePublish,
+      afterPublish,
+    );
   }
 
   commitAndPushForceWithLease(
@@ -32,7 +49,8 @@ export class CommitService {
     expectedRevision: RevisionId,
     selectedPaths?: readonly RepoPath[],
     beforePublish?: BeforeCommitPublish,
-  ): Promise<CommitResult> {
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     if (!this.adapter.capabilities.forceWithLease) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support force-with-lease.');
     }
@@ -44,6 +62,7 @@ export class CommitService {
       { kind: 'force', expectedRevision },
       selectedPaths,
       beforePublish,
+      afterPublish,
     );
   }
 
@@ -53,7 +72,8 @@ export class CommitService {
     message: string,
     selectedPaths?: readonly RepoPath[],
     beforePublish?: BeforeCommitPublish,
-  ): Promise<CommitResult> {
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     if (!this.adapter.capabilities.amend || !this.adapter.capabilities.forceWithLease) {
       throw new RemotishError(
         'UNSUPPORTED',
@@ -71,6 +91,7 @@ export class CommitService {
       },
       selectedPaths,
       beforePublish,
+      afterPublish,
     );
   }
 
@@ -84,7 +105,8 @@ export class CommitService {
       | { readonly kind: 'amend'; readonly expectedRevision: RevisionId },
     selectedPaths?: readonly RepoPath[],
     beforePublish?: BeforeCommitPublish,
-  ): Promise<CommitResult> {
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     const commit = this.adapter.commit;
     if (!this.adapter.capabilities.commits || !commit) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support commit publication.');
@@ -141,15 +163,25 @@ export class CommitService {
     await beforePublish?.(request);
     const result = await commit.call(this.adapter, request);
     if (result.status !== 'success') {
-      return result;
+      return { result, reconciliation: 'settled' };
+    }
+
+    try {
+      await afterPublish?.(result);
+    } catch {
+      // Publication already succeeded. Journal persistence cannot turn it back into a failure.
     }
 
     if (selectedPaths === undefined) {
       tree.acceptPublishedRevision(result.revision);
-    } else {
-      await tree.acceptPartiallyPublishedRevision(result.revision);
+      return { result, reconciliation: 'settled' };
     }
 
-    return result;
+    try {
+      await tree.acceptPartiallyPublishedRevision(result.revision);
+      return { result, reconciliation: 'settled' };
+    } catch {
+      return { result, reconciliation: 'pending' };
+    }
   }
 }

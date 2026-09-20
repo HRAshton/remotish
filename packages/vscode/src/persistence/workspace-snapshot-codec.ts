@@ -10,10 +10,18 @@ interface StoredRenameSnapshot {
   readonly to: string;
 }
 
-interface StoredPendingCommitPublication {
-  readonly branch: string;
-  readonly expectedRemoteRevision: string;
-}
+type StoredPendingCommitPublication =
+  | {
+      readonly phase: 'prepared';
+      readonly branch: string;
+      readonly expectedRemoteRevision: string;
+    }
+  | {
+      readonly phase: 'published';
+      readonly branch: string;
+      readonly expectedRemoteRevision: string;
+      readonly publishedRevision: string;
+    };
 
 interface StoredBranchWorkspaceSnapshot {
   readonly baseRevision: string;
@@ -154,13 +162,26 @@ function requireStoredWorkspaceSnapshot(value: unknown): StoredWorkspaceSnapshot
 
 function requirePendingCommitPublication(value: unknown): StoredPendingCommitPublication {
   const pending = requireRecord(value, 'pendingCommitPublication');
-  return {
-    branch: requireString(pending.branch, 'pendingCommitPublication.branch'),
-    expectedRemoteRevision: requireString(
-      pending.expectedRemoteRevision,
-      'pendingCommitPublication.expectedRemoteRevision',
-    ),
-  };
+  const branch = requireString(pending.branch, 'pendingCommitPublication.branch');
+  const expectedRemoteRevision = requireString(
+    pending.expectedRemoteRevision,
+    'pendingCommitPublication.expectedRemoteRevision',
+  );
+  if (pending.phase === undefined || pending.phase === 'prepared') {
+    return { phase: 'prepared', branch, expectedRemoteRevision };
+  }
+  if (pending.phase === 'published') {
+    return {
+      phase: 'published',
+      branch,
+      expectedRemoteRevision,
+      publishedRevision: requireString(
+        pending.publishedRevision,
+        'pendingCommitPublication.publishedRevision',
+      ),
+    };
+  }
+  throw invalidSnapshot(`pendingCommitPublication.phase is unsupported: ${String(pending.phase)}`);
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

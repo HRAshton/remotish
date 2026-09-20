@@ -44,22 +44,26 @@ export class Overlay {
 
   static fromSnapshot(snapshot?: OverlaySnapshot): Overlay {
     const overlay = new Overlay();
-    if (!snapshot) {
-      return overlay;
-    }
-    for (const file of snapshot.files) {
-      overlay.files.set(normalizePath(file.path), cloneBytes(file.content));
-    }
-    for (const directory of snapshot.directories) {
-      overlay.directories.add(normalizePath(directory));
-    }
-    for (const path of snapshot.deletedPaths) {
-      overlay.deletedPaths.add(normalizePath(path));
-    }
-    for (const rename of snapshot.renames) {
-      overlay.renames.push({ from: normalizePath(rename.from), to: normalizePath(rename.to) });
+    if (snapshot) {
+      overlay.restore(snapshot);
     }
     return overlay;
+  }
+
+  restore(snapshot: OverlaySnapshot): void {
+    this.clear();
+    for (const file of snapshot.files) {
+      this.files.set(normalizePath(file.path), cloneBytes(file.content));
+    }
+    for (const directory of snapshot.directories) {
+      this.directories.add(normalizePath(directory));
+    }
+    for (const path of snapshot.deletedPaths) {
+      this.deletedPaths.add(normalizePath(path));
+    }
+    for (const rename of snapshot.renames) {
+      this.renames.push({ from: normalizePath(rename.from), to: normalizePath(rename.to) });
+    }
   }
 
   get isEmpty(): boolean {

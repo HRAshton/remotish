@@ -169,12 +169,16 @@ test('workspace mutations: persistence failure rolls back local state', async ()
 
 test('workspace amend: persistence failure after publication does not report failure', async () => {
   const adapter = new FixtureAdapter();
+  let saves = 0;
   const storage = {
     async load() {
       return undefined;
     },
     async save() {
-      throw new Error('disk full');
+      saves += 1;
+      if (saves > 1) {
+        throw new Error('disk full');
+      }
     },
     async delete() {},
   };
@@ -193,6 +197,40 @@ test('workspace amend: persistence failure after publication does not report fai
   assert.equal(adapter.getBranchHead('main'), result.revision);
   assert.equal(workspace.baseRevision, result.revision);
   assert.deepEqual(events, [{ branch: 'main', baseRevision: result.revision }]);
+});
+
+test('workspace commit: publication does not start until its journal is durable', async () => {
+  const baseAdapter = new FixtureAdapter();
+  let commitCalls = 0;
+  const adapter = new Proxy(baseAdapter, {
+    get(target, property, receiver) {
+      if (property === 'commit') {
+        return async (...args) => {
+          commitCalls += 1;
+          return target.commit(...args);
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const storage = {
+    async load() {
+      return undefined;
+    },
+    async save() {
+      throw new Error('disk full');
+    },
+    async delete() {},
+  };
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+
+  await assert.rejects(
+    workspace.amendAndPushForceWithLease('Do not publish without a journal'),
+    /disk full/u,
+  );
+  assert.equal(commitCalls, 0);
+  assert.equal(baseAdapter.getBranchHead('main'), 'C3');
 });
 
 test('workspace branches: persistence failure after creation does not report failure', async () => {
@@ -320,6 +358,146 @@ test('workspace commit: selected paths publish while unselected changes stay in 
     decoder.decode(await workspace.readFile('src/index.ts')),
     "export const greeting = 'unselected';\n",
   );
+});
+
+test('workspace commit: reconciliation failure after publication still reports success', async () => {
+  const baseAdapter = new FixtureAdapter();
+  const storage = new MemoryWorkspaceStorage();
+  let _publishedRevision;
+  let failingPublishedRevision;
+  const adapter = new Proxy(baseAdapter, {
+    get(target, property, receiver) {
+      if (property === 'commit') {
+        return async (...args) => {
+          const result = await target.commit(...args);
+          if (result.status === 'success') {
+            _publishedRevision = result.revision;
+            failingPublishedRevision = result.revision;
+          }
+          return result;
+        };
+      }
+      if (property === 'readFile') {
+        return async (revision, ...args) => {
+          if (revision === failingPublishedRevision) {
+            throw new RemotishError('OFFLINE', 'published revision is temporarily unavailable');
+          }
+          return target.readFile(revision, ...args);
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.writeFile('README.md', encoder.encode('selected\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.writeFile(
+    'src/index.ts',
+    encoder.encode("export const greeting = 'unselected';\n"),
+    { create: false, overwrite: true },
+  );
+
+  const result = await workspace.commitAndPush('Publish README', ['README.md']);
+  assert.equal(result.status, 'success');
+  if (result.status !== 'success') {
+    return;
+  }
+  assert.equal(baseAdapter.getBranchHead('main'), result.revision);
+  assert.equal(workspace.baseRevision, 'C3');
+  assert.deepEqual(await workspace.getChanges(), [
+    { type: 'modified', path: 'README.md' },
+    { type: 'modified', path: 'src/index.ts' },
+  ]);
+  await assert.rejects(
+    workspace.writeFile('README.md', encoder.encode('blocked\n'), {
+      create: false,
+      overwrite: true,
+    }),
+    /local reconciliation is incomplete/u,
+  );
+
+  failingPublishedRevision = undefined;
+  const restored = await RemotishWorkspace.open(adapter, storage);
+  assert.equal(restored.baseRevision, result.revision);
+  assert.deepEqual(await restored.getChanges(), [{ type: 'modified', path: 'src/index.ts' }]);
+  assert.equal(
+    decoder.decode(await restored.readFile('src/index.ts')),
+    "export const greeting = 'unselected';\n",
+  );
+});
+
+test('workspace recovery: prepared publication stays pinned after unrelated remote movement', async () => {
+  const baseAdapter = new FixtureAdapter();
+  const storage = new MemoryWorkspaceStorage();
+  const adapter = new Proxy(baseAdapter, {
+    get(target, property, receiver) {
+      if (property === 'commit') {
+        return async () => {
+          throw new RemotishError('OFFLINE', 'request outcome is unknown');
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.writeFile('README.md', encoder.encode('local uncertain change\n'), {
+    create: false,
+    overwrite: true,
+  });
+
+  await assert.rejects(workspace.commitAndPush('Uncertain publish'), (error) => {
+    return error instanceof RemotishError && error.code === 'OFFLINE';
+  });
+  baseAdapter.moveBranchHead('main', 'F2');
+
+  const restored = await RemotishWorkspace.open(baseAdapter, storage);
+  assert.equal(restored.baseRevision, 'C3');
+  assert.equal(restored.hasChanges, true);
+  assert.equal(decoder.decode(await restored.readFile('README.md')), 'local uncertain change\n');
+  await assert.rejects(restored.revertAll(), /publication has an uncertain outcome/u);
+});
+
+test('workspace recovery: published journal uses the exact published revision', async () => {
+  const adapter = new FixtureAdapter();
+  const durable = new MemoryWorkspaceStorage();
+  let settledSaveError;
+  const storage = {
+    load(repositoryId) {
+      return durable.load(repositoryId);
+    },
+    async save(repositoryId, snapshot) {
+      if (!snapshot.pendingCommitPublication && settledSaveError) {
+        throw settledSaveError;
+      }
+      await durable.save(repositoryId, snapshot);
+    },
+    delete(repositoryId) {
+      return durable.delete(repositoryId);
+    },
+  };
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.writeFile('README.md', encoder.encode('published before crash\n'), {
+    create: false,
+    overwrite: true,
+  });
+  settledSaveError = new Error('disk full');
+
+  const result = await workspace.commitAndPush('Publish before persistence failure');
+  assert.equal(result.status, 'success');
+  if (result.status !== 'success') {
+    return;
+  }
+  adapter.moveBranchHead('main', 'F2');
+  settledSaveError = undefined;
+
+  const restored = await RemotishWorkspace.open(adapter, storage);
+  assert.equal(restored.baseRevision, result.revision);
+  assert.equal(restored.hasChanges, false);
+  assert.equal(decoder.decode(await restored.readFile('README.md')), 'published before crash\n');
 });
 
 test('workspace commit: selecting a rename publishes both sides of the rename', async () => {

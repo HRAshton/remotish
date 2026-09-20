@@ -14,7 +14,12 @@ import type {
   RevisionId,
 } from '@remotish/adapter-sdk';
 import { RemotishError } from '@remotish/adapter-sdk';
-import { type BeforeCommitPublish, CommitService } from '../commit/commit-service.js';
+import {
+  type AfterCommitPublish,
+  type BeforeCommitPublish,
+  type CommitExecutionResult,
+  CommitService,
+} from '../commit/commit-service.js';
 import { type Disposable, EventSource } from '../events/events.js';
 import { MemoryWorkspaceStorage } from '../persistence/memory-workspace-storage.js';
 import type { WorkspaceSnapshot, WorkspaceStorage } from '../persistence/workspace-storage.js';
@@ -192,7 +197,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit((beforePublish) => {
+    return this.mutateCommit((beforePublish, afterPublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.commitAndPush(
         this.branch,
@@ -200,6 +205,7 @@ export class RemotishWorkspace {
         message,
         selectedPaths,
         beforePublish,
+        afterPublish,
       );
     });
   }
@@ -210,7 +216,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit((beforePublish) => {
+    return this.mutateCommit((beforePublish, afterPublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.commitAndPushForceWithLease(
         this.branch,
@@ -219,6 +225,7 @@ export class RemotishWorkspace {
         expectedRevision,
         selectedPaths,
         beforePublish,
+        afterPublish,
       );
     });
   }
@@ -228,7 +235,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit((beforePublish) => {
+    return this.mutateCommit((beforePublish, afterPublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.amendAndPushForceWithLease(
         this.branch,
@@ -236,6 +243,7 @@ export class RemotishWorkspace {
         message,
         selectedPaths,
         beforePublish,
+        afterPublish,
       );
     });
   }
@@ -313,13 +321,17 @@ export class RemotishWorkspace {
   }
 
   private requireNoPendingCommitPublication(): void {
-    if (!this.pendingCommitPublication) {
+    const pending = this.pendingCommitPublication;
+    if (!pending) {
       return;
     }
-    throw new RemotishError(
-      'INVALID_REQUEST',
-      'A previous commit publication has an uncertain outcome. Reopen the workspace to reconcile it.',
-    );
+    const message =
+      pending.phase === 'prepared'
+        ? 'A previous commit publication has an uncertain outcome. ' +
+          'Reopen the workspace to reconcile it.'
+        : 'A previous commit was published, but local reconciliation is incomplete. ' +
+          'Reopen the workspace to retry recovery.';
+    throw new RemotishError('INVALID_REQUEST', message);
   }
 
   private mutate(operation: () => Promise<void>): Promise<void> {
@@ -330,12 +342,16 @@ export class RemotishWorkspace {
   }
 
   private mutateCommit(
-    operation: (beforePublish: BeforeCommitPublish) => Promise<CommitResult>,
+    operation: (
+      beforePublish: BeforeCommitPublish,
+      afterPublish: AfterCommitPublish,
+    ) => Promise<CommitExecutionResult>,
   ): Promise<CommitResult> {
     return this.mutations.run(async () => {
       this.requireNoPendingCommitPublication();
       const beforePublish: BeforeCommitPublish = async (request) => {
         this.pendingCommitPublication = {
+          phase: 'prepared',
           branch: request.branch,
           expectedRemoteRevision:
             request.push.mode === 'normal' ? request.baseRevision : request.push.expectedRevision,
@@ -347,11 +363,37 @@ export class RemotishWorkspace {
           throw error;
         }
       };
+      const afterPublish: AfterCommitPublish = async (result) => {
+        const prepared = this.pendingCommitPublication;
+        if (prepared?.phase !== 'prepared') {
+          return;
+        }
+        this.pendingCommitPublication = {
+          ...prepared,
+          phase: 'published',
+          publishedRevision: result.revision,
+        };
+        try {
+          await this.saveSnapshot();
+        } catch {
+          // The exact publication revision remains known in memory for this session.
+        }
+      };
 
-      const result = await operation(beforePublish);
+      const execution = await operation(beforePublish, afterPublish);
+      const { result } = execution;
       if (result.status === 'success') {
-        this.pendingCommitPublication = undefined;
-        await this.changedAfterRemoteSuccess();
+        if (execution.reconciliation === 'settled') {
+          this.pendingCommitPublication = undefined;
+          await this.changedAfterRemoteSuccess();
+        } else {
+          try {
+            await this.saveSnapshot();
+          } catch {
+            // Keep the in-memory published journal even when persistence remains unavailable.
+          }
+          this.emitChanged();
+        }
       } else if (this.pendingCommitPublication) {
         this.pendingCommitPublication = undefined;
         await this.saveSnapshot();
@@ -420,20 +462,28 @@ export class RemotishWorkspace {
       );
     }
 
-    const remote = (await this.adapter.getBranches()).find(
-      (candidate) => candidate.name === pending.branch,
-    );
-    if (!remote) {
-      throw new RemotishError(
-        'NOT_FOUND',
-        `Cannot recover publication state because branch ${pending.branch} no longer exists.`,
-      );
-    }
-    if (remote.revision !== pending.expectedRemoteRevision) {
-      await this.branches.current.acceptPartiallyPublishedRevision(remote.revision);
+    if (pending.phase === 'prepared') {
+      let remote: Branch | undefined;
+      try {
+        remote = (await this.adapter.getBranches()).find(
+          (candidate) => candidate.name === pending.branch,
+        );
+      } catch {
+        return;
+      }
+      if (!remote || remote.revision !== pending.expectedRemoteRevision) {
+        return;
+      }
+      this.pendingCommitPublication = undefined;
+    } else {
+      try {
+        await this.branches.current.acceptPartiallyPublishedRevision(pending.publishedRevision);
+      } catch {
+        return;
+      }
+      this.pendingCommitPublication = undefined;
     }
 
-    this.pendingCommitPublication = undefined;
     try {
       await this.saveSnapshot();
     } catch {

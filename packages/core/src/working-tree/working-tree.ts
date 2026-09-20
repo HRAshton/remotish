@@ -165,8 +165,10 @@ export class WorkingTree {
   }
 
   async acceptPartiallyPublishedRevision(revision: RevisionId): Promise<void> {
+    const rebasedOverlay = Overlay.fromSnapshot(this.overlay.snapshot());
+    await rebaseOverlayAfterPartialPublish(this.repository, revision, rebasedOverlay);
     this._baseRevision = revision;
-    await rebaseOverlayAfterPartialPublish(this.repository, revision, this.overlay);
+    this.overlay.restore(rebasedOverlay.snapshot());
   }
 
   rebindCleanBase(revision: RevisionId): void {
