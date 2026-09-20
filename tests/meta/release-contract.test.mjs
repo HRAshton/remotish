@@ -38,6 +38,28 @@ test('VS Code web workspace URIs include an explicit root path', () => {
   }
 });
 
+test('packaged VSIX smoke includes a separately packaged web provider', async () => {
+  const providerManifest = JSON.parse(
+    await readFile(new URL('../fixtures/provider-extension/package.json', import.meta.url)),
+  );
+  assert.equal(providerManifest.browser, './dist/extension.js');
+  assert.equal(providerManifest.main, undefined);
+  assert.equal(providerManifest.extensionKind, undefined);
+  assert.deepEqual(providerManifest.remotish, {
+    provider: true,
+    apiVersion: 1,
+    id: 'fixture-provider',
+    displayName: 'Fixture Provider',
+  });
+
+  assert.match(rootManifest.scripts?.['release:test-provider:vsix'] ?? '', /provider-vsix-smoke/u);
+  assert.match(rootManifest.scripts?.['test:vscode-web:vsix'] ?? '', /release:test-provider:vsix/u);
+  assert.match(
+    rootManifest.scripts?.['test:vscode-web:vsix'] ?? '',
+    /--extensionPath=artifacts\/vsix-smoke\/providers/u,
+  );
+});
+
 test('releaseable workspace packages share the root release version', async () => {
   assert.match(rootManifest.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u);
 
