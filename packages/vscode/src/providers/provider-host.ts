@@ -261,25 +261,34 @@ export class RemotishProviderHost implements vscode.Disposable {
       );
     }
 
-    let discovered = this.discovery.get(metadata.provider);
-    if (!discovered) {
-      this.discovery.refresh();
-      discovered = this.discovery.get(metadata.provider);
+    let provider = this.providers.get(metadata.provider);
+    if (provider) {
+      if (provider.extensionId !== metadata.extensionId.toLowerCase()) {
+        throw new RemotishError(
+          'INVALID_REQUEST',
+          `Provider ${metadata.provider} is registered as ${provider.extensionId}, not persisted extension ${metadata.extensionId}.`,
+        );
+      }
+    } else {
+      let discovered = this.discovery.get(metadata.provider);
+      if (!discovered) {
+        this.discovery.refresh();
+        discovered = this.discovery.get(metadata.provider);
+      }
+      if (!discovered) {
+        throw new RemotishError(
+          'UNSUPPORTED',
+          `${metadata.providerDisplayName} provider is not installed or enabled.`,
+        );
+      }
+      if (discovered.extensionId !== metadata.extensionId.toLowerCase()) {
+        throw new RemotishError(
+          'INVALID_REQUEST',
+          `Provider ${metadata.provider} is installed as ${discovered.extensionId}, not persisted extension ${metadata.extensionId}.`,
+        );
+      }
+      provider = await this.discovery.activate(metadata.provider);
     }
-    if (!discovered) {
-      throw new RemotishError(
-        'UNSUPPORTED',
-        `${metadata.providerDisplayName} provider is not installed or enabled.`,
-      );
-    }
-    if (discovered.extensionId !== metadata.extensionId.toLowerCase()) {
-      throw new RemotishError(
-        'INVALID_REQUEST',
-        `Provider ${metadata.provider} is installed as ${discovered.extensionId}, not persisted extension ${metadata.extensionId}.`,
-      );
-    }
-
-    const provider = await this.discovery.activate(metadata.provider);
     if (!provider.restoreWorkspace) {
       throw new RemotishError(
         'UNSUPPORTED',
