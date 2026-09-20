@@ -458,7 +458,59 @@ test('workspace recovery: prepared publication stays pinned after unrelated remo
   assert.equal(restored.baseRevision, 'C3');
   assert.equal(restored.hasChanges, true);
   assert.equal(decoder.decode(await restored.readFile('README.md')), 'local uncertain change\n');
+  assert.deepEqual(restored.pendingPublication, {
+    phase: 'prepared',
+    branch: 'main',
+    expectedRemoteRevision: 'C3',
+  });
   await assert.rejects(restored.revertAll(), /publication has an uncertain outcome/u);
+
+  await restored.resolvePendingCommitPublication('not-published');
+  assert.equal(restored.pendingPublication, undefined);
+  await restored.writeFile('README.md', encoder.encode('editable again\n'), {
+    create: false,
+    overwrite: true,
+  });
+});
+
+test('workspace recovery: explicit published revision resolves an unknown commit outcome', async () => {
+  const baseAdapter = new FixtureAdapter();
+  const storage = new MemoryWorkspaceStorage();
+  let publishedRevision;
+  const adapter = new Proxy(baseAdapter, {
+    get(target, property, receiver) {
+      if (property === 'commit') {
+        return async (...args) => {
+          const result = await target.commit(...args);
+          if (result.status === 'success') {
+            publishedRevision = result.revision;
+          }
+          throw new RemotishError('OFFLINE', 'response was lost after publication');
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.writeFile('README.md', encoder.encode('published but response lost\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await assert.rejects(workspace.commitAndPush('Publish with lost response'), /response was lost/u);
+  assert.ok(publishedRevision);
+
+  const restored = await RemotishWorkspace.open(baseAdapter, storage);
+  assert.equal(restored.pendingPublication?.phase, 'prepared');
+  await restored.resolvePendingCommitPublication({ publishedRevision });
+  assert.equal(restored.pendingPublication, undefined);
+  assert.equal(restored.baseRevision, publishedRevision);
+  assert.equal(restored.hasChanges, false);
+  assert.equal(
+    decoder.decode(await restored.readFile('README.md')),
+    'published but response lost\n',
+  );
 });
 
 test('workspace recovery: published journal uses the exact published revision', async () => {

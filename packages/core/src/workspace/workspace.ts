@@ -105,6 +105,11 @@ export class RemotishWorkspace {
     return this.branches.current.hasChanges;
   }
 
+  /** Durable publication state that still requires recovery before mutation. */
+  get pendingPublication(): WorkspaceSnapshot['pendingCommitPublication'] {
+    return this.pendingCommitPublication ? { ...this.pendingCommitPublication } : undefined;
+  }
+
   onDidChange(listener: (event: WorkspaceChangedEvent) => void): Disposable {
     return this.events.on(listener);
   }
@@ -300,6 +305,67 @@ export class RemotishWorkspace {
     return this.mutations.run(() => this.saveSnapshot());
   }
 
+  /**
+   * Resolves a publication whose outcome could not be proven automatically.
+   *
+   * Use `not-published` only after independently establishing that no publication occurred.
+   * Otherwise provide the exact revision that was published.
+   */
+  resolvePendingCommitPublication(
+    resolution: 'not-published' | Readonly<{ publishedRevision: RevisionId }>,
+  ): Promise<void> {
+    return this.mutations.run(async () => {
+      const pending = this.pendingCommitPublication;
+      if (!pending) {
+        return;
+      }
+
+      if (resolution === 'not-published') {
+        if (pending.phase === 'published') {
+          throw new RemotishError(
+            'INVALID_REQUEST',
+            `Publication ${pending.publishedRevision} is already known to have succeeded.`,
+          );
+        }
+        this.pendingCommitPublication = undefined;
+        try {
+          await this.saveSnapshot();
+        } catch (error) {
+          this.pendingCommitPublication = pending;
+          throw error;
+        }
+        this.emitChanged();
+        return;
+      }
+
+      const publishedRevision = resolution.publishedRevision;
+      if (!publishedRevision.trim()) {
+        throw new RemotishError(
+          'INVALID_REQUEST',
+          'Published revision is required to resolve publication recovery.',
+        );
+      }
+      if (pending.phase === 'published' && pending.publishedRevision !== publishedRevision) {
+        throw new RemotishError(
+          'INVALID_REQUEST',
+          `Pending publication is ${pending.publishedRevision}, not ${publishedRevision}.`,
+        );
+      }
+
+      const snapshot = this.branches.snapshot();
+      try {
+        await this.branches.current.acceptPartiallyPublishedRevision(publishedRevision);
+        this.pendingCommitPublication = undefined;
+        await this.saveSnapshot();
+      } catch (error) {
+        this.branches.restore(snapshot);
+        this.pendingCommitPublication = pending;
+        throw error;
+      }
+      this.emitChanged();
+    });
+  }
+
   private requireWritable(): void {
     if (!this.capabilities.commits) {
       throw new RemotishError('FORBIDDEN', 'This repository is read-only.');
@@ -328,9 +394,9 @@ export class RemotishWorkspace {
     const message =
       pending.phase === 'prepared'
         ? 'A previous commit publication has an uncertain outcome. ' +
-          'Reopen the workspace to reconcile it.'
+          'Resolve the pending publication explicitly before mutating the workspace.'
         : 'A previous commit was published, but local reconciliation is incomplete. ' +
-          'Reopen the workspace to retry recovery.';
+          'Reopen the workspace to retry recovery, or resolve it explicitly.';
     throw new RemotishError('INVALID_REQUEST', message);
   }
 
