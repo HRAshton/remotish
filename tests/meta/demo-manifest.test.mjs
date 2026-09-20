@@ -9,12 +9,16 @@ const manifest = JSON.parse(
   await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
 );
 
-test('demo manifest is WebWorker-compatible and uses automatic command activation', () => {
+test('host manifest is WebWorker-compatible and activates for provider commands', () => {
   assert.equal(Object.hasOwn(manifest, 'type'), false);
-  assert.equal(
-    manifest.activationEvents?.some((event) => event.startsWith('onCommand:')) ?? false,
-    false,
-  );
+  const activationEvents = new Set(manifest.activationEvents ?? []);
+  for (const command of [
+    'remotish.ensureRepository',
+    'remotish.openRepository',
+    'remotish.refreshProviders',
+  ]) {
+    assert.ok(activationEvents.has(`onCommand:${command}`), `Missing activation for ${command}`);
+  }
 });
 
 test('demo manifest contributes every public framework command', () => {
@@ -30,6 +34,9 @@ test('demo manifest contributes every public framework command', () => {
 
   assert.equal(contributed.has(SCM_COMMANDS.openChange), false);
   assert.ok(contributed.has('remotish.demo.openFixture'));
+  assert.ok(contributed.has('remotish.ensureRepository'));
+  assert.ok(contributed.has('remotish.openRepository'));
+  assert.ok(contributed.has('remotish.refreshProviders'));
 });
 
 test('internal diff command is not exposed as an SCM button or menu action', () => {
@@ -87,7 +94,10 @@ test('context-only SCM commands are hidden from the Command Palette', () => {
     'remotish.unstageAll',
     'remotish.revert',
     'remotish.revertAll',
+    'remotish.ensureRepository',
+    'remotish.openRepository',
   ]) {
     assert.equal(hidden.get(command), 'false', `${command} should be context-only`);
   }
+  assert.equal(hidden.has('remotish.refreshProviders'), false);
 });

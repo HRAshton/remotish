@@ -21,6 +21,20 @@ export { RemotishError } from './errors.js';
 export { normalizeRepoPath } from './path.js';
 /** Public identifier primitives. */
 export type { BranchName, RepoPath, RepositoryId, RevisionId } from './primitives.js';
+export type {
+  RemotishAdapterProviderV1,
+  RemotishRepositoryCommandV1,
+  RemotishRepositoryRequest,
+  RemotishRepositoryResultV1,
+} from './provider.js';
+/** Public provider-extension contract and provider-neutral repository commands. */
+export {
+  REMOTISH_ADAPTER_PROVIDER_API_VERSION,
+  REMOTISH_ENSURE_REPOSITORY_COMMAND,
+  REMOTISH_OPEN_REPOSITORY_COMMAND,
+  REMOTISH_REFRESH_PROVIDERS_COMMAND,
+  REMOTISH_REPOSITORY_COMMAND_VERSION,
+} from './provider.js';
 /** Public immutable repository and history model. */
 export type {
   Branch,

@@ -14,6 +14,7 @@ Use one canonical page for each kind of information:
 | Adapter tutorial | `docs/adapter-authoring.md` |
 | Exact adapter semantics | `docs/adapter-contract.md` |
 | Adapter verification | `docs/testing-adapters.md` |
+| Provider extensions | `docs/provider-extensions.md` |
 | VS Code composition | `docs/vscode-integration.md` |
 | Package/runtime architecture | `docs/architecture.md` |
 | Proposal/host details | `docs/code-oss-integration.md` |
@@ -32,10 +33,6 @@ Other pages should link to the canonical explanation instead of copying it.
 - Do not use prototype planning documents as current behavior.
 - Update docs in the same change as public behavior or package-surface changes.
 - Prefer relative repository links so docs work in branches and source archives.
-
-## Prototype archive
-
-Historical design/specification files are stored under `docs/archive/`. They exist to preserve context, not to define current behavior. New documentation must not link to them as normative references.
 
 ## Before merging a documentation change
 

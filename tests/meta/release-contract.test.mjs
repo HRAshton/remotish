@@ -38,6 +38,28 @@ test('VS Code web workspace URIs include an explicit root path', () => {
   }
 });
 
+test('packaged VSIX smoke includes a separately packaged web provider', async () => {
+  const providerManifest = JSON.parse(
+    await readFile(new URL('../fixtures/provider-extension/package.json', import.meta.url)),
+  );
+  assert.equal(providerManifest.browser, './dist/extension.js');
+  assert.equal(providerManifest.main, undefined);
+  assert.equal(providerManifest.extensionKind, undefined);
+  assert.deepEqual(providerManifest.remotish, {
+    provider: true,
+    apiVersion: 1,
+    id: 'fixture-provider',
+    displayName: 'Fixture Provider',
+  });
+
+  assert.match(rootManifest.scripts?.['release:test-provider:vsix'] ?? '', /provider-vsix-smoke/u);
+  assert.match(rootManifest.scripts?.['test:vscode-web:vsix'] ?? '', /release:test-provider:vsix/u);
+  assert.match(
+    rootManifest.scripts?.['test:vscode-web:vsix'] ?? '',
+    /--extensionPath=artifacts\/vsix-smoke\/providers/u,
+  );
+});
+
 test('releaseable workspace packages share the root release version', async () => {
   assert.match(rootManifest.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u);
 
@@ -171,10 +193,15 @@ test('adapter SDK is configured as the only public npm package', async () => {
   const sdkManifest = JSON.parse(
     await readFile(new URL('../../packages/adapter-sdk/package.json', import.meta.url)),
   );
+  const vscodeManifest = JSON.parse(
+    await readFile(new URL('../../packages/vscode/package.json', import.meta.url)),
+  );
   assert.equal(sdkManifest.name, '@remotish/adapter-sdk');
   assert.equal(sdkManifest.private, undefined);
   assert.equal(sdkManifest.publishConfig?.access, 'public');
   assert.deepEqual(sdkManifest.files, ['dist']);
+  assert.equal(vscodeManifest.publishConfig, undefined);
+  assert.equal(vscodeManifest.exports?.['./provider-api'], undefined);
 
   const releaseWorkflow = await readFile(
     new URL('../../.github/workflows/release.yml', import.meta.url),
@@ -184,6 +211,7 @@ test('adapter SDK is configured as the only public npm package', async () => {
   assert.match(releaseWorkflow, /environment: npm/u);
   assert.match(releaseWorkflow, /id-token: write/u);
   assert.match(releaseWorkflow, /pnpm --filter @remotish\/adapter-sdk build/u);
+  assert.doesNotMatch(releaseWorkflow, /packages\/vscode.*npm publish/u);
   assert.match(releaseWorkflow, /npm pack --dry-run/u);
   assert.match(releaseWorkflow, /publish_args=\(--access public\)/u);
   assert.match(releaseWorkflow, /publish_args\+=\(--tag beta\)/u);
@@ -215,6 +243,14 @@ test('pnpm owns release versioning and CI uses the pinned package manager', asyn
     assert.match(source, /pnpm run ci/u);
     assert.doesNotMatch(source, /(?:^|\s)pnpm ci(?:\s|$)/mu);
   }
+});
+
+test('CI push checks target the repository default branch', async () => {
+  const ciWorkflow = await readFile(
+    new URL('../../.github/workflows/ci.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(ciWorkflow, /^ {2}push:\r?\n {4}branches:\r?\n {6}- master$/mu);
 });
 
 test('release scripts delegate generic infrastructure to standard tooling', async () => {

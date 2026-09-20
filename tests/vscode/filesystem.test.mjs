@@ -55,7 +55,7 @@ test('vscode filesystem model: revision resources are immutable', async () => {
     fs.writeFile(base, encoder.encode('nope'), { create: false, overwrite: true }),
     (error) => error instanceof RemotishError && error.code === 'FORBIDDEN',
   );
-  assert.equal(fs.isReadonly(base), true);
+  assert.equal(await fs.isReadonly(base), true);
 });
 
 test('vscode filesystem model: URI parsing requires a pinned revision for base resources', () => {
@@ -94,4 +94,42 @@ test('vscode filesystem model: URI paths use the same repository path validation
   );
   assert.throws(() => workingUriParts('fixture-demo', 'src//index.ts'));
   assert.equal(workingUriParts('fixture-demo', 'src\\index.ts').path, '/src/index.ts');
+});
+
+test('vscode filesystem model: cold read waits for workspace restoration', async () => {
+  const workspace = await RemotishWorkspace.open(new FixtureAdapter());
+  let registry;
+  registry = new WorkspaceRegistry({
+    defaultRestoreTimeoutMs: 1_000,
+    restoreWorkspace: async (workspaceId) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      registry.register(workspaceId, workspace);
+    },
+  });
+  const fs = new RepositoryFileSystem(registry);
+
+  const content = await fs.readFile(uri(workingUriParts('cold-fixture', 'README.md')));
+  assert.match(decoder.decode(content), /Fixture repository/u);
+});
+
+test('vscode filesystem model: failed restoration can be retried', async () => {
+  const workspace = await RemotishWorkspace.open(new FixtureAdapter());
+  let restoreAttempts = 0;
+  let registry;
+  registry = new WorkspaceRegistry({
+    defaultRestoreTimeoutMs: 1_000,
+    restoreWorkspace: async (workspaceId) => {
+      restoreAttempts += 1;
+      if (restoreAttempts === 1) {
+        throw new RemotishError('UNAUTHORIZED', 'Authentication cancelled.');
+      }
+      registry.register(workspaceId, workspace);
+    },
+  });
+  const fs = new RepositoryFileSystem(registry);
+  const target = uri(workingUriParts('retry-fixture', 'README.md'));
+
+  await assert.rejects(fs.readFile(target), { name: 'RemotishError', code: 'UNAUTHORIZED' });
+  assert.match(decoder.decode(await fs.readFile(target)), /Fixture repository/u);
+  assert.equal(restoreAttempts, 2);
 });

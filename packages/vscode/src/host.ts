@@ -6,16 +6,22 @@ import { RepositoryFileSystem } from './filesystem/file-system.js';
 import { RemotishFileSystemProvider } from './filesystem/provider.js';
 import { REVISION_SCHEME, WORKING_SCHEME } from './filesystem/uri.js';
 import { ScmManager } from './scm/manager.js';
-import { WorkspaceRegistry } from './workspaces/workspace-registry.js';
+import {
+  WorkspaceRegistry,
+  type WorkspaceRegistryOptions,
+} from './workspaces/workspace-registry.js';
+
+export interface RemotishVsCodeHostOptions extends WorkspaceRegistryOptions {}
 
 /** Coordinates VFS, SCM, branch UX, persistence, and workspace registrations for VS Code. */
 export class RemotishVsCodeHost implements vscode.Disposable {
-  readonly registry = new WorkspaceRegistry();
+  readonly registry: WorkspaceRegistry;
   readonly scm: ScmManager;
   readonly branches: BranchUiManager;
   private readonly disposables: vscode.Disposable[];
 
-  constructor() {
+  constructor(options: RemotishVsCodeHostOptions = {}) {
+    this.registry = new WorkspaceRegistry(options);
     const logger = vscode.window.createOutputChannel('Remotish', { log: true });
     const fileSystem = new RepositoryFileSystem(this.registry);
     const workingProvider = new RemotishFileSystemProvider(this.registry, fileSystem, 'working');

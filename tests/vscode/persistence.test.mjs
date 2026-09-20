@@ -32,6 +32,37 @@ test('vscode persistence codec: binary overlays round-trip as JSON-safe base64',
   assert.equal(decoder.decode(await restored.readFile('README.md')), 'persisted\n');
 });
 
+test('vscode persistence codec: preserves publication phases and upgrades legacy journals', () => {
+  const emptyOverlay = { files: [], directories: [], deletedPaths: [], renames: [] };
+  const published = {
+    version: 1,
+    selectedBranch: 'main',
+    branches: { main: { baseRevision: 'C3', overlay: emptyOverlay } },
+    pendingCommitPublication: {
+      phase: 'published',
+      branch: 'main',
+      expectedRemoteRevision: 'C3',
+      publishedRevision: 'C4',
+    },
+  };
+  assert.deepEqual(
+    decodeWorkspaceSnapshot(encodeWorkspaceSnapshot(published)).pendingCommitPublication,
+    published.pendingCommitPublication,
+  );
+
+  const legacy = decodeWorkspaceSnapshot({
+    version: 1,
+    selectedBranch: 'main',
+    branches: { main: { baseRevision: 'C3', overlay: emptyOverlay } },
+    pendingCommitPublication: { branch: 'main', expectedRemoteRevision: 'C3' },
+  });
+  assert.deepEqual(legacy.pendingCommitPublication, {
+    phase: 'prepared',
+    branch: 'main',
+    expectedRemoteRevision: 'C3',
+  });
+});
+
 test('vscode persistence codec: rejects malformed persisted state before decoding', () => {
   assert.throws(
     () =>

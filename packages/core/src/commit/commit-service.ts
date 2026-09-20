@@ -9,6 +9,16 @@ import {
 } from '@remotish/adapter-sdk';
 import type { WorkingTree } from '../working-tree/working-tree.js';
 
+export type BeforeCommitPublish = (request: CommitRequest) => Promise<void>;
+export type AfterCommitPublish = (
+  result: Extract<CommitResult, { readonly status: 'success' }>,
+) => Promise<void>;
+
+export interface CommitExecutionResult {
+  readonly result: CommitResult;
+  readonly reconciliation: 'settled' | 'pending';
+}
+
 /** Builds adapter commit requests and advances only the published subset of a working tree on success. */
 export class CommitService {
   constructor(private readonly adapter: RemotishAdapter) {}
@@ -18,8 +28,18 @@ export class CommitService {
     tree: WorkingTree,
     message: string,
     selectedPaths?: readonly RepoPath[],
-  ): Promise<CommitResult> {
-    return this.execute(branch, tree, message, { kind: 'normal' }, selectedPaths);
+    beforePublish?: BeforeCommitPublish,
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
+    return this.execute(
+      branch,
+      tree,
+      message,
+      { kind: 'normal' },
+      selectedPaths,
+      beforePublish,
+      afterPublish,
+    );
   }
 
   commitAndPushForceWithLease(
@@ -28,12 +48,22 @@ export class CommitService {
     message: string,
     expectedRevision: RevisionId,
     selectedPaths?: readonly RepoPath[],
-  ): Promise<CommitResult> {
+    beforePublish?: BeforeCommitPublish,
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     if (!this.adapter.capabilities.forceWithLease) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support force-with-lease.');
     }
 
-    return this.execute(branch, tree, message, { kind: 'force', expectedRevision }, selectedPaths);
+    return this.execute(
+      branch,
+      tree,
+      message,
+      { kind: 'force', expectedRevision },
+      selectedPaths,
+      beforePublish,
+      afterPublish,
+    );
   }
 
   amendAndPushForceWithLease(
@@ -41,7 +71,9 @@ export class CommitService {
     tree: WorkingTree,
     message: string,
     selectedPaths?: readonly RepoPath[],
-  ): Promise<CommitResult> {
+    beforePublish?: BeforeCommitPublish,
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     if (!this.adapter.capabilities.amend || !this.adapter.capabilities.forceWithLease) {
       throw new RemotishError(
         'UNSUPPORTED',
@@ -58,6 +90,8 @@ export class CommitService {
         expectedRevision: tree.baseRevision,
       },
       selectedPaths,
+      beforePublish,
+      afterPublish,
     );
   }
 
@@ -70,7 +104,9 @@ export class CommitService {
       | { readonly kind: 'force'; readonly expectedRevision: RevisionId }
       | { readonly kind: 'amend'; readonly expectedRevision: RevisionId },
     selectedPaths?: readonly RepoPath[],
-  ): Promise<CommitResult> {
+    beforePublish?: BeforeCommitPublish,
+    afterPublish?: AfterCommitPublish,
+  ): Promise<CommitExecutionResult> {
     const commit = this.adapter.commit;
     if (!this.adapter.capabilities.commits || !commit) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support commit publication.');
@@ -124,17 +160,28 @@ export class CommitService {
       };
     }
 
+    await beforePublish?.(request);
     const result = await commit.call(this.adapter, request);
     if (result.status !== 'success') {
-      return result;
+      return { result, reconciliation: 'settled' };
+    }
+
+    try {
+      await afterPublish?.(result);
+    } catch {
+      // Publication already succeeded. Journal persistence cannot turn it back into a failure.
     }
 
     if (selectedPaths === undefined) {
       tree.acceptPublishedRevision(result.revision);
-    } else {
-      await tree.acceptPartiallyPublishedRevision(result.revision);
+      return { result, reconciliation: 'settled' };
     }
 
-    return result;
+    try {
+      await tree.acceptPartiallyPublishedRevision(result.revision);
+      return { result, reconciliation: 'settled' };
+    } catch {
+      return { result, reconciliation: 'pending' };
+    }
   }
 }

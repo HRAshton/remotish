@@ -1,0 +1,21 @@
+{
+  "name": "remotish-fixture-provider",
+  "displayName": "Remotish Fixture Provider",
+  "description": "Packaged web-provider fixture used by Remotish VSIX smoke tests.",
+  "version": "0.0.1",
+  "publisher": "remotish-tests",
+  "license": "0BSD",
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "browser": "./dist/extension.js",
+  "capabilities": {
+    "virtualWorkspaces": true
+  },
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "fixture-provider",
+    "displayName": "Fixture Provider"
+  }
+}

@@ -79,6 +79,10 @@ export class BranchWorkspaces {
     this.workspaces.set(branch.name, workspace);
   }
 
+  hasChanges(branch: BranchName): boolean {
+    return this.workspaces.get(branch)?.tree.hasChanges ?? false;
+  }
+
   remove(branch: BranchName): void {
     this.workspaces.delete(branch);
   }
@@ -94,6 +98,17 @@ export class BranchWorkspaces {
       branches[branch] = { baseRevision: snapshot.baseRevision, overlay: snapshot.overlay };
     }
     return { version: 1, selectedBranch: this._selectedBranch, branches };
+  }
+
+  restore(snapshot: WorkspaceSnapshot): void {
+    this.workspaces.clear();
+    for (const [branch, branchSnapshot] of Object.entries(snapshot.branches)) {
+      this.workspaces.set(
+        branch,
+        this.createWorkspace(branch, branchSnapshot.baseRevision, branchSnapshot.overlay),
+      );
+    }
+    this._selectedBranch = snapshot.selectedBranch;
   }
 
   private async ensureWorkspace(branch: BranchName): Promise<void> {

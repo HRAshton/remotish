@@ -104,13 +104,15 @@ async function revertFromArgument(
   explicitPath?: string,
 ): Promise<void> {
   const resource = requireScmResourceArgument(value, explicitPath);
+  const workspace = registry.require(resource.workspaceId).workspace;
+  const expectedState = { branch: workspace.branch, baseRevision: workspace.baseRevision };
   const confirmed = await vscode.window.showWarningMessage(
     `Revert working changes to ${resource.path}?`,
     { modal: true },
     'Revert',
   );
   if (confirmed === 'Revert') {
-    await registry.require(resource.workspaceId).workspace.revert(resource.path);
+    await workspace.revert(resource.path, expectedState);
   }
 }
 
@@ -120,6 +122,7 @@ async function revertAllFromArgument(registry: WorkspaceRegistry, value: unknown
   if (!workspace.hasChanges) {
     return;
   }
+  const expectedState = { branch: workspace.branch, baseRevision: workspace.baseRevision };
 
   const confirmed = await vscode.window.showWarningMessage(
     'Revert all working changes?',
@@ -127,7 +130,7 @@ async function revertAllFromArgument(registry: WorkspaceRegistry, value: unknown
     'Revert All',
   );
   if (confirmed === 'Revert All') {
-    await workspace.revertAll();
+    await workspace.revertAll(expectedState);
   }
 }
 

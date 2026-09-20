@@ -280,12 +280,15 @@ function command(
   };
 }
 
-/** Resolves the current remote head for the workspace's selected branch. */
-export async function currentRemoteRevision(workspace: RemotishWorkspace): Promise<RevisionId> {
+/** Resolves the current remote head for one explicitly selected branch. */
+export async function currentRemoteRevision(
+  workspace: RemotishWorkspace,
+  branch: BranchName,
+): Promise<RevisionId> {
   const branches = await workspace.listBranches();
-  const branch = branches.find((candidate) => candidate.name === workspace.branch);
-  if (!branch) {
-    throw new RemotishError('NOT_FOUND', `Branch ${workspace.branch} no longer exists.`);
+  const remote = branches.find((candidate) => candidate.name === branch);
+  if (!remote) {
+    throw new RemotishError('NOT_FOUND', `Branch ${branch} no longer exists.`);
   }
-  return branch.revision;
+  return remote.revision;
 }

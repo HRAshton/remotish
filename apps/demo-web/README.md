@@ -1,30 +1,28 @@
-# Remotish Demo Web Extension
+# Remotish Web Host Extension
 
-Complete browser-host composition example for Remotish.
+Browser-safe Remotish host extension plus the fixture-powered smoke-test workspace.
 
-The demo deliberately contains no repository-specific VS Code UI code. It wires:
+The host discovers independently installed provider extensions from manifest metadata without activating them at startup. Providers consume only `@remotish/adapter-sdk`; provider → host bootstrap operations use the versioned `remotish.ensureRepository` and `remotish.openRepository` commands.
+
+The bundled fixture remains available for local and packaged VS Code Web smoke tests:
 
 ```text
 FixtureAdapter
       ↓
 RemotishWorkspace
       ↓
-RemotishVsCodeHost
+RemotishProviderHost / RemotishVsCodeHost
       ↓
-RemotishHistoryHost
+filesystem + SCM + history
 ```
 
-Run it from the repository root:
+Run from the repository root:
 
 ```sh
 corepack pnpm install --frozen-lockfile
 corepack pnpm vscode:web
 ```
 
-The opened workspace root is `remotish://fixture-demo/`.
+The fixture workspace root is `remotish://fixture-demo/`. Production providers are discovered lazily and are not required to import `@remotish/vscode` or `@remotish/core`.
 
-`package.json` is the reference extension manifest for command/menu contributions, `resourceLabelFormatters`, virtual-workspace support and the proposal flags required by the controlled Code-OSS host.
-
-The production bundle is browser/WebWorker-oriented. CI tests both the source extension and the unpacked exact VSIX artifact through `@vscode/test-web`.
-
-See [Getting started](https://github.com/HRAshton/remotish/blob/main/docs/getting-started.md) for the walkthrough and [VS Code integration](https://github.com/HRAshton/remotish/blob/main/docs/vscode-integration.md) before adapting this composition to a production extension.
+See [Provider extensions](../../docs/provider-extensions.md), [Getting started](../../docs/getting-started.md), and [VS Code integration](../../docs/vscode-integration.md).

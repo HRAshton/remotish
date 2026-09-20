@@ -10,6 +10,19 @@ interface StoredRenameSnapshot {
   readonly to: string;
 }
 
+type StoredPendingCommitPublication =
+  | {
+      readonly phase: 'prepared';
+      readonly branch: string;
+      readonly expectedRemoteRevision: string;
+    }
+  | {
+      readonly phase: 'published';
+      readonly branch: string;
+      readonly expectedRemoteRevision: string;
+      readonly publishedRevision: string;
+    };
+
 interface StoredBranchWorkspaceSnapshot {
   readonly baseRevision: string;
   readonly overlay: {
@@ -25,6 +38,7 @@ export interface StoredWorkspaceSnapshot {
   readonly version: 1;
   readonly selectedBranch: string;
   readonly branches: Readonly<Record<string, StoredBranchWorkspaceSnapshot>>;
+  readonly pendingCommitPublication?: StoredPendingCommitPublication;
 }
 
 /** Encodes binary overlay files as base64 for Memento-compatible JSON storage. */
@@ -44,7 +58,14 @@ export function encodeWorkspaceSnapshot(snapshot: WorkspaceSnapshot): StoredWork
       },
     };
   }
-  return { version: 1, selectedBranch: snapshot.selectedBranch, branches };
+  return {
+    version: 1,
+    selectedBranch: snapshot.selectedBranch,
+    branches,
+    ...(snapshot.pendingCommitPublication
+      ? { pendingCommitPublication: { ...snapshot.pendingCommitPublication } }
+      : {}),
+  };
 }
 
 /** Validates and restores persisted JSON/base64 data to the core workspace representation. */
@@ -65,7 +86,14 @@ export function decodeWorkspaceSnapshot(value: unknown): WorkspaceSnapshot {
       },
     };
   }
-  return { version: 1, selectedBranch: stored.selectedBranch, branches };
+  return {
+    version: 1,
+    selectedBranch: stored.selectedBranch,
+    branches,
+    ...(stored.pendingCommitPublication
+      ? { pendingCommitPublication: { ...stored.pendingCommitPublication } }
+      : {}),
+  };
 }
 
 function requireStoredWorkspaceSnapshot(value: unknown): StoredWorkspaceSnapshot {
@@ -76,6 +104,10 @@ function requireStoredWorkspaceSnapshot(value: unknown): StoredWorkspaceSnapshot
   const selectedBranch = requireString(snapshot.selectedBranch, 'selectedBranch');
   const storedBranches = requireRecord(snapshot.branches, 'branches');
   const branches = Object.create(null) as Record<string, StoredBranchWorkspaceSnapshot>;
+  const pendingCommitPublication =
+    snapshot.pendingCommitPublication === undefined
+      ? undefined
+      : requirePendingCommitPublication(snapshot.pendingCommitPublication);
 
   for (const [name, value] of Object.entries(storedBranches)) {
     const branch = requireRecord(value, `branches.${name}`);
@@ -117,7 +149,39 @@ function requireStoredWorkspaceSnapshot(value: unknown): StoredWorkspaceSnapshot
   if (!Object.hasOwn(branches, selectedBranch)) {
     throw invalidSnapshot(`selected branch ${selectedBranch} is not present in branches`);
   }
-  return { version: 1, selectedBranch, branches };
+  if (pendingCommitPublication && pendingCommitPublication.branch !== selectedBranch) {
+    throw invalidSnapshot('pending publication branch must be the selected branch');
+  }
+  return {
+    version: 1,
+    selectedBranch,
+    branches,
+    ...(pendingCommitPublication ? { pendingCommitPublication } : {}),
+  };
+}
+
+function requirePendingCommitPublication(value: unknown): StoredPendingCommitPublication {
+  const pending = requireRecord(value, 'pendingCommitPublication');
+  const branch = requireString(pending.branch, 'pendingCommitPublication.branch');
+  const expectedRemoteRevision = requireString(
+    pending.expectedRemoteRevision,
+    'pendingCommitPublication.expectedRemoteRevision',
+  );
+  if (pending.phase === undefined || pending.phase === 'prepared') {
+    return { phase: 'prepared', branch, expectedRemoteRevision };
+  }
+  if (pending.phase === 'published') {
+    return {
+      phase: 'published',
+      branch,
+      expectedRemoteRevision,
+      publishedRevision: requireString(
+        pending.publishedRevision,
+        'pendingCommitPublication.publishedRevision',
+      ),
+    };
+  }
+  throw invalidSnapshot(`pendingCommitPublication.phase is unsupported: ${String(pending.phase)}`);
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

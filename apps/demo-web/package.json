@@ -1,8 +1,8 @@
 {
-  "name": "remotish-demo",
-  "displayName": "Remotish Demo",
-  "description": "Fixture-powered browser demo for the Remotish remote repository framework.",
-  "version": "0.1.0-beta.11",
+  "name": "remotish",
+  "displayName": "Remotish",
+  "description": "Browser-safe Remotish host extension with automatic adapter provider discovery.",
+  "version": "0.1.0-beta.12",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
@@ -28,7 +28,10 @@
   ],
   "activationEvents": [
     "onFileSystem:remotish",
-    "onFileSystem:remotish-base"
+    "onFileSystem:remotish-base",
+    "onCommand:remotish.ensureRepository",
+    "onCommand:remotish.openRepository",
+    "onCommand:remotish.refreshProviders"
   ],
   "capabilities": {
     "virtualWorkspaces": true,
@@ -103,6 +106,18 @@
       {
         "command": "remotish.demo.openFixture",
         "title": "Remotish Demo: Open Fixture Repository"
+      },
+      {
+        "command": "remotish.ensureRepository",
+        "title": "Remotish: Ensure Remote Repository"
+      },
+      {
+        "command": "remotish.openRepository",
+        "title": "Remotish: Open Remote Repository"
+      },
+      {
+        "command": "remotish.refreshProviders",
+        "title": "Remotish: Refresh Providers"
       }
     ],
     "menus": {
@@ -179,6 +194,14 @@
         },
         {
           "command": "remotish.revertAll",
+          "when": "false"
+        },
+        {
+          "command": "remotish.ensureRepository",
+          "when": "false"
+        },
+        {
+          "command": "remotish.openRepository",
           "when": "false"
         }
       ]

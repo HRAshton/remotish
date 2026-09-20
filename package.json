@@ -1,6 +1,6 @@
 {
   "name": "remotish",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "private": true,
   "license": "0BSD",
   "packageManager": "pnpm@12.5.1",
@@ -24,7 +24,7 @@
     "test:adapter": "pnpm build && node --import ./tests/vscode-runtime/register-vscode-stub.mjs --test tests/adapter/*.test.mjs tests/http/*.test.mjs tests/github/github-adapter.test.mjs",
     "test:github-live": "pnpm build && cross-env REMOTISH_LIVE_GITHUB=1 node --test tests/github/github-live.test.mjs",
     "bundle:demo:extension": "esbuild apps/demo-web/src/extension.ts --bundle --platform=browser --format=cjs --external:vscode --outfile=apps/demo-web/dist/extension.js",
-    "bundle:demo:tests": "esbuild apps/demo-web/src/test/suite/index.ts --bundle --platform=browser --format=cjs --external:vscode --outfile=apps/demo-web/dist/test/suite/index.js",
+    "bundle:demo:tests": "esbuild apps/demo-web/src/test/suite/index.ts apps/demo-web/src/test/suite/vsix.ts --bundle --platform=browser --format=cjs --external:vscode --outdir=apps/demo-web/dist/test/suite",
     "bundle:demo": "pnpm build && pnpm bundle:demo:extension",
     "vscode:web": "pnpm bundle:demo && vscode-test-web --browserType=chromium --extensionDevelopmentPath=apps/demo-web --folder-uri=remotish://fixture-demo/",
     "test:vscode-web": "pnpm build && pnpm bundle:demo:extension && pnpm bundle:demo:tests && vscode-test-web --browserType=chromium --headless=true --extensionDevelopmentPath=apps/demo-web --extensionTestsPath=apps/demo-web/dist/test/suite/index.js --folder-uri=remotish://fixture-demo/",
@@ -32,8 +32,10 @@
     "release:source": "shx mkdir -p artifacts && git archive --format=tar.gz --output=artifacts/remotish-framework.tar.gz HEAD",
     "ci": "pnpm build && pnpm lint && pnpm test && shx mkdir -p artifacts && pnpm sbom --sbom-format cyclonedx --sbom-spec-version 1.6 --sbom-type application --prod --lockfile-only --out artifacts/remotish.cdx.json",
     "release:vsix": "shx rm -rf apps/demo-web/dist && pnpm bundle:demo && shx mkdir -p artifacts && pnpm --dir apps/demo-web exec vsce package --no-dependencies --allow-missing-repository --out ../../artifacts/remotish-demo.vsix",
-    "prepare:vscode-web-vsix": "node scripts/prepare-vsix-smoke.mjs artifacts/remotish-demo.vsix",
-    "test:vscode-web:vsix": "pnpm release:vsix && pnpm bundle:demo:tests && pnpm prepare:vscode-web-vsix && vscode-test-web --browserType=chromium --headless=true --extensionDevelopmentPath=artifacts/vsix-smoke/extension --extensionTestsPath=artifacts/vsix-smoke/extension/dist/test/suite/index.js --folder-uri=remotish://fixture-demo/ && shx rm -rf artifacts/vsix-smoke"
+    "prepare:vscode-web-vsix": "node scripts/prepare-vsix-smoke.mjs artifacts/remotish-demo.vsix artifacts/remotish-fixture-provider.vsix",
+    "test:vscode-web:vsix": "pnpm release:vsix && pnpm release:test-provider:vsix && pnpm bundle:demo:tests && pnpm prepare:vscode-web-vsix && vscode-test-web --browserType=chromium --headless=true --extensionDevelopmentPath=artifacts/vsix-smoke/extension --extensionTestsPath=artifacts/vsix-smoke/extension/dist/test/suite/vsix.js --extensionPath=artifacts/vsix-smoke/providers --folder-uri=remotish://fixture-demo/ && shx rm -rf artifacts/vsix-smoke tests/fixtures/provider-extension/dist",
+    "bundle:test-provider:extension": "esbuild tests/fixtures/provider-extension/src/extension.ts --bundle --platform=browser --format=cjs --external:vscode --outfile=tests/fixtures/provider-extension/dist/extension.js",
+    "release:test-provider:vsix": "pnpm bundle:test-provider:extension && node scripts/package-provider-vsix-smoke.mjs artifacts/remotish-fixture-provider.vsix"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

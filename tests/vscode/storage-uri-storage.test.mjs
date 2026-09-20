@@ -25,6 +25,67 @@ test('vscode persistence: storageUri-backed storage restores workspace overlays'
   vscode.__test.reset();
 });
 
+test('vscode persistence: storageUri preserves publication phases and upgrades legacy journals', async () => {
+  vscode.__test.reset();
+  const root = vscode.Uri.from({ scheme: 'test-storage', authority: 'workspace', path: '/state' });
+  const namespace = 'publication-journal';
+  const repositoryId = 'fixture/demo';
+  const storage = new StorageUriWorkspaceStorage(root, namespace);
+  const emptyOverlay = { files: [], directories: [], deletedPaths: [], renames: [] };
+  const published = {
+    version: 1,
+    selectedBranch: 'main',
+    branches: { main: { baseRevision: 'C3', overlay: emptyOverlay } },
+    pendingCommitPublication: {
+      phase: 'published',
+      branch: 'main',
+      expectedRemoteRevision: 'C3',
+      publishedRevision: 'C4',
+    },
+  };
+
+  await storage.save(repositoryId, published);
+  assert.deepEqual(
+    (await storage.load(repositoryId)).pendingCommitPublication,
+    published.pendingCommitPublication,
+  );
+
+  const pointerKey = [...vscode.__test.storageFiles.keys()].find(
+    (key) => key.includes(namespace) && key.endsWith('/current.json'),
+  );
+  assert.ok(pointerKey);
+  const pointer = JSON.parse(decoder.decode(vscode.__test.storageFiles.get(pointerKey)));
+  const manifestKey = [...vscode.__test.storageFiles.keys()].find((key) =>
+    key.endsWith(`/manifests/${pointer.current}.json`),
+  );
+  assert.ok(manifestKey);
+  const manifest = JSON.parse(decoder.decode(vscode.__test.storageFiles.get(manifestKey)));
+  manifest.pendingCommitPublication = { branch: 'main', expectedRemoteRevision: 'C3' };
+
+  const legacyContent = encoder.encode(JSON.stringify(manifest));
+  const digest = await crypto.subtle.digest('SHA-256', legacyContent);
+  const legacyGeneration = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  const legacyManifestKey = manifestKey.replace(
+    `${pointer.current}.json`,
+    `${legacyGeneration}.json`,
+  );
+  vscode.__test.storageFiles.set(legacyManifestKey, legacyContent);
+  vscode.__test.storageFiles.set(
+    pointerKey,
+    encoder.encode(JSON.stringify({ version: 1, current: legacyGeneration })),
+  );
+
+  const restarted = new StorageUriWorkspaceStorage(root, namespace);
+  assert.deepEqual((await restarted.load(repositoryId)).pendingCommitPublication, {
+    phase: 'prepared',
+    branch: 'main',
+    expectedRemoteRevision: 'C3',
+  });
+  vscode.__test.reset();
+});
+
 test('vscode persistence: storageUri uses raw content-addressed blobs instead of base64 snapshots', async () => {
   vscode.__test.reset();
   const root = vscode.Uri.from({ scheme: 'test-storage', authority: 'workspace', path: '/state' });

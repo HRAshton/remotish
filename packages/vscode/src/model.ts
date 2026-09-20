@@ -32,5 +32,7 @@ export type {
   RegisteredWorkspace,
   RegisteredWorkspaceChangedEvent,
   WorkspaceRegistryEvent,
+  WorkspaceRegistryOptions,
+  WorkspaceWaitOptions,
 } from './workspaces/workspace-registry.js';
 export { WorkspaceRegistry } from './workspaces/workspace-registry.js';

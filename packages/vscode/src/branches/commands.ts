@@ -53,15 +53,20 @@ async function switchBranch(registry: WorkspaceRegistry, workspaceId: string): P
 
 async function createBranch(registry: WorkspaceRegistry, workspaceId: string): Promise<void> {
   const workspace = registry.require(workspaceId).workspace;
+  const expectedBranch = workspace.branch;
+  const expectedBaseRevision = workspace.baseRevision;
   const name = await vscode.window.showInputBox({
     title: 'Create Remote Branch',
-    prompt: `Create from ${workspace.baseRevision}`,
+    prompt: `Create from ${expectedBaseRevision}`,
     validateInput: (value) => (value.trim() ? undefined : 'Branch name is required.'),
   });
   if (!name) {
     return;
   }
-  await workspace.createBranch(name.trim(), true);
+  await workspace.createBranch(name.trim(), true, {
+    branch: expectedBranch,
+    baseRevision: expectedBaseRevision,
+  });
 }
 
 async function deleteBranch(registry: WorkspaceRegistry, workspaceId: string): Promise<void> {

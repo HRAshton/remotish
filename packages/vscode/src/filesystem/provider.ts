@@ -44,7 +44,9 @@ export class RemotishFileSystemProvider implements vscode.FileSystemProvider, vs
         ctime: timestamps.ctime,
         mtime: timestamps.mtime,
         size: stat.size,
-        ...(this.fileSystem.isReadonly(uri) ? { permissions: vscode.FilePermission.Readonly } : {}),
+        ...((await this.fileSystem.isReadonly(uri))
+          ? { permissions: vscode.FilePermission.Readonly }
+          : {}),
       };
     });
   }

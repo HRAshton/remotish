@@ -59,14 +59,26 @@ export class WorkspaceBranchService {
     return branch;
   }
 
-  async delete(name: BranchName): Promise<void> {
+  validateDelete(name: BranchName): void {
     if (name === this.branches.selectedBranch) {
       throw new RemotishError('INVALID_REQUEST', 'Cannot delete the currently selected branch.');
+    }
+    if (this.branches.hasChanges(name)) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Cannot delete branch ${name} because it has uncommitted local changes.`,
+      );
     }
     if (!this.adapter.capabilities.deleteBranch || !this.adapter.deleteBranch) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support branch deletion.');
     }
-    await this.adapter.deleteBranch(name);
-    this.branches.remove(name);
+  }
+
+  deleteRemote(name: BranchName): Promise<void> {
+    const deleteBranch = this.adapter.deleteBranch;
+    if (!deleteBranch) {
+      throw new RemotishError('UNSUPPORTED', 'Adapter does not support branch deletion.');
+    }
+    return deleteBranch.call(this.adapter, name);
   }
 }

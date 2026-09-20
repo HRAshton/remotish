@@ -7,11 +7,26 @@ export interface BranchWorkspaceSnapshot {
   readonly overlay: OverlaySnapshot;
 }
 
+/** Durable state for a commit publication that has not been fully reconciled locally. */
+type PendingCommitPublication =
+  | Readonly<{
+      phase: 'prepared';
+      branch: BranchName;
+      expectedRemoteRevision: RevisionId;
+    }>
+  | Readonly<{
+      phase: 'published';
+      branch: BranchName;
+      expectedRemoteRevision: RevisionId;
+      publishedRevision: RevisionId;
+    }>;
+
 /** Persisted selected branch plus all branch-local workspace states for one repository. */
 export interface WorkspaceSnapshot {
   readonly version: 1;
   readonly selectedBranch: BranchName;
   readonly branches: Readonly<Record<BranchName, BranchWorkspaceSnapshot>>;
+  readonly pendingCommitPublication?: PendingCommitPublication;
 }
 
 /** Host-provided persistence boundary for loading and saving repository workspace state. */

@@ -141,6 +141,19 @@ const warningResponses = [];
 const storageFiles = new Map();
 const storageDirectories = new Set();
 const logOutputChannels = [];
+const installedExtensions = [];
+const extensionsChanged = new EventEmitter();
+
+export const extensions = {
+  get all() {
+    return [...installedExtensions];
+  },
+  getExtension(id) {
+    const normalized = String(id).toLowerCase();
+    return installedExtensions.find((extension) => extension.id.toLowerCase() === normalized);
+  },
+  onDidChange: extensionsChanged.event,
+};
 
 export const commands = {
   registerCommand(command, callback) {
@@ -389,7 +402,43 @@ export const __test = {
   logOutputChannels,
   storageFiles,
   storageDirectories,
-  reset() {
+  installedExtensions,
+  installExtension({ id, packageJSON = {}, activate = async () => undefined }) {
+    let activation;
+    const extension = {
+      id,
+      packageJSON,
+      extensionUri: Uri.from({ scheme: 'test-extension', authority: id, path: '/' }),
+      extensionPath: `/extensions/${id}`,
+      isActive: false,
+      exports: undefined,
+      async activate() {
+        if (!activation) {
+          activation = Promise.resolve()
+            .then(activate)
+            .then((value) => {
+              extension.exports = value;
+              extension.isActive = true;
+              return value;
+            });
+        }
+        return activation;
+      },
+    };
+    installedExtensions.push(extension);
+    extensionsChanged.fire(undefined);
+    return extension;
+  },
+  removeExtension(id) {
+    const index = installedExtensions.findIndex(
+      (extension) => extension.id.toLowerCase() === String(id).toLowerCase(),
+    );
+    if (index >= 0) {
+      installedExtensions.splice(index, 1);
+      extensionsChanged.fire(undefined);
+    }
+  },
+  reset(options = {}) {
     commandHandlers.clear();
     fileSystemProviders.clear();
     timelineProviders.splice(0);
@@ -402,8 +451,13 @@ export const __test = {
     quickPickResponses.splice(0);
     inputBoxResponses.splice(0);
     warningResponses.splice(0);
-    storageFiles.clear();
-    storageDirectories.clear();
+    if (!options.preserveStorage) {
+      storageFiles.clear();
+      storageDirectories.clear();
+    }
+    if (!options.preserveExtensions) {
+      installedExtensions.splice(0);
+    }
     logOutputChannels.splice(0);
   },
 };
