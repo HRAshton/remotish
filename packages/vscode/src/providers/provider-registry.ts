@@ -1,10 +1,8 @@
 import { RemotishError } from '@remotish/adapter-sdk';
-import type {
-  RemotishDisposable,
-  RemotishProviderRegistration,
-} from '../provider-api.js';
+import type { RemotishDisposable, RemotishProviderRegistration } from '../provider-api.js';
 
 const PROVIDER_ID_MAX_LENGTH = 64;
+const EXTENSION_ID_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9.-]*$/u;
 
 /** Tracks provider wrapper registrations exposed through the installed Remotish host. */
 export class ProviderRegistry {
@@ -13,8 +11,21 @@ export class ProviderRegistry {
   register(provider: RemotishProviderRegistration): RemotishDisposable {
     const id = normalizeProviderId(provider.id);
     const displayName = provider.displayName.trim();
+    const extensionId = provider.extensionId.trim().toLowerCase();
     if (!displayName) {
       throw new RemotishError('INVALID_REQUEST', 'Provider displayName is required.');
+    }
+    if (!EXTENSION_ID_PATTERN.test(extensionId)) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Provider ${id} must declare a valid VS Code extensionId.`,
+      );
+    }
+    if (typeof provider.validateRepository !== 'function') {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Provider ${id} must define validateRepository().`,
+      );
     }
     if (typeof provider.createAdapter !== 'function') {
       throw new RemotishError('INVALID_REQUEST', `Provider ${id} must define createAdapter().`);
@@ -26,6 +37,8 @@ export class ProviderRegistry {
     const registration: RemotishProviderRegistration = {
       id,
       displayName,
+      extensionId,
+      validateRepository: (repository) => provider.validateRepository(repository),
       createAdapter: (repository) => provider.createAdapter(repository),
     };
     this.providers.set(id, registration);

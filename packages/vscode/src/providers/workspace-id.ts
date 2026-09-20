@@ -4,9 +4,13 @@ import { normalizeProviderId } from './provider-registry.js';
 const encoder = new TextEncoder();
 
 /**
- * Derives a branch-independent workspace authority from provider identity and stable repository ID.
+ * Stable workspace-ID format v1.
  *
- * The repository ID is hashed so workspace authorities do not expose provider-specific identifiers.
+ * Input: lower-cased provider id, NUL separator, exact trimmed stable repository id.
+ * Digest: SHA-256. Authority: <provider>-<first 32 lowercase hex digest characters>.
+ *
+ * This format is persisted external state and must not change without a new format version and
+ * migration path.
  */
 export async function createStableWorkspaceId(
   providerId: string,
@@ -25,4 +29,19 @@ export async function createStableWorkspaceId(
     .join('');
 
   return `${provider}-${hash.slice(0, 32)}`;
+}
+
+/** Verifies that a restored adapter still resolves to the persisted canonical authority. */
+export async function verifyStableWorkspaceId(
+  providerId: string,
+  repositoryId: string,
+  expectedWorkspaceId: string,
+): Promise<void> {
+  const actual = await createStableWorkspaceId(providerId, repositoryId);
+  if (actual !== expectedWorkspaceId.trim().toLowerCase()) {
+    throw new RemotishError(
+      'INVALID_REQUEST',
+      `Repository identity does not match restored workspace ${expectedWorkspaceId}.`,
+    );
+  }
 }

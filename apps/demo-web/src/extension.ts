@@ -6,16 +6,19 @@ import {
   ProviderRegistry,
   RemotishVsCodeHost,
   StorageUriWorkspaceStorage,
+  verifyStableWorkspaceId,
 } from '@remotish/vscode';
 import {
   REMOTISH_EXTENSION_API_VERSION,
   type RemotishExtensionApiV1,
   type RemotishOpenRequest,
+  type RemotishOpenResult,
 } from '@remotish/vscode/provider-api';
 import { RemotishHistoryHost } from '@remotish/vscode-history';
 import * as vscode from 'vscode';
 
 const WORKSPACE_ID = 'fixture-demo';
+const HOST_RESTORE_PREFIX = 'remotish.restore.v1.';
 const SECRET_DESCRIPTOR_KEYS = new Set([
   'access_token',
   'api_token',
@@ -26,6 +29,7 @@ const SECRET_DESCRIPTOR_KEYS = new Set([
   'oauth_token',
   'password',
   'private_key',
+  'publisher_token',
   'refresh_token',
   'secret',
   'session',
@@ -33,17 +37,122 @@ const SECRET_DESCRIPTOR_KEYS = new Set([
   'token',
 ]);
 
-export async function activate(
-  context: vscode.ExtensionContext,
-): Promise<RemotishExtensionApiV1> {
+interface HostRestoreMetadataV1 {
+  readonly version: 1;
+  readonly provider: string;
+  readonly extensionId: string;
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<RemotishExtensionApiV1> {
   const storageRoot = context.storageUri ?? context.globalStorageUri;
   const hostStorage = new StorageUriWorkspaceStorage(storageRoot, 'host');
   const demoStorage = new StorageUriWorkspaceStorage(storageRoot, 'demo-fixture');
-
-  const host = new RemotishVsCodeHost();
   const providers = new ProviderRegistry();
+  const pendingPreparations = new Map<string, Promise<RemotishOpenResult>>();
+
+  const host = new RemotishVsCodeHost({
+    restoreWorkspace: async (workspaceId) => {
+      const metadata = context.globalState.get<HostRestoreMetadataV1>(
+        `${HOST_RESTORE_PREFIX}${workspaceId}`,
+      );
+      if (metadata?.version !== 1) {
+        throw new Error(`No provider restoration metadata exists for ${workspaceId}.`);
+      }
+
+      const extension = vscode.extensions.getExtension(metadata.extensionId);
+      if (!extension) {
+        throw new Error(
+          `Provider extension ${metadata.extensionId} for ${workspaceId} is not installed.`,
+        );
+      }
+
+      if (!extension.isActive) {
+        await extension.activate();
+      }
+
+      if (!providers.get(metadata.provider)) {
+        throw new Error(
+          `Provider ${metadata.provider} did not register after activating ${metadata.extensionId}.`,
+        );
+      }
+
+      // The provider wrapper owns the descriptor and, on activation, must restore the canonical
+      // workspace by calling ensureRepository() with expectedWorkspaceId set to workspaceId.
+    },
+  });
   const history = new RemotishHistoryHost(host);
   context.subscriptions.push(host, history);
+
+  const ensureRepository = (request: RemotishOpenRequest): Promise<RemotishOpenResult> => {
+    validateOpenRequest(request);
+    const key = preparationKey(request);
+    const pending = pendingPreparations.get(key);
+
+    if (pending !== undefined) {
+      return pending;
+    }
+
+    const preparation = prepareRepository(request).finally(() => {
+      if (pendingPreparations.get(key) === preparation) {
+        pendingPreparations.delete(key);
+      }
+    });
+
+    pendingPreparations.set(key, preparation);
+    return preparation;
+  };
+
+  const prepareRepository = async (request: RemotishOpenRequest): Promise<RemotishOpenResult> => {
+    const provider = providers.require(request.provider);
+    provider.validateRepository(request.repository);
+
+    const adapter = await provider.createAdapter(request.repository);
+    const candidate = await RemotishWorkspace.open(adapter, hostStorage);
+    const workspaceId = await createStableWorkspaceId(provider.id, candidate.repositoryInfo.id);
+
+    if (request.expectedWorkspaceId) {
+      await verifyStableWorkspaceId(
+        provider.id,
+        candidate.repositoryInfo.id,
+        request.expectedWorkspaceId,
+      );
+    }
+
+    const requestedBranch = request.branch?.trim();
+    const existing = host.registry.get(workspaceId);
+    let workspace = existing?.workspace;
+
+    if (workspace) {
+      if (requestedBranch && workspace.branch !== requestedBranch) {
+        await workspace.switchBranch(requestedBranch);
+      }
+    } else {
+      if (requestedBranch && candidate.branch !== requestedBranch) {
+        await candidate.switchBranch(requestedBranch);
+      }
+      const unregister = host.registry.register(workspaceId, candidate);
+      context.subscriptions.push(unregister);
+      workspace = candidate;
+    }
+
+    await context.globalState.update(`${HOST_RESTORE_PREFIX}${workspaceId}`, {
+      version: 1,
+      provider: provider.id,
+      extensionId: provider.extensionId,
+    } satisfies HostRestoreMetadataV1);
+
+    const uri = createWorkingUri(workspaceId);
+    const requestedPath = request.path?.trim();
+    const resourceUri = requestedPath ? createWorkingUri(workspaceId, requestedPath) : undefined;
+
+    return {
+      workspaceId,
+      repositoryId: workspace.repositoryInfo.id,
+      branch: workspace.branch,
+      uri: uri.toString(),
+      ...(resourceUri ? { resourceUri: resourceUri.toString() } : {}),
+    };
+  };
 
   const api: RemotishExtensionApiV1 = {
     version: REMOTISH_EXTENSION_API_VERSION,
@@ -54,41 +163,16 @@ export async function activate(
       return registration;
     },
 
+    ensureRepository,
+
     async openRepository(request) {
-      validateOpenRequest(request);
-      const provider = providers.require(request.provider);
-      const adapter = await provider.createAdapter(request.repository);
-      const candidate = await RemotishWorkspace.open(adapter, hostStorage);
-      const requestedBranch = request.branch?.trim();
-
-      if (requestedBranch) {
-        await candidate.switchBranch(requestedBranch);
-      }
-
-      const workspaceId = await createStableWorkspaceId(
-        provider.id,
-        candidate.repositoryInfo.id,
+      const result = await ensureRepository(request);
+      await vscode.commands.executeCommand(
+        'vscode.openFolder',
+        createWorkingUri(result.workspaceId),
+        false,
       );
-      const existing = host.registry.get(workspaceId);
-      let workspace = existing?.workspace;
-
-      if (!workspace) {
-        const unregister = host.registry.register(workspaceId, candidate);
-        context.subscriptions.push(unregister);
-        workspace = candidate;
-      } else if (requestedBranch && workspace.branch !== requestedBranch) {
-        await workspace.switchBranch(requestedBranch);
-      }
-
-      const uri = createWorkingUri(workspaceId, request.path ?? '');
-      await vscode.commands.executeCommand('vscode.openFolder', uri, false);
-
-      return {
-        workspaceId,
-        repositoryId: workspace.repositoryInfo.id,
-        branch: workspace.branch,
-        uri: uri.toString(),
-      };
+      return result;
     },
   };
 
@@ -132,4 +216,18 @@ function validateOpenRequest(request: RemotishOpenRequest): void {
   if (request.branch !== undefined && !request.branch.trim()) {
     throw new Error('Requested branch must not be empty.');
   }
+  if (request.expectedWorkspaceId !== undefined && !request.expectedWorkspaceId.trim()) {
+    throw new Error('Expected workspace id must not be empty.');
+  }
+}
+
+function preparationKey(request: RemotishOpenRequest): string {
+  return JSON.stringify({
+    provider: request.provider.trim().toLowerCase(),
+    repository: Object.entries(request.repository)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, value.trim()]),
+    branch: request.branch?.trim() ?? '',
+    expectedWorkspaceId: request.expectedWorkspaceId?.trim().toLowerCase() ?? '',
+  });
 }

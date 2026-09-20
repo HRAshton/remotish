@@ -2,7 +2,7 @@
   "name": "remotish",
   "displayName": "Remotish",
   "description": "Browser-safe Remotish host extension with a versioned provider API and fixture demo.",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,

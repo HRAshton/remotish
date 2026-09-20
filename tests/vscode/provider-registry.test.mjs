@@ -7,18 +7,23 @@ function provider(id, displayName = id) {
   return {
     id,
     displayName,
+    extensionId: `example.${id.toLowerCase()}`,
+    validateRepository(repository) {
+      assert.equal(typeof repository, 'object');
+    },
     createAdapter() {
       throw new Error('not used');
     },
   };
 }
 
-test('provider registry normalizes ids and disposes registrations', () => {
+test('provider registry normalizes ids and disposes registrations without destroying workspaces', () => {
   const registry = new ProviderRegistry();
   const disposable = registry.register(provider('Bitbucket-Cloud', 'Bitbucket Cloud'));
 
   assert.equal(registry.require('bitbucket-cloud').id, 'bitbucket-cloud');
   assert.equal(registry.require('BITBUCKET-CLOUD').displayName, 'Bitbucket Cloud');
+  assert.equal(registry.require('bitbucket-cloud').extensionId, 'example.bitbucket-cloud');
   assert.equal(registry.list().length, 1);
 
   disposable.dispose();
@@ -38,6 +43,10 @@ test('provider registry rejects duplicate and malformed registrations', () => {
     code: 'INVALID_REQUEST',
   });
   assert.throws(() => registry.register(provider('gitlab', '   ')), {
+    name: 'RemotishError',
+    code: 'INVALID_REQUEST',
+  });
+  assert.throws(() => registry.register({ ...provider('gitlab'), extensionId: 'invalid' }), {
     name: 'RemotishError',
     code: 'INVALID_REQUEST',
   });

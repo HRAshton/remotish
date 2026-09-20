@@ -38,13 +38,14 @@ export class RemotishFileSystemProvider implements vscode.FileSystemProvider, vs
   async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
     return this.call(uri, async () => {
       const stat = await this.fileSystem.stat(uri);
+      const readonly = await this.fileSystem.isReadonly(uri);
       const timestamps = this.timestamps.stat(uri);
       return {
         type: stat.type === 'directory' ? vscode.FileType.Directory : vscode.FileType.File,
         ctime: timestamps.ctime,
         mtime: timestamps.mtime,
         size: stat.size,
-        ...(this.fileSystem.isReadonly(uri) ? { permissions: vscode.FilePermission.Readonly } : {}),
+        ...(readonly ? { permissions: vscode.FilePermission.Readonly } : {}),
       };
     });
   }
