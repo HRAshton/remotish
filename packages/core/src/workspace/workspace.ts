@@ -155,14 +155,21 @@ export class RemotishWorkspace {
     return this.branches.current.getChanges();
   }
 
-  revert(path: RepoPath): Promise<void> {
+  revert(
+    path: RepoPath,
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
+  ): Promise<void> {
     return this.mutate(async () => {
+      this.requireExpectedState(expectedState);
       await this.branches.current.revert(path);
     });
   }
 
-  revertAll(): Promise<void> {
+  revertAll(
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
+  ): Promise<void> {
     return this.mutate(async () => {
+      this.requireExpectedState(expectedState);
       await this.branches.current.revertAll();
     });
   }

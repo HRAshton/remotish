@@ -35,3 +35,63 @@ test('workspace commit: queued branch switch cannot redirect a guarded normal co
   assert.equal(adapter.getBranchHead('feature/test'), 'F2');
   assert.equal(decoder.decode(await workspace.readFile('README.md')), 'feature local\n');
 });
+
+test('workspace revert: queued branch switch cannot redirect a confirmed revert', async () => {
+  const adapter = new FixtureAdapter();
+  const workspace = await RemotishWorkspace.open(adapter);
+
+  await workspace.writeFile('README.md', encoder.encode('main local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.switchBranch('feature/test');
+  await workspace.writeFile('README.md', encoder.encode('feature local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.switchBranch('main');
+
+  const expectedState = { branch: workspace.branch, baseRevision: workspace.baseRevision };
+  const switchBranch = workspace.switchBranch('feature/test');
+  const revert = workspace.revert('README.md', expectedState);
+
+  await switchBranch;
+  await assert.rejects(
+    revert,
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+  assert.equal(decoder.decode(await workspace.readFile('README.md')), 'feature local\n');
+
+  await workspace.switchBranch('main');
+  assert.equal(decoder.decode(await workspace.readFile('README.md')), 'main local\n');
+});
+
+test('workspace revert all: queued branch switch cannot redirect a confirmed revert', async () => {
+  const adapter = new FixtureAdapter();
+  const workspace = await RemotishWorkspace.open(adapter);
+
+  await workspace.writeFile('README.md', encoder.encode('main local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.switchBranch('feature/test');
+  await workspace.writeFile('README.md', encoder.encode('feature local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.switchBranch('main');
+
+  const expectedState = { branch: workspace.branch, baseRevision: workspace.baseRevision };
+  const switchBranch = workspace.switchBranch('feature/test');
+  const revertAll = workspace.revertAll(expectedState);
+
+  await switchBranch;
+  await assert.rejects(
+    revertAll,
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+  assert.equal(decoder.decode(await workspace.readFile('README.md')), 'feature local\n');
+
+  await workspace.switchBranch('main');
+  assert.equal(decoder.decode(await workspace.readFile('README.md')), 'main local\n');
+});
