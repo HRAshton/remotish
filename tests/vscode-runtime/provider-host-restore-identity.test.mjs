@@ -125,3 +125,91 @@ test('restoration identity mismatch fails before registering the wrong repositor
   );
   assert.equal(secondHost.host.registry.get(wrongWorkspaceId), undefined);
 });
+
+test('restoration identity checks are isolated from concurrent normal preparation', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  const globalState = createMemento();
+  const records = new Map();
+  installProvider(records);
+
+  const firstHost = new RemotishProviderHost(createContext(globalState));
+  const prepared = await firstHost.ensureRepository(request());
+  records.set(prepared.workspaceId, {
+    provider: 'fixture-provider',
+    repository: { repository: 'wrong' },
+  });
+  firstHost.dispose();
+
+  vscode.__test.reset({ preserveStorage: true });
+  let creations = 0;
+  let started;
+  const firstStarted = new Promise((resolve) => {
+    started = resolve;
+  });
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  vscode.__test.installExtension({
+    id: 'example.fixture-provider',
+    packageJSON: {
+      remotish: {
+        provider: true,
+        apiVersion: 1,
+        id: 'fixture-provider',
+        displayName: 'Fixture Provider',
+      },
+    },
+    async activate() {
+      return {
+        apiVersion: 1,
+        id: 'fixture-provider',
+        displayName: 'Fixture Provider',
+        validateRepository(repository) {
+          assert.equal(typeof repository.repository, 'string');
+        },
+        async createAdapter(repository) {
+          creations += 1;
+          if (creations === 1) {
+            started();
+          }
+          await gate;
+          return repository.repository === 'wrong'
+            ? new WrongIdentityAdapter()
+            : new FixtureAdapter();
+        },
+        async restoreWorkspace(workspaceId) {
+          return records.get(workspaceId);
+        },
+      };
+    },
+  });
+
+  const secondHost = new RemotishProviderHost(createContext(globalState));
+  t.after(() => secondHost.dispose());
+
+  const normalPreparation = secondHost.ensureRepository(request('wrong'));
+  await firstStarted;
+  const fileSystem = vscode.__test.fileSystemProviders.get('remotish').provider;
+  const restoration = fileSystem.readFile(workingUri(prepared.workspaceId));
+  await new Promise((resolve) => setImmediate(resolve));
+  const concurrentCreations = creations;
+  release();
+
+  const normalResult = await normalPreparation;
+  const wrongWorkspaceId = await createStableWorkspaceId('fixture-provider', 'fixture/wrong');
+  assert.equal(normalResult.workspaceId, wrongWorkspaceId);
+  await assert.rejects(
+    restoration,
+    (error) =>
+      error?.code === 'Unavailable' &&
+      /Repository identity does not match restored workspace/u.test(error.message),
+  );
+  assert.equal(
+    concurrentCreations,
+    2,
+    'restoration must not share preparation that lacks its expected workspace identity',
+  );
+});

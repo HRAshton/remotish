@@ -245,6 +245,14 @@ test('pnpm owns release versioning and CI uses the pinned package manager', asyn
   }
 });
 
+test('CI push checks target the repository default branch', async () => {
+  const ciWorkflow = await readFile(
+    new URL('../../.github/workflows/ci.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(ciWorkflow, /^ {2}push:\r?\n {4}branches:\r?\n {6}- master$/mu);
+});
+
 test('release scripts delegate generic infrastructure to standard tooling', async () => {
   assert.equal(
     rootManifest.scripts?.clean,
