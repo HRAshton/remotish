@@ -286,7 +286,8 @@ test('concurrent alias descriptors serialize before opening canonical persisted 
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
 
-  let branchReads = 0;
+  let adapterCreations = 0;
+  const adaptersReadingBranches = new Set();
   vscode.__test.installExtension({
     id: 'example.fixture-provider',
     packageJSON: {
@@ -306,12 +307,14 @@ test('concurrent alias descriptors serialize before opening canonical persisted 
           assert.match(repository.repository, /^alias-(?:a|b)$/u);
         },
         createAdapter() {
+          adapterCreations += 1;
+          const adapterId = adapterCreations;
           const target = new FixtureAdapter();
           return new Proxy(target, {
             get(current, property, receiver) {
               if (property === 'getBranches') {
                 return async (...args) => {
-                  branchReads += 1;
+                  adaptersReadingBranches.add(adapterId);
                   await new Promise((resolve) => setTimeout(resolve, 10));
                   return current.getBranches(...args);
                 };
@@ -341,7 +344,16 @@ test('concurrent alias descriptors serialize before opening canonical persisted 
   ]);
 
   assert.equal(first.workspaceId, second.workspaceId);
-  assert.equal(branchReads, 1);
+  assert.equal(
+    adapterCreations,
+    2,
+    'both descriptors must resolve their stable repository identity',
+  );
+  assert.equal(
+    adaptersReadingBranches.size,
+    1,
+    'only one adapter may open canonical branch state for the shared workspace',
+  );
   assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
 });
 

@@ -193,7 +193,12 @@ test('restoration identity checks are isolated from concurrent normal preparatio
   const normalPreparation = secondHost.ensureRepository(request('wrong'));
   await firstStarted;
   const fileSystem = vscode.__test.fileSystemProviders.get('remotish').provider;
-  const restoration = fileSystem.readFile(workingUri(prepared.workspaceId));
+  const restoration = assert.rejects(
+    fileSystem.readFile(workingUri(prepared.workspaceId)),
+    (error) =>
+      error?.code === 'Unavailable' &&
+      /Repository identity does not match restored workspace/u.test(error.message),
+  );
   await new Promise((resolve) => setImmediate(resolve));
   const concurrentCreations = creations;
   release();
@@ -201,12 +206,7 @@ test('restoration identity checks are isolated from concurrent normal preparatio
   const normalResult = await normalPreparation;
   const wrongWorkspaceId = await createStableWorkspaceId('fixture-provider', 'fixture/wrong');
   assert.equal(normalResult.workspaceId, wrongWorkspaceId);
-  await assert.rejects(
-    restoration,
-    (error) =>
-      error?.code === 'Unavailable' &&
-      /Repository identity does not match restored workspace/u.test(error.message),
-  );
+  await restoration;
   assert.equal(
     concurrentCreations,
     2,
