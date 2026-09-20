@@ -94,7 +94,15 @@ export class RemotishProviderHost implements vscode.Disposable {
         this.ensureRepository(requireCommand(value)),
       ),
       vscode.commands.registerCommand(REMOTISH_OPEN_REPOSITORY_COMMAND, async (value: unknown) => {
-        const result = await this.ensureRepository(requireCommand(value));
+        const command = requireCommand(value);
+        const provider = await this.resolveProvider(command.provider);
+        if (!provider.restoreWorkspace) {
+          throw new RemotishError(
+            'UNSUPPORTED',
+            `Provider ${provider.displayName} does not support workspace restoration.`,
+          );
+        }
+        const result = await this.ensureRepository(command);
         await vscode.commands.executeCommand(
           'vscode.openFolder',
           createWorkingUri(result.workspaceId),
