@@ -108,6 +108,14 @@ After activation, Remotish validates:
 
 The activation result must use the same provider ID as the discovery marker. Unsupported API versions and malformed exports fail before repository access.
 
+## Extension-host placement
+
+The current Remotish → provider boundary consumes the object returned from `extension.activate()`. The provider extension therefore must execute in the same VS Code extension host as the Remotish host extension. This matters for desktop and remote deployments where VS Code may have local, remote, and web extension hosts available.
+
+A browser-only provider with a `browser` entry point and no Node-only entry point already runs in the web extension host and should not add `extensionKind` solely for Remotish. Providers that support multiple runtimes or remote extension hosts must choose compatible placement, using the appropriate manifest/runtime configuration when necessary. If a deployment cannot colocate the provider and Remotish, it needs a cross-host command or messaging boundary rather than relying on the activation return value.
+
+Static Code-OSS Web deployments naturally satisfy this constraint when both Remotish and the provider are browser extensions.
+
 ## Provider-to-host commands
 
 Provider extensions do not need a Remotish TypeScript host API. Provider-to-Remotish operations use stable, versioned VS Code commands from the SDK:
