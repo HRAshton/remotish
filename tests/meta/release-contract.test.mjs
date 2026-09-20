@@ -167,7 +167,7 @@ test('production dependencies stay internal and notices are tracked', async () =
   assert.match(notices, /no third-party production npm dependencies/u);
 });
 
-test('adapter SDK and provider API host package are public npm compatibility surfaces', async () => {
+test('adapter SDK is configured as the only public npm package', async () => {
   const sdkManifest = JSON.parse(
     await readFile(new URL('../../packages/adapter-sdk/package.json', import.meta.url)),
   );
@@ -178,9 +178,8 @@ test('adapter SDK and provider API host package are public npm compatibility sur
   assert.equal(sdkManifest.private, undefined);
   assert.equal(sdkManifest.publishConfig?.access, 'public');
   assert.deepEqual(sdkManifest.files, ['dist']);
-  assert.equal(vscodeManifest.name, '@remotish/vscode');
-  assert.equal(vscodeManifest.publishConfig?.access, 'public');
-  assert.deepEqual(vscodeManifest.files, ['dist']);
+  assert.equal(vscodeManifest.publishConfig, undefined);
+  assert.equal(vscodeManifest.exports?.['./provider-api'], undefined);
 
   const releaseWorkflow = await readFile(
     new URL('../../.github/workflows/release.yml', import.meta.url),
@@ -189,13 +188,12 @@ test('adapter SDK and provider API host package are public npm compatibility sur
   assert.match(releaseWorkflow, /npm-publish:/u);
   assert.match(releaseWorkflow, /environment: npm/u);
   assert.match(releaseWorkflow, /id-token: write/u);
-  assert.match(releaseWorkflow, /@remotish\/adapter-sdk/u);
-  assert.match(releaseWorkflow, /@remotish\/vscode/u);
+  assert.match(releaseWorkflow, /pnpm --filter @remotish\/adapter-sdk build/u);
+  assert.doesNotMatch(releaseWorkflow, /packages\/vscode.*npm publish/u);
   assert.match(releaseWorkflow, /npm pack --dry-run/u);
   assert.match(releaseWorkflow, /publish_args=\(--access public\)/u);
   assert.match(releaseWorkflow, /publish_args\+=\(--tag beta\)/u);
-  assert.match(releaseWorkflow, /packages\/adapter-sdk/u);
-  assert.match(releaseWorkflow, /packages\/vscode/u);
+  assert.match(releaseWorkflow, /npm publish/u);
   assert.doesNotMatch(releaseWorkflow, /NPM_TOKEN/u);
 });
 

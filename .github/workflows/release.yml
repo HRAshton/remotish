@@ -32,10 +32,8 @@ jobs:
         run: |
           version="$(node --print "require('./package.json').version")"
           sdk_version="$(node --print "require('./packages/adapter-sdk/package.json').version")"
-          vscode_version="$(node --print "require('./packages/vscode/package.json').version")"
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
-          test "$vscode_version" = "$version"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm test:vscode-web:vsix
@@ -82,31 +80,27 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: pnpm
-      - name: Verify tag and public package versions
+      - name: Verify tag and adapter SDK version
         shell: bash
         run: |
           version="$(node --print "require('./package.json').version")"
           sdk_version="$(node --print "require('./packages/adapter-sdk/package.json').version")"
-          vscode_version="$(node --print "require('./packages/vscode/package.json').version")"
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
-          test "$vscode_version" = "$version"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @remotish/adapter-sdk --filter @remotish/vscode build
+      - run: pnpm --filter @remotish/adapter-sdk build
       - name: Verify npm package contents
-        shell: bash
-        run: |
-          (cd packages/adapter-sdk && npm pack --dry-run)
-          (cd packages/vscode && npm pack --dry-run)
-      - name: Publish public packages to npm
+        working-directory: packages/adapter-sdk
+        run: npm pack --dry-run
+      - name: Publish adapter SDK to npm
+        working-directory: packages/adapter-sdk
         shell: bash
         run: |
           publish_args=(--access public)
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             publish_args+=(--tag beta)
           fi
-          (cd packages/adapter-sdk && npm publish "${publish_args[@]}")
-          (cd packages/vscode && npm publish "${publish_args[@]}")
+          npm publish "${publish_args[@]}"
 
   release:
     needs: [package, npm-publish]

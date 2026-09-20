@@ -11,10 +11,6 @@
     "./model": {
       "types": "./dist/model.d.ts",
       "default": "./dist/model.js"
-    },
-    "./provider-api": {
-      "types": "./dist/provider-api.d.ts",
-      "default": "./dist/provider-api.js"
     }
   },
   "files": [
@@ -27,12 +23,5 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false"
-  },
-  "description": "Browser-safe VS Code integration and public provider API for Remotish.",
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=22 <23 || >=24 <25"
   }
 }

@@ -2,7 +2,7 @@
   "name": "remotish",
   "displayName": "Remotish",
   "description": "Browser-safe Remotish host extension with automatic adapter provider discovery.",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
