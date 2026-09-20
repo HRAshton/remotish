@@ -98,6 +98,8 @@ This is why revision IDs must actually be immutable.
 
 ## Publication state transitions
 
+Before a remote publication starts, core durably records a `prepared` journal containing the branch and expected remote revision. After a known success, it records the exact `published` revision before local reconciliation. If recovery cannot prove the outcome, mutations remain blocked rather than guessing. A host may inspect `pendingPublication` and explicitly call `resolvePendingCommitPublication(...)` only after independently establishing that nothing was published or determining the exact published revision.
+
 Normal success:
 
 ```text
@@ -146,7 +148,7 @@ Persisted data is decoded/validated before it becomes core state.
 
 ## Events and failure semantics
 
-Core events are notifications, not transactional hooks. State mutation and persistence complete before change events are emitted. A failing observer is reported but does not roll back a completed operation or prevent later observers from running.
+Core events are notifications, not transactional hooks. Local-only mutations persist before change events are emitted. For irreversible remote mutations, core first persists any safety-critical intent it can; if a later persistence write fails after remote success, the remote outcome is not falsely reported as failed. A failing observer is reported but does not roll back a completed operation or prevent later observers from running.
 
 ## URI architecture
 

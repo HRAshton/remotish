@@ -143,9 +143,9 @@ const prepared = await vscode.commands.executeCommand(
 );
 ```
 
-`remotish.ensureRepository` creates or restores the canonical workspace and returns its URI without navigating. This allows the provider to persist its own reconstruction record before `vscode.openFolder` tears down the current workbench context.
+`remotish.ensureRepository` creates or restores the canonical workspace and returns its URI without navigating. Session-local integrations may use it without restoration support. A provider that intends to navigate to the canonical URI and survive an extension-host restart should implement `restoreWorkspace()` and persist its reconstruction record before `vscode.openFolder` tears down the current workbench context.
 
-`remotish.openRepository` performs the same preparation and then opens the canonical repository root. The command always opens the root; a request `path` is returned separately as `resourceUri`.
+`remotish.openRepository` performs the same preparation and then opens the canonical repository root. It requires `restoreWorkspace()` before navigation. The command always opens the root; a request `path` is returned separately as `resourceUri`.
 
 The V1 result shape is:
 
@@ -175,11 +175,10 @@ The provider owns non-secret information needed to reconstruct one repository. A
     workspace: 'acme',
     repository: 'backend',
   },
-  lastBranch: 'feature/payments',
 }
 ```
 
-Remotish does not persist that descriptor. The host persists only generic routing metadata needed to locate the responsible provider extension after restart.
+Remotish does not persist that descriptor. The host persists only generic routing metadata needed to locate the responsible provider extension after restart. Mutable workspace state such as the selected branch belongs to the core workspace snapshot and should not be duplicated in provider reconstruction data.
 
 Authentication also remains provider-owned. Provider discovery must not open login UI. Authentication is acquired when repository access or restoration actually requires it.
 
@@ -234,14 +233,11 @@ Restoration always recomputes this value from the recreated adapter. If it diffe
 Branch selection follows:
 
 ```text
-explicit branch request
-        ↓
-persisted selected branch
-        ↓
-repository default branch
+new preparation: explicit branch → persisted selected branch → repository default
+canonical restoration: persisted selected branch → repository default
 ```
 
-Each branch retains its own overlay state.
+A `branch` returned from `restoreWorkspace()` is ignored during canonical restoration so stale provider-owned data cannot overwrite newer core-persisted state. Each branch retains its own overlay state.
 
 ## Static web bootstrap
 
@@ -284,7 +280,7 @@ workspace
 repository
 ```
 
-Unknown provider-specific fields should be rejected. The generic host additionally rejects common secret-looking descriptor keys such as `token`, `password`, `authorization`, `client_secret`, and `private_key`.
+Unknown provider-specific fields should be rejected. The generic host additionally rejects common secret-looking descriptor keys such as `token`, `password`, `authorization`, `client_secret`, and `private_key`, including equivalent camelCase spellings. This generic check is defense in depth; the provider-specific descriptor allowlist remains the security boundary.
 
 Descriptors are routed strictly by provider ID. One provider is never asked to interpret another provider's reconstruction record.
 
