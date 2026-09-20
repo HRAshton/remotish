@@ -3,14 +3,13 @@ import { normalizeProviderId } from './provider-registry.js';
 
 const encoder = new TextEncoder();
 
+/** Persisted format version for stable Remotish workspace authorities. */
+export const REMOTISH_WORKSPACE_ID_FORMAT_VERSION = 1 as const;
+
 /**
  * Stable workspace-ID format v1.
- *
- * Input: lower-cased provider id, NUL separator, exact trimmed stable repository id.
+ * Input: normalized provider id, NUL separator, exact trimmed stable repository id.
  * Digest: SHA-256. Authority: <provider>-<first 32 lowercase hex digest characters>.
- *
- * This format is persisted external state and must not change without a new format version and
- * migration path.
  */
 export async function createStableWorkspaceId(
   providerId: string,
@@ -27,7 +26,6 @@ export async function createStableWorkspaceId(
   const hash = [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
-
   return `${provider}-${hash.slice(0, 32)}`;
 }
 

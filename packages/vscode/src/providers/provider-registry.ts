@@ -1,45 +1,68 @@
-import { RemotishError } from '@remotish/adapter-sdk';
-import type { RemotishDisposable, RemotishProviderRegistration } from '../provider-api.js';
+import {
+  REMOTISH_ADAPTER_PROVIDER_API_VERSION,
+  RemotishError,
+  type RemotishAdapterProviderV1,
+} from '@remotish/adapter-sdk';
+import type { Disposable } from '@remotish/core';
 
 const PROVIDER_ID_MAX_LENGTH = 64;
 const EXTENSION_ID_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9.-]*$/u;
 
-/** Tracks provider wrapper registrations exposed through the installed Remotish host. */
-export class ProviderRegistry {
-  private readonly providers = new Map<string, RemotishProviderRegistration>();
+/** Validated provider implementation associated with the extension that owns it. */
+export interface RegisteredProvider extends RemotishAdapterProviderV1 {
+  readonly extensionId: string;
+}
 
-  register(provider: RemotishProviderRegistration): RemotishDisposable {
+/** Tracks validated provider implementations for the current extension-host lifetime. */
+export class ProviderRegistry {
+  private readonly providers = new Map<string, RegisteredProvider>();
+
+  register(provider: RemotishAdapterProviderV1, extensionIdValue: string): Disposable {
     const id = normalizeProviderId(provider.id);
     const displayName = provider.displayName.trim();
-    const extensionId = provider.extensionId.trim().toLowerCase();
+    const extensionId = extensionIdValue.trim().toLowerCase();
+
     if (!displayName) {
-      throw new RemotishError('INVALID_REQUEST', 'Provider displayName is required.');
+      throw new RemotishError('INVALID_REQUEST', `Provider ${id} requires a displayName.`);
     }
     if (!EXTENSION_ID_PATTERN.test(extensionId)) {
       throw new RemotishError(
         'INVALID_REQUEST',
-        `Provider ${id} must declare a valid VS Code extensionId.`,
+        `Provider ${id} must be associated with a valid VS Code extension id.`,
+      );
+    }
+    if (provider.apiVersion !== REMOTISH_ADAPTER_PROVIDER_API_VERSION) {
+      throw new RemotishError(
+        'UNSUPPORTED',
+        `Provider ${id} uses unsupported API version ${String(provider.apiVersion)}.`,
       );
     }
     if (typeof provider.validateRepository !== 'function') {
-      throw new RemotishError(
-        'INVALID_REQUEST',
-        `Provider ${id} must define validateRepository().`,
-      );
+      throw new RemotishError('INVALID_REQUEST', `Provider ${id} must define validateRepository().`);
     }
     if (typeof provider.createAdapter !== 'function') {
       throw new RemotishError('INVALID_REQUEST', `Provider ${id} must define createAdapter().`);
+    }
+    if (provider.restoreWorkspace !== undefined && typeof provider.restoreWorkspace !== 'function') {
+      throw new RemotishError('INVALID_REQUEST', `Provider ${id} restoreWorkspace must be a function.`);
     }
     if (this.providers.has(id)) {
       throw new RemotishError('INVALID_REQUEST', `Provider ${id} is already registered.`);
     }
 
-    const registration: RemotishProviderRegistration = {
+    const restoreWorkspace = provider.restoreWorkspace;
+    const registration: RegisteredProvider = {
+      apiVersion: REMOTISH_ADAPTER_PROVIDER_API_VERSION,
       id,
       displayName,
       extensionId,
-      validateRepository: (repository) => provider.validateRepository(repository),
-      createAdapter: (repository) => provider.createAdapter(repository),
+      validateRepository: (repository) => provider.validateRepository.call(provider, repository),
+      createAdapter: (repository) => provider.createAdapter.call(provider, repository),
+      ...(restoreWorkspace
+        ? {
+            restoreWorkspace: (workspaceId) => restoreWorkspace.call(provider, workspaceId),
+          }
+        : {}),
     };
     this.providers.set(id, registration);
 
@@ -57,19 +80,19 @@ export class ProviderRegistry {
     };
   }
 
-  get(id: string): RemotishProviderRegistration | undefined {
+  get(id: string): RegisteredProvider | undefined {
     return this.providers.get(normalizeProviderId(id));
   }
 
-  require(id: string): RemotishProviderRegistration {
+  require(id: string): RegisteredProvider {
     const provider = this.get(id);
     if (!provider) {
-      throw new RemotishError('NOT_FOUND', `Remotish provider ${id} is not registered.`);
+      throw new RemotishError('UNSUPPORTED', `Remotish provider ${id} is not available.`);
     }
     return provider;
   }
 
-  list(): readonly RemotishProviderRegistration[] {
+  list(): readonly RegisteredProvider[] {
     return [...this.providers.values()];
   }
 }

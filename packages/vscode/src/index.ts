@@ -5,21 +5,15 @@ export { RemotishVsCodeHost } from './host.js';
 export { MementoWorkspaceStorage } from './persistence/memento-workspace-storage.js';
 export { StorageUriWorkspaceStorage } from './persistence/storage-uri-workspace-storage.js';
 export type {
-  PersistedProviderWorkspaceV1,
-  RemotishDisposable,
-  RemotishExtensionApiV1,
-  RemotishOpenRequest,
-  RemotishOpenResult,
-  RemotishProviderRegistration,
-  SerializedRemotishOpenRequestV1,
-} from './provider-api.js';
-export {
-  REMOTISH_EXTENSION_API_VERSION,
-  REMOTISH_WORKSPACE_ID_FORMAT_VERSION,
-} from './provider-api.js';
+  DiscoveredProvider,
+  ProviderDiscoveryState,
+} from './providers/provider-discovery.js';
+export { ProviderDiscovery } from './providers/provider-discovery.js';
+export type { RegisteredProvider } from './providers/provider-registry.js';
 export { ProviderRegistry } from './providers/provider-registry.js';
 export {
   createStableWorkspaceId,
+  REMOTISH_WORKSPACE_ID_FORMAT_VERSION,
   verifyStableWorkspaceId,
 } from './providers/workspace-id.js';
 export type {

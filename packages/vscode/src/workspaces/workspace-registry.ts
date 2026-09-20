@@ -38,12 +38,7 @@ interface WorkspaceWaiter {
   reject(error: unknown): void;
 }
 
-/**
- * Tracks active Remotish workspaces and provides a bounded, event-driven cold-start restoration gate.
- *
- * Restoration attempts and waiters are keyed by workspace ID, so a blocked repository never stalls
- * filesystem work for already-ready repositories.
- */
+/** Tracks active workspaces and provides a bounded, per-workspace cold restoration gate. */
 export class WorkspaceRegistry {
   private readonly registrations = new Map<string, RegisteredWorkspace>();
   private readonly workspaceDisposables = new Map<string, Disposable>();
@@ -122,12 +117,6 @@ export class WorkspaceRegistry {
 
     const promise = new Promise<RegisteredWorkspace>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const onAbort = () => {
-        cleanup();
-        reject(
-          new RemotishError('CANCELLED', `Workspace restoration cancelled for ${normalized}.`),
-        );
-      };
       const waiter: WorkspaceWaiter = {
         resolve: (registration) => {
           cleanup();
@@ -137,6 +126,11 @@ export class WorkspaceRegistry {
           cleanup();
           reject(error);
         },
+      };
+      const onAbort = () => {
+        waiter.reject(
+          new RemotishError('CANCELLED', `Workspace restoration cancelled for ${normalized}.`),
+        );
       };
       const cleanup = () => {
         if (timer !== undefined) {
@@ -155,8 +149,7 @@ export class WorkspaceRegistry {
       this.waiters.set(normalized, workspaceWaiters);
       options.signal?.addEventListener('abort', onAbort, { once: true });
       timer = setTimeout(() => {
-        cleanup();
-        reject(
+        waiter.reject(
           new RemotishError(
             'OFFLINE',
             `Timed out restoring Remotish workspace ${normalized} after ${timeoutMs} ms.`,
@@ -188,7 +181,14 @@ export class WorkspaceRegistry {
 
     const attempt = Promise.resolve()
       .then(() => this.restoreWorkspace?.(workspaceId))
-      .then(() => undefined)
+      .then(() => {
+        if (!this.registrations.has(workspaceId)) {
+          throw new RemotishError(
+            'OFFLINE',
+            `Restoration completed without registering Remotish workspace ${workspaceId}.`,
+          );
+        }
+      })
       .catch((error: unknown) => {
         this.rejectWaiters(workspaceId, error);
       })
