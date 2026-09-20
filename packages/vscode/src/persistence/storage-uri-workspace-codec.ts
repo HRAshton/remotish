@@ -16,6 +16,11 @@ interface StoredRenameSnapshot {
   readonly to: string;
 }
 
+interface StoredPendingCommitPublication {
+  readonly branch: string;
+  readonly expectedRemoteRevision: string;
+}
+
 interface StoredBranchWorkspaceSnapshot {
   readonly baseRevision: string;
   readonly overlay: {
@@ -31,6 +36,7 @@ export interface StoredStorageUriWorkspaceManifest {
   readonly version: 2;
   readonly selectedBranch: string;
   readonly branches: Readonly<Record<string, StoredBranchWorkspaceSnapshot>>;
+  readonly pendingCommitPublication?: StoredPendingCommitPublication;
 }
 
 /** Builds a manifest while handing raw overlay bytes to the storage implementation. */
@@ -55,7 +61,14 @@ export async function encodeStorageUriWorkspaceManifest(
       },
     };
   }
-  return { version: 2, selectedBranch: snapshot.selectedBranch, branches };
+  return {
+    version: 2,
+    selectedBranch: snapshot.selectedBranch,
+    branches,
+    ...(snapshot.pendingCommitPublication
+      ? { pendingCommitPublication: { ...snapshot.pendingCommitPublication } }
+      : {}),
+  };
 }
 
 /** Restores and validates a content-addressed storage manifest. */
@@ -83,7 +96,14 @@ export async function decodeStorageUriWorkspaceManifest(
     };
   }
 
-  return { version: 1, selectedBranch: stored.selectedBranch, branches };
+  return {
+    version: 1,
+    selectedBranch: stored.selectedBranch,
+    branches,
+    ...(stored.pendingCommitPublication
+      ? { pendingCommitPublication: { ...stored.pendingCommitPublication } }
+      : {}),
+  };
 }
 
 /** Returns the blob hashes referenced by a validated persisted manifest. */
@@ -107,6 +127,10 @@ function requireStorageUriWorkspaceManifest(value: unknown): StoredStorageUriWor
   const selectedBranch = requireString(snapshot.selectedBranch, 'selectedBranch');
   const storedBranches = requireRecord(snapshot.branches, 'branches');
   const branches = Object.create(null) as Record<string, StoredBranchWorkspaceSnapshot>;
+  const pendingCommitPublication =
+    snapshot.pendingCommitPublication === undefined
+      ? undefined
+      : requirePendingCommitPublication(snapshot.pendingCommitPublication);
 
   for (const [name, value] of Object.entries(storedBranches)) {
     const branch = requireRecord(value, `branches.${name}`);
@@ -161,7 +185,26 @@ function requireStorageUriWorkspaceManifest(value: unknown): StoredStorageUriWor
   if (!Object.hasOwn(branches, selectedBranch)) {
     throw invalidManifest(`selected branch ${selectedBranch} is not present in branches`);
   }
-  return { version: 2, selectedBranch, branches };
+  if (pendingCommitPublication && pendingCommitPublication.branch !== selectedBranch) {
+    throw invalidManifest('pending publication branch must be the selected branch');
+  }
+  return {
+    version: 2,
+    selectedBranch,
+    branches,
+    ...(pendingCommitPublication ? { pendingCommitPublication } : {}),
+  };
+}
+
+function requirePendingCommitPublication(value: unknown): StoredPendingCommitPublication {
+  const pending = requireRecord(value, 'pendingCommitPublication');
+  return {
+    branch: requireString(pending.branch, 'pendingCommitPublication.branch'),
+    expectedRemoteRevision: requireString(
+      pending.expectedRemoteRevision,
+      'pendingCommitPublication.expectedRemoteRevision',
+    ),
+  };
 }
 
 function requireRecord(value: unknown, field: string): Record<string, unknown> {

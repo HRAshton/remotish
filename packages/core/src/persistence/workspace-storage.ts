@@ -12,6 +12,10 @@ export interface WorkspaceSnapshot {
   readonly version: 1;
   readonly selectedBranch: BranchName;
   readonly branches: Readonly<Record<BranchName, BranchWorkspaceSnapshot>>;
+  readonly pendingCommitPublication?: Readonly<{
+    branch: BranchName;
+    expectedRemoteRevision: RevisionId;
+  }>;
 }
 
 /** Host-provided persistence boundary for loading and saving repository workspace state. */

@@ -14,10 +14,10 @@ import type {
   RevisionId,
 } from '@remotish/adapter-sdk';
 import { RemotishError } from '@remotish/adapter-sdk';
-import { CommitService } from '../commit/commit-service.js';
+import { type BeforeCommitPublish, CommitService } from '../commit/commit-service.js';
 import { type Disposable, EventSource } from '../events/events.js';
 import { MemoryWorkspaceStorage } from '../persistence/memory-workspace-storage.js';
-import type { WorkspaceStorage } from '../persistence/workspace-storage.js';
+import type { WorkspaceSnapshot, WorkspaceStorage } from '../persistence/workspace-storage.js';
 import { type FileStat, RepositoryReader } from '../repository/repository-reader.js';
 import { SerialExecutor } from '../util/serial-executor.js';
 import type { WorkingTreeChange } from '../working-tree/change.js';
@@ -31,6 +31,8 @@ export interface WorkspaceChangedEvent {
   readonly baseRevision: RevisionId;
 }
 
+type PendingCommitPublication = NonNullable<WorkspaceSnapshot['pendingCommitPublication']>;
+
 /**
  * Public façade for one editable remote repository workspace.
  *
@@ -43,15 +45,18 @@ export class RemotishWorkspace {
   private readonly mutations = new SerialExecutor();
   private readonly commitService: CommitService;
   private readonly branchService: WorkspaceBranchService;
+  private pendingCommitPublication: PendingCommitPublication | undefined;
 
   private constructor(
     private readonly adapter: RemotishAdapter,
     readonly repositoryInfo: RepositoryInfo,
     private readonly branches: BranchWorkspaces,
     private readonly storage: WorkspaceStorage,
+    pendingCommitPublication?: PendingCommitPublication,
   ) {
     this.commitService = new CommitService(adapter);
     this.branchService = new WorkspaceBranchService(adapter, branches);
+    this.pendingCommitPublication = pendingCommitPublication;
   }
 
   static async open(
@@ -68,7 +73,15 @@ export class RemotishWorkspace {
       repositoryInfo.defaultBranch,
       persisted,
     );
-    return new RemotishWorkspace(adapter, repositoryInfo, branches, storage);
+    const workspace = new RemotishWorkspace(
+      adapter,
+      repositoryInfo,
+      branches,
+      storage,
+      persisted?.pendingCommitPublication,
+    );
+    await workspace.recoverPendingCommitPublication();
+    return workspace;
   }
 
   get capabilities(): RemotishCapabilities {
@@ -179,13 +192,14 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit(() => {
+    return this.mutateCommit((beforePublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.commitAndPush(
         this.branch,
         this.branches.current,
         message,
         selectedPaths,
+        beforePublish,
       );
     });
   }
@@ -196,7 +210,7 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit(() => {
+    return this.mutateCommit((beforePublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.commitAndPushForceWithLease(
         this.branch,
@@ -204,6 +218,7 @@ export class RemotishWorkspace {
         message,
         expectedRevision,
         selectedPaths,
+        beforePublish,
       );
     });
   }
@@ -213,13 +228,14 @@ export class RemotishWorkspace {
     selectedPaths?: readonly RepoPath[],
     expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
   ): Promise<CommitResult> {
-    return this.mutateCommit(() => {
+    return this.mutateCommit((beforePublish) => {
       this.requireExpectedState(expectedState);
       return this.commitService.amendAndPushForceWithLease(
         this.branch,
         this.branches.current,
         message,
         selectedPaths,
+        beforePublish,
       );
     });
   }
@@ -246,12 +262,13 @@ export class RemotishWorkspace {
   }
 
   refreshRemoteHead(): Promise<RemoteHeadRefreshResult> {
-    return this.mutations.run(() =>
-      this.runLocalMutation(
+    return this.mutations.run(() => {
+      this.requireNoPendingCommitPublication();
+      return this.runLocalMutation(
         () => this.branchService.refresh(),
         (result) => result.status === 'updated',
-      ),
-    );
+      );
+    });
   }
 
   createBranch(
@@ -295,15 +312,49 @@ export class RemotishWorkspace {
     }
   }
 
-  private mutate(operation: () => Promise<void>): Promise<void> {
-    return this.mutations.run(() => this.runLocalMutation(operation));
+  private requireNoPendingCommitPublication(): void {
+    if (!this.pendingCommitPublication) {
+      return;
+    }
+    throw new RemotishError(
+      'INVALID_REQUEST',
+      'A previous commit publication has an uncertain outcome. Reopen the workspace to reconcile it.',
+    );
   }
 
-  private mutateCommit(operation: () => Promise<CommitResult>): Promise<CommitResult> {
+  private mutate(operation: () => Promise<void>): Promise<void> {
+    return this.mutations.run(() => {
+      this.requireNoPendingCommitPublication();
+      return this.runLocalMutation(operation);
+    });
+  }
+
+  private mutateCommit(
+    operation: (beforePublish: BeforeCommitPublish) => Promise<CommitResult>,
+  ): Promise<CommitResult> {
     return this.mutations.run(async () => {
-      const result = await operation();
+      this.requireNoPendingCommitPublication();
+      const beforePublish: BeforeCommitPublish = async (request) => {
+        this.pendingCommitPublication = {
+          branch: request.branch,
+          expectedRemoteRevision:
+            request.push.mode === 'normal' ? request.baseRevision : request.push.expectedRevision,
+        };
+        try {
+          await this.saveSnapshot();
+        } catch (error) {
+          this.pendingCommitPublication = undefined;
+          throw error;
+        }
+      };
+
+      const result = await operation(beforePublish);
       if (result.status === 'success') {
+        this.pendingCommitPublication = undefined;
         await this.changedAfterRemoteSuccess();
+      } else if (this.pendingCommitPublication) {
+        this.pendingCommitPublication = undefined;
+        await this.saveSnapshot();
       }
       return result;
     });
@@ -311,6 +362,7 @@ export class RemotishWorkspace {
 
   private mutateRemote(operation: () => Promise<void>): Promise<void> {
     return this.mutations.run(async () => {
+      this.requireNoPendingCommitPublication();
       await operation();
       await this.changedAfterRemoteSuccess();
     });
@@ -318,6 +370,7 @@ export class RemotishWorkspace {
 
   private mutateRemoteWithResult<T>(operation: () => Promise<T>): Promise<T> {
     return this.mutations.run(async () => {
+      this.requireNoPendingCommitPublication();
       const result = await operation();
       await this.changedAfterRemoteSuccess();
       return result;
@@ -355,11 +408,50 @@ export class RemotishWorkspace {
     this.emitChanged();
   }
 
+  private async recoverPendingCommitPublication(): Promise<void> {
+    const pending = this.pendingCommitPublication;
+    if (!pending) {
+      return;
+    }
+    if (this.branch !== pending.branch) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Persisted publication journal targets ${pending.branch}, but ${this.branch} is selected.`,
+      );
+    }
+
+    const remote = (await this.adapter.getBranches()).find(
+      (candidate) => candidate.name === pending.branch,
+    );
+    if (!remote) {
+      throw new RemotishError(
+        'NOT_FOUND',
+        `Cannot recover publication state because branch ${pending.branch} no longer exists.`,
+      );
+    }
+    if (remote.revision !== pending.expectedRemoteRevision) {
+      await this.branches.current.acceptPartiallyPublishedRevision(remote.revision);
+    }
+
+    this.pendingCommitPublication = undefined;
+    try {
+      await this.saveSnapshot();
+    } catch {
+      // Recovery is idempotent; a persisted journal can be reconciled again on the next open.
+    }
+  }
+
   private emitChanged(): void {
     this.events.emit({ branch: this.branch, baseRevision: this.baseRevision });
   }
 
   private saveSnapshot(): Promise<void> {
-    return this.storage.save(this.repositoryInfo.id, this.branches.snapshot());
+    const snapshot = this.branches.snapshot();
+    return this.storage.save(
+      this.repositoryInfo.id,
+      this.pendingCommitPublication
+        ? { ...snapshot, pendingCommitPublication: { ...this.pendingCommitPublication } }
+        : snapshot,
+    );
   }
 }

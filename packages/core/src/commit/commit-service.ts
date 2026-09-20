@@ -9,6 +9,8 @@ import {
 } from '@remotish/adapter-sdk';
 import type { WorkingTree } from '../working-tree/working-tree.js';
 
+export type BeforeCommitPublish = (request: CommitRequest) => Promise<void>;
+
 /** Builds adapter commit requests and advances only the published subset of a working tree on success. */
 export class CommitService {
   constructor(private readonly adapter: RemotishAdapter) {}
@@ -18,8 +20,9 @@ export class CommitService {
     tree: WorkingTree,
     message: string,
     selectedPaths?: readonly RepoPath[],
+    beforePublish?: BeforeCommitPublish,
   ): Promise<CommitResult> {
-    return this.execute(branch, tree, message, { kind: 'normal' }, selectedPaths);
+    return this.execute(branch, tree, message, { kind: 'normal' }, selectedPaths, beforePublish);
   }
 
   commitAndPushForceWithLease(
@@ -28,12 +31,20 @@ export class CommitService {
     message: string,
     expectedRevision: RevisionId,
     selectedPaths?: readonly RepoPath[],
+    beforePublish?: BeforeCommitPublish,
   ): Promise<CommitResult> {
     if (!this.adapter.capabilities.forceWithLease) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support force-with-lease.');
     }
 
-    return this.execute(branch, tree, message, { kind: 'force', expectedRevision }, selectedPaths);
+    return this.execute(
+      branch,
+      tree,
+      message,
+      { kind: 'force', expectedRevision },
+      selectedPaths,
+      beforePublish,
+    );
   }
 
   amendAndPushForceWithLease(
@@ -41,6 +52,7 @@ export class CommitService {
     tree: WorkingTree,
     message: string,
     selectedPaths?: readonly RepoPath[],
+    beforePublish?: BeforeCommitPublish,
   ): Promise<CommitResult> {
     if (!this.adapter.capabilities.amend || !this.adapter.capabilities.forceWithLease) {
       throw new RemotishError(
@@ -58,6 +70,7 @@ export class CommitService {
         expectedRevision: tree.baseRevision,
       },
       selectedPaths,
+      beforePublish,
     );
   }
 
@@ -70,6 +83,7 @@ export class CommitService {
       | { readonly kind: 'force'; readonly expectedRevision: RevisionId }
       | { readonly kind: 'amend'; readonly expectedRevision: RevisionId },
     selectedPaths?: readonly RepoPath[],
+    beforePublish?: BeforeCommitPublish,
   ): Promise<CommitResult> {
     const commit = this.adapter.commit;
     if (!this.adapter.capabilities.commits || !commit) {
@@ -124,6 +138,7 @@ export class CommitService {
       };
     }
 
+    await beforePublish?.(request);
     const result = await commit.call(this.adapter, request);
     if (result.status !== 'success') {
       return result;
