@@ -34,3 +34,14 @@ export type {
   DirectoryEntryType,
   RepositoryInfo,
 } from './repository.js';
+/** Public provider-extension contract and provider-neutral repository commands. */
+export {
+  REMOTISH_ADAPTER_PROVIDER_API_VERSION,
+  REMOTISH_REPOSITORY_COMMAND_VERSION,
+} from './provider.js';
+export type {
+  RemotishAdapterProviderV1,
+  RemotishRepositoryCommandV1,
+  RemotishRepositoryRequest,
+  RemotishRepositoryResultV1,
+} from './provider.js';
