@@ -224,14 +224,10 @@ test('duplicate provider ids fail deterministically without activating either ex
   assert.equal(vscode.__test.sourceControls.length, 0);
 });
 
-test('concurrent preparation serializes canonical registration and keeps caller-specific paths', async (t) => {
+test('concurrent identical preparation coalesces adapter work and keeps caller-specific paths', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
 
-  let release;
-  const gate = new Promise((resolve) => {
-    release = resolve;
-  });
   let creations = 0;
   vscode.__test.installExtension({
     id: 'example.fixture-provider',
@@ -253,10 +249,7 @@ test('concurrent preparation serializes canonical registration and keeps caller-
         },
         async createAdapter() {
           creations += 1;
-          if (creations === 2) {
-            release();
-          }
-          await gate;
+          await new Promise((resolve) => setTimeout(resolve, 20));
           return new FixtureAdapter();
         },
       };
@@ -278,7 +271,7 @@ test('concurrent preparation serializes canonical registration and keeps caller-
     ),
   ]);
 
-  assert.equal(creations, 2);
+  assert.equal(creations, 1);
   assert.equal(readme.workspaceId, source.workspaceId);
   assert.equal(readme.resourceUri.endsWith('/README.md'), true);
   assert.equal(source.resourceUri.endsWith('/src/index.ts'), true);
