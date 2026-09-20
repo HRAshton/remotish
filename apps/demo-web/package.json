@@ -2,7 +2,7 @@
   "name": "remotish-demo",
   "displayName": "Remotish Demo",
   "description": "Fixture-powered browser demo for the Remotish remote repository framework.",
-  "version": "0.1.0-beta.10",
+  "version": "0.1.0-beta.11",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
