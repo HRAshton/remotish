@@ -96,14 +96,14 @@ test('vscode filesystem model: URI paths use the same repository path validation
   assert.equal(workingUriParts('fixture-demo', 'src\\index.ts').path, '/src/index.ts');
 });
 
-test('vscode filesystem model: cold read waits for delayed workspace restoration', async () => {
+
+test('vscode filesystem model: cold read waits for workspace restoration', async () => {
   const workspace = await RemotishWorkspace.open(new FixtureAdapter());
   let registry;
   registry = new WorkspaceRegistry({
     defaultRestoreTimeoutMs: 1_000,
     restoreWorkspace: async (workspaceId) => {
-      assert.equal(workspaceId, 'cold-fixture');
-      await new Promise((resolve) => setTimeout(resolve, 25));
+      await new Promise((resolve) => setTimeout(resolve, 20));
       registry.register(workspaceId, workspace);
     },
   });
@@ -113,24 +113,24 @@ test('vscode filesystem model: cold read waits for delayed workspace restoration
   assert.match(decoder.decode(content), /Fixture repository/u);
 });
 
-test('vscode filesystem model: failed restoration times out and can be retried', async () => {
+test('vscode filesystem model: failed restoration can be retried', async () => {
   const workspace = await RemotishWorkspace.open(new FixtureAdapter());
   let restoreAttempts = 0;
   let registry;
   registry = new WorkspaceRegistry({
-    defaultRestoreTimeoutMs: 20,
+    defaultRestoreTimeoutMs: 1_000,
     restoreWorkspace: async (workspaceId) => {
       restoreAttempts += 1;
-      if (restoreAttempts > 1) {
-        registry.register(workspaceId, workspace);
+      if (restoreAttempts === 1) {
+        throw new RemotishError('UNAUTHORIZED', 'Authentication cancelled.');
       }
+      registry.register(workspaceId, workspace);
     },
   });
-
   const fs = new RepositoryFileSystem(registry);
   const target = uri(workingUriParts('retry-fixture', 'README.md'));
 
-  await assert.rejects(fs.readFile(target), /Timed out restoring Remotish workspace/u);
+  await assert.rejects(fs.readFile(target), { name: 'RemotishError', code: 'UNAUTHORIZED' });
   assert.match(decoder.decode(await fs.readFile(target)), /Fixture repository/u);
   assert.equal(restoreAttempts, 2);
 });

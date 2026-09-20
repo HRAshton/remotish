@@ -13,7 +13,7 @@ test('workspace registry coalesces restoration attempts for concurrent waiters',
     defaultRestoreTimeoutMs: 1_000,
     restoreWorkspace: async (workspaceId) => {
       attempts += 1;
-      await new Promise((resolve) => setTimeout(resolve, 25));
+      await new Promise((resolve) => setTimeout(resolve, 20));
       registry.register(workspaceId, workspace);
     },
   });

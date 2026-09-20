@@ -67,6 +67,10 @@ export class RemotishProviderHost implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     options: RemotishProviderHostOptions = {},
   ) {
+    // Discovery is manifest-only and may fail on a duplicate provider id. Do it before registering
+    // filesystem/SCM resources so a discovery error cannot leak a partially initialized host.
+    this.discovery.refresh();
+
     // Canonical repository state must survive bootstrap-workspace -> remotish:// navigation.
     this.storage = new StorageUriWorkspaceStorage(context.globalStorageUri, 'provider-workspaces');
     this.host = new RemotishVsCodeHost({
@@ -76,7 +80,6 @@ export class RemotishProviderHost implements vscode.Disposable {
       restoreWorkspace: (workspaceId) => this.restoreWorkspace(workspaceId),
     });
 
-    this.discovery.refresh();
     this.disposables.push(
       vscode.commands.registerCommand(REMOTISH_ENSURE_REPOSITORY_COMMAND, (value: unknown) =>
         this.ensureRepository(requireCommand(value)),

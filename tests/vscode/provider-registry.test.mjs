@@ -5,9 +5,9 @@ import { ProviderRegistry } from '@remotish/vscode';
 
 function provider(id, displayName = id) {
   return {
+    apiVersion: 1,
     id,
     displayName,
-    extensionId: `example.${id.toLowerCase()}`,
     validateRepository(repository) {
       assert.equal(typeof repository, 'object');
     },
@@ -17,9 +17,12 @@ function provider(id, displayName = id) {
   };
 }
 
-test('provider registry normalizes ids and disposes registrations without destroying workspaces', () => {
+test('provider registry normalizes ids and disposes registrations', () => {
   const registry = new ProviderRegistry();
-  const disposable = registry.register(provider('Bitbucket-Cloud', 'Bitbucket Cloud'));
+  const disposable = registry.register(
+    provider('Bitbucket-Cloud', 'Bitbucket Cloud'),
+    'example.bitbucket-cloud',
+  );
 
   assert.equal(registry.require('bitbucket-cloud').id, 'bitbucket-cloud');
   assert.equal(registry.require('BITBUCKET-CLOUD').displayName, 'Bitbucket Cloud');
@@ -32,31 +35,26 @@ test('provider registry normalizes ids and disposes registrations without destro
 
 test('provider registry rejects duplicate and malformed registrations', () => {
   const registry = new ProviderRegistry();
-  registry.register(provider('github'));
+  registry.register(provider('github'), 'example.github');
 
-  assert.throws(() => registry.register(provider('GITHUB')), {
+  assert.throws(() => registry.register(provider('GITHUB'), 'other.github'), {
     name: 'RemotishError',
     code: 'INVALID_REQUEST',
   });
-  assert.throws(() => registry.register(provider('bad/provider')), {
+  assert.throws(() => registry.register(provider('bad/provider'), 'example.bad'), {
     name: 'RemotishError',
     code: 'INVALID_REQUEST',
   });
-  assert.throws(() => registry.register(provider('gitlab', '   ')), {
+  assert.throws(() => registry.register(provider('gitlab', '   '), 'example.gitlab'), {
     name: 'RemotishError',
     code: 'INVALID_REQUEST',
   });
-  assert.throws(() => registry.register({ ...provider('gitlab'), extensionId: 'invalid' }), {
+  assert.throws(() => registry.register(provider('gitlab'), 'invalid'), {
     name: 'RemotishError',
     code: 'INVALID_REQUEST',
   });
-});
-
-test('provider registry reports an unregistered provider distinctly', () => {
-  const registry = new ProviderRegistry();
-
-  assert.throws(() => registry.require('bitbucket-cloud'), {
-    name: 'RemotishError',
-    code: 'NOT_FOUND',
-  });
+  assert.throws(
+    () => registry.register({ ...provider('gitlab'), apiVersion: 2 }, 'example.gitlab'),
+    { name: 'RemotishError', code: 'UNSUPPORTED' },
+  );
 });

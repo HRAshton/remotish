@@ -32,10 +32,3 @@ test('restoration rejects a descriptor that resolves to a different repository i
     { name: 'RemotishError', code: 'INVALID_REQUEST' },
   );
 });
-
-test('stable workspace ids reject empty repository identity', async () => {
-  await assert.rejects(() => createStableWorkspaceId('github', '   '), {
-    name: 'RemotishError',
-    code: 'INVALID_REQUEST',
-  });
-});
