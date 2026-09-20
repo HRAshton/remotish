@@ -74,7 +74,7 @@ export class RemotishProviderHost implements vscode.Disposable {
   private readonly workspaceRegistrations: CoreDisposable[] = [];
   private readonly pendingPreparations = new Map<string, Promise<PreparedRepository>>();
   private readonly preparationTails = new Map<string, Promise<void>>();
-  private disposed = false;
+  private disposed: boolean = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,

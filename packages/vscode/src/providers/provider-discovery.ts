@@ -137,7 +137,7 @@ export class ProviderDiscovery {
     }
 
     const pending = this.activations.get(normalized);
-    if (pending) {
+    if (pending !== undefined) {
       return pending;
     }
 
