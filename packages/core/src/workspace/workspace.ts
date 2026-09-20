@@ -495,14 +495,6 @@ export class RemotishWorkspace {
     });
   }
 
-  private mutateRemote(operation: () => Promise<void>): Promise<void> {
-    return this.mutations.run(async () => {
-      this.requireNoPendingCommitPublication();
-      await operation();
-      await this.changedAfterRemoteSuccess();
-    });
-  }
-
   private mutateRemoteWithResult<T>(operation: () => Promise<T>): Promise<T> {
     return this.mutations.run(async () => {
       this.requireNoPendingCommitPublication();

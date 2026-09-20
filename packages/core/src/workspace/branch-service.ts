@@ -75,6 +75,10 @@ export class WorkspaceBranchService {
   }
 
   deleteRemote(name: BranchName): Promise<void> {
-    return this.adapter.deleteBranch!(name);
+    const deleteBranch = this.adapter.deleteBranch;
+    if (!deleteBranch) {
+      throw new RemotishError('UNSUPPORTED', 'Adapter does not support branch deletion.');
+    }
+    return deleteBranch.call(this.adapter, name);
   }
 }

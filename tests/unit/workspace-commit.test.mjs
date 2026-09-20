@@ -322,13 +322,15 @@ test('workspace branches: deletion is durable before the remote branch is remove
     },
   });
   const durable = new MemoryWorkspaceStorage();
-  let failSaves = false;
+  const failingSaveCalls = new Set();
+  let saveCalls = 0;
   const storage = {
     load(repositoryId) {
       return durable.load(repositoryId);
     },
     async save(repositoryId, snapshot) {
-      if (failSaves) {
+      saveCalls += 1;
+      if (failingSaveCalls.delete(saveCalls)) {
         throw new Error('disk full');
       }
       if (remoteDeleted) {
@@ -345,7 +347,7 @@ test('workspace branches: deletion is durable before the remote branch is remove
   await workspace.switchBranch('feature/test');
   await workspace.switchBranch('main');
 
-  failSaves = true;
+  failingSaveCalls.add(saveCalls + 1);
   await assert.rejects(workspace.deleteBranch('feature/test'), /disk full/u);
   assert.equal(remoteDeleted, false);
   assert.equal(
@@ -353,7 +355,6 @@ test('workspace branches: deletion is durable before the remote branch is remove
     true,
   );
 
-  failSaves = false;
   await workspace.deleteBranch('feature/test');
   assert.equal(remoteDeleted, true);
 
