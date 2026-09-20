@@ -1,8 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["tests/**/*.test.mjs"],
-  "project": ["tests/**/*.mjs"],
   "workspaces": {
+    ".": {
+      "entry": ["tests/**/*.test.mjs"],
+      "project": ["tests/**/*.mjs"]
+    },
     "packages/*": {},
     "adapters/*": {},
     "apps/demo-web": {}
