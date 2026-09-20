@@ -240,6 +240,33 @@ test('workspace branches: create and delete are remote operations owned by core'
   await assert.rejects(workspace.deleteBranch('main'));
 });
 
+test('workspace branches: deleting an inactive dirty branch preserves its local work', async () => {
+  const adapter = new FixtureAdapter();
+  const workspace = await RemotishWorkspace.open(adapter);
+
+  await workspace.switchBranch('feature/test');
+  await workspace.writeFile('README.md', encoder.encode('feature local work\n'), {
+    create: false,
+    overwrite: true,
+  });
+  await workspace.switchBranch('main');
+
+  await assert.rejects(
+    workspace.deleteBranch('feature/test'),
+    (error) =>
+      error instanceof RemotishError &&
+      error.code === 'INVALID_REQUEST' &&
+      error.message.includes('uncommitted local changes'),
+  );
+  assert.equal(
+    (await workspace.listBranches()).some((branch) => branch.name === 'feature/test'),
+    true,
+  );
+
+  await workspace.switchBranch('feature/test');
+  assert.equal(decoder.decode(await workspace.readFile('README.md')), 'feature local work\n');
+});
+
 test('workspace refresh: clean workspace can advance, dirty workspace stays pinned', async () => {
   const cleanAdapter = new FixtureAdapter();
   const clean = await RemotishWorkspace.open(cleanAdapter);

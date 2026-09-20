@@ -63,6 +63,12 @@ export class WorkspaceBranchService {
     if (name === this.branches.selectedBranch) {
       throw new RemotishError('INVALID_REQUEST', 'Cannot delete the currently selected branch.');
     }
+    if (this.branches.hasChanges(name)) {
+      throw new RemotishError(
+        'INVALID_REQUEST',
+        `Cannot delete branch ${name} because it has uncommitted local changes.`,
+      );
+    }
     if (!this.adapter.capabilities.deleteBranch || !this.adapter.deleteBranch) {
       throw new RemotishError('UNSUPPORTED', 'Adapter does not support branch deletion.');
     }

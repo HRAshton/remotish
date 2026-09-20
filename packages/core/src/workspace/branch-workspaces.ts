@@ -79,6 +79,10 @@ export class BranchWorkspaces {
     this.workspaces.set(branch.name, workspace);
   }
 
+  hasChanges(branch: BranchName): boolean {
+    return this.workspaces.get(branch)?.tree.hasChanges ?? false;
+  }
+
   remove(branch: BranchName): void {
     this.workspaces.delete(branch);
   }
