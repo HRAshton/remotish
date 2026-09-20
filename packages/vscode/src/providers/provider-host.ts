@@ -439,12 +439,20 @@ function snapshotRepositoryDescriptor(
 
 function validateRepositoryDescriptor(repository: Readonly<Record<string, string>>): void {
   for (const key of Object.keys(repository)) {
-    const normalizedKey = key.trim().toLowerCase().replace(/[-\s]/gu, '_');
-    if (SECRET_DESCRIPTOR_KEYS.has(normalizedKey)) {
+    if (SECRET_DESCRIPTOR_KEYS.has(normalizeDescriptorKey(key))) {
       throw new RemotishError(
         'INVALID_REQUEST',
         `Repository descriptor must not contain secret field "${key}".`,
       );
     }
   }
+}
+
+function normalizeDescriptorKey(key: string): string {
+  return key
+    .trim()
+    .replace(/([A-Z]+)([A-Z][a-z])/gu, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/gu, '$1_$2')
+    .toLowerCase()
+    .replace(/[-\s]+/gu, '_');
 }

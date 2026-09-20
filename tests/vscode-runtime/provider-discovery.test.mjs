@@ -345,6 +345,35 @@ test('concurrent alias descriptors serialize before opening canonical persisted 
   assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
 });
 
+test('generic secret filtering normalizes camelCase descriptor keys', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  let providerValidated = false;
+  installFixtureProvider({
+    validateRepository() {
+      providerValidated = true;
+    },
+  });
+  const context = createContext({ root: '/secret-key-normalization' });
+  await activate(context);
+  t.after(() => disposeContext(context));
+
+  await assert.rejects(
+    vscode.commands.executeCommand(
+      REMOTISH_ENSURE_REPOSITORY_COMMAND,
+      request({
+        repository: {
+          repository: 'demo',
+          accessToken: 'must-not-enter-a-repository-descriptor',
+        },
+      }),
+    ),
+    /secret field "accessToken"/u,
+  );
+  assert.equal(providerValidated, false);
+});
+
 test('provider-owned descriptor validation is not bypassed by concurrent normalization', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
