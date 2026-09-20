@@ -167,10 +167,20 @@ export class RemotishWorkspace {
     });
   }
 
-  commitAndPush(message: string, selectedPaths?: readonly RepoPath[]): Promise<CommitResult> {
-    return this.mutateCommit(() =>
-      this.commitService.commitAndPush(this.branch, this.branches.current, message, selectedPaths),
-    );
+  commitAndPush(
+    message: string,
+    selectedPaths?: readonly RepoPath[],
+    expectedState?: Readonly<{ branch: BranchName; baseRevision: RevisionId }>,
+  ): Promise<CommitResult> {
+    return this.mutateCommit(() => {
+      this.requireExpectedState(expectedState);
+      return this.commitService.commitAndPush(
+        this.branch,
+        this.branches.current,
+        message,
+        selectedPaths,
+      );
+    });
   }
 
   commitAndPushForceWithLease(

@@ -50,7 +50,13 @@ async function commitAndPush(
 ): Promise<void> {
   const { workspace, input, stagedPaths } = requireScm(registry, scm, workspaceId);
   requireStagedChanges(stagedPaths);
-  const result = await workspace.commitAndPush(requireMessage(input.value), stagedPaths);
+  const message = requireMessage(input.value);
+  const expectedBranch = workspace.branch;
+  const expectedBaseRevision = workspace.baseRevision;
+  const result = await workspace.commitAndPush(message, stagedPaths, {
+    branch: expectedBranch,
+    baseRevision: expectedBaseRevision,
+  });
   handleCommitResult(result, input);
 }
 
