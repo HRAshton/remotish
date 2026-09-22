@@ -1,11 +1,19 @@
 {
   "name": "remotish-fixture-provider",
   "displayName": "Remotish Fixture Provider",
-  "description": "Deterministic fixture provider for the Remotish web demo and smoke tests.",
+  "description": "Deterministic demo/reference provider for Remotish.",
   "version": "0.1.0-beta.12",
-  "publisher": "remotish-tests",
+  "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HRAshton/remotish.git"
+  },
+  "homepage": "https://github.com/HRAshton/remotish/tree/master/extensions/fixture-provider#readme",
+  "bugs": {
+    "url": "https://github.com/HRAshton/remotish/issues"
+  },
   "engines": {
     "vscode": "^1.138.0"
   },

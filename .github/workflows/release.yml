@@ -27,13 +27,17 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Verify tag and public package versions
+      - name: Verify tag and release component versions
         shell: bash
         run: |
           version="$(node --print "require('./package.json').version")"
           sdk_version="$(node --print "require('./packages/adapter-sdk/package.json').version")"
+          host_version="$(node --print "require('./apps/demo-web/package.json').version")"
+          fixture_provider_version="$(node --print "require('./extensions/fixture-provider/package.json').version")"
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
+          test "$host_version" = "$version"
+          test "$fixture_provider_version" = "$version"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm test:vscode-web:vsix
@@ -41,12 +45,19 @@ jobs:
       - run: cp THIRD_PARTY_NOTICES.md artifacts/THIRD_PARTY_NOTICES.md
       - name: Create checksums
         working-directory: artifacts
-        run: sha256sum remotish-demo.vsix remotish-framework.tar.gz remotish.cdx.json THIRD_PARTY_NOTICES.md > SHA256SUMS
+        run: |
+          sha256sum \
+            remotish-demo.vsix \
+            remotish-fixture-provider.vsix \
+            remotish-framework.tar.gz \
+            remotish.cdx.json \
+            THIRD_PARTY_NOTICES.md > SHA256SUMS
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
             artifacts/remotish-demo.vsix
+            artifacts/remotish-fixture-provider.vsix
             artifacts/remotish-framework.tar.gz
             artifacts/remotish.cdx.json
             artifacts/THIRD_PARTY_NOTICES.md
@@ -128,6 +139,7 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" \
             artifacts/remotish-demo.vsix \
+            artifacts/remotish-fixture-provider.vsix \
             artifacts/remotish-framework.tar.gz \
             artifacts/remotish.cdx.json \
             artifacts/THIRD_PARTY_NOTICES.md \

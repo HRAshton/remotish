@@ -62,7 +62,8 @@ A successful commit is already published remotely. Remotish does not create loca
 @remotish/vscode-history    native SCM history + file Timeline integration
 @remotish/adapter-http      small HTTP protocol example
 @remotish/adapter-github    production-style GitHub reference adapter
-apps/demo-web               complete browser extension composition
+extensions/fixture-provider  deterministic demo/reference provider extension
+apps/demo-web               browser-safe Remotish host extension
 ```
 
 Adapters depend on `@remotish/adapter-sdk`, not on VS Code or core internals.
@@ -76,7 +77,7 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm vscode:web
 ```
 
-The demo opens a deterministic fixture repository through the same filesystem, SCM, branch and history layers used by real adapters.
+The launcher loads the Remotish host and fixture provider as separate extensions. Run **Remotish Demo: Open Fixture Repository** to open the deterministic fixture through the same provider discovery, canonical workspace, filesystem, SCM, branch and history paths used by real providers.
 
 ## Suitable backends
 

@@ -4,7 +4,7 @@ import { run as runWebSmoke } from './index.js';
 
 export async function run(): Promise<void> {
   const providerExtension = vscode.extensions.getExtension(
-    'remotish-tests.remotish-fixture-provider',
+    'hrashton.remotish-fixture-provider',
   );
   if (!providerExtension) {
     throw new Error('Packaged fixture provider VSIX was not loaded into Code-OSS Web.');
