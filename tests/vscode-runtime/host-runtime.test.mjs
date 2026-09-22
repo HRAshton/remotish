@@ -170,7 +170,10 @@ test('vscode runtime: working edit can be opened, staged, reverted, and publishe
     readme,
     cancellationToken(),
   );
-  assert.equal(original?.toString(), `remotish-base://${FIXTURE_WORKSPACE_ID}/README.md?revision=C3`);
+  assert.equal(
+    original?.toString(),
+    `remotish-base://${FIXTURE_WORKSPACE_ID}/README.md?revision=C3`,
+  );
 
   await vscode.commands.executeCommand('remotish.openFile', changes.resourceStates[0]);
   const opened = vscode.__test.externalCommands.find((item) => item.command === 'vscode.open');

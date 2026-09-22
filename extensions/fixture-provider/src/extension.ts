@@ -42,13 +42,10 @@ export async function activate(
   };
 
   const openFixture = vscode.commands.registerCommand(OPEN_FIXTURE_COMMAND, () =>
-    vscode.commands.executeCommand(
-      REMOTISH_OPEN_REPOSITORY_COMMAND,
-      {
-        version: REMOTISH_REPOSITORY_COMMAND_VERSION,
-        ...repositoryRequest(),
-      } satisfies RemotishRepositoryCommandV1,
-    ),
+    vscode.commands.executeCommand(REMOTISH_OPEN_REPOSITORY_COMMAND, {
+      version: REMOTISH_REPOSITORY_COMMAND_VERSION,
+      ...repositoryRequest(),
+    } satisfies RemotishRepositoryCommandV1),
   );
   context.subscriptions.push(openFixture);
 

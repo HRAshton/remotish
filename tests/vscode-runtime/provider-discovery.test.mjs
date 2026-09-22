@@ -149,10 +149,7 @@ test('repository commands discover providers installed after host activation', a
   const activations = { count: 0 };
   installFixtureProvider({ activations });
 
-  const result = await vscode.commands.executeCommand(
-    REMOTISH_OPEN_REPOSITORY_COMMAND,
-    request(),
-  );
+  const result = await vscode.commands.executeCommand(REMOTISH_OPEN_REPOSITORY_COMMAND, request());
 
   assert.equal(activations.count, 1);
   const opened = vscode.__test.externalCommands.find(

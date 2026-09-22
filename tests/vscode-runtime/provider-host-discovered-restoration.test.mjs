@@ -3,10 +3,7 @@ import { test } from 'node:test';
 import { RemotishProviderHost } from '@remotish/vscode';
 import * as vscode from 'vscode';
 
-import {
-  FIXTURE_REQUEST,
-  installFixtureProvider,
-} from './fixture-provider-extension.mjs';
+import { FIXTURE_REQUEST, installFixtureProvider } from './fixture-provider-extension.mjs';
 
 function createMemento(values = new Map()) {
   return {

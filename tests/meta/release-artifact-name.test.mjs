@@ -21,10 +21,7 @@ test('host VSIX uses the Remotish product artifact name everywhere release tooli
     prepareVsix,
     'node scripts/prepare-vsix-smoke.mjs artifacts/remotish.vsix artifacts/remotish-fixture-provider.vsix',
   );
-  assert.match(
-    prepareVsixSmoke,
-    /process\.argv\[2\] \?\? 'artifacts\/remotish\.vsix'/u,
-  );
+  assert.match(prepareVsixSmoke, /process\.argv\[2\] \?\? 'artifacts\/remotish\.vsix'/u);
 
   assert.match(releaseWorkflow, /sha256sum[\s\S]*remotish\.vsix/u);
   assert.match(releaseWorkflow, /Attest build provenance[\s\S]*artifacts\/remotish\.vsix/u);

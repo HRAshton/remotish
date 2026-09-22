@@ -45,9 +45,7 @@ test('VS Code web launchers load the host and fixture provider separately', () =
 
 test('packaged VSIX smoke uses the promoted fixture provider extension', async () => {
   const providerManifest = JSON.parse(
-    await readFile(
-      new URL('../../extensions/fixture-provider/package.json', import.meta.url),
-    ),
+    await readFile(new URL('../../extensions/fixture-provider/package.json', import.meta.url)),
   );
   assert.equal(providerManifest.browser, './dist/extension.js');
   assert.equal(providerManifest.main, undefined);

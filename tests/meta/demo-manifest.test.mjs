@@ -43,7 +43,6 @@ test('host manifest contributes every public framework command', () => {
   assert.ok(contributed.has('remotish.refreshProviders'));
 });
 
-
 test('host activation contains no fixture or demo special cases', () => {
   assert.doesNotMatch(hostSource, /adapter-fixture|FixtureAdapter|RemotishWorkspace/u);
   assert.doesNotMatch(hostSource, /fixture-demo|remotish\.demo\.openFixture/u);

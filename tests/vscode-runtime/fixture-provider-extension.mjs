@@ -7,9 +7,7 @@ import {
 import { createStableWorkspaceId } from '@remotish/vscode';
 import * as vscode from 'vscode';
 
-import {
-  activate as activateFixtureProvider,
-} from '../../extensions/fixture-provider/build/extension.js';
+import { activate as activateFixtureProvider } from '../../extensions/fixture-provider/build/extension.js';
 
 const manifest = JSON.parse(
   await readFile(new URL('../../extensions/fixture-provider/package.json', import.meta.url)),
