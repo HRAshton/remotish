@@ -1,0 +1,43 @@
+{
+  "name": "remotish-fixture-provider",
+  "displayName": "Remotish Fixture Provider",
+  "description": "Deterministic fixture provider for the Remotish web demo and smoke tests.",
+  "version": "0.1.0-beta.12",
+  "publisher": "remotish-tests",
+  "license": "0BSD",
+  "private": true,
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "browser": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:remotish.demo.openFixture"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "fixture-provider",
+    "displayName": "Fixture Provider"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "remotish.demo.openFixture",
+        "title": "Remotish Demo: Open Fixture Repository"
+      }
+    ]
+  },
+  "dependencies": {
+    "@remotish/adapter-fixture": "workspace:*",
+    "@remotish/adapter-sdk": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty false"
+  }
+}

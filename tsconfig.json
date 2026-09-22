@@ -24,6 +24,9 @@
     },
     {
       "path": "./apps/demo-web"
+    },
+    {
+      "path": "./extensions/fixture-provider"
     }
   ]
 }

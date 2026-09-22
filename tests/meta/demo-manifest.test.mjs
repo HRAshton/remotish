@@ -8,6 +8,10 @@ import { SCM_COMMANDS } from '../../packages/vscode/dist/scm/source-control.js';
 const manifest = JSON.parse(
   await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
 );
+const hostSource = await readFile(
+  new URL('../../apps/demo-web/src/extension.ts', import.meta.url),
+  'utf8',
+);
 
 test('host manifest is WebWorker-compatible and activates for provider commands', () => {
   assert.equal(Object.hasOwn(manifest, 'type'), false);
@@ -21,7 +25,7 @@ test('host manifest is WebWorker-compatible and activates for provider commands'
   }
 });
 
-test('demo manifest contributes every public framework command', () => {
+test('host manifest contributes every public framework command', () => {
   const contributed = new Set(manifest.contributes.commands.map((command) => command.command));
   const expected = [
     ...Object.values(SCM_COMMANDS).filter((command) => command !== SCM_COMMANDS.openChange),
@@ -33,10 +37,25 @@ test('demo manifest contributes every public framework command', () => {
   }
 
   assert.equal(contributed.has(SCM_COMMANDS.openChange), false);
-  assert.ok(contributed.has('remotish.demo.openFixture'));
+  assert.equal(contributed.has('remotish.demo.openFixture'), false);
   assert.ok(contributed.has('remotish.ensureRepository'));
   assert.ok(contributed.has('remotish.openRepository'));
   assert.ok(contributed.has('remotish.refreshProviders'));
+});
+
+
+test('host activation contains no fixture or demo special cases', () => {
+  assert.doesNotMatch(hostSource, /adapter-fixture|FixtureAdapter|RemotishWorkspace/u);
+  assert.doesNotMatch(hostSource, /fixture-demo|remotish\.demo\.openFixture/u);
+});
+
+test('host manifest has no fixture or core runtime dependency', () => {
+  assert.equal(manifest.dependencies?.['@remotish/adapter-fixture'], undefined);
+  assert.equal(manifest.dependencies?.['@remotish/core'], undefined);
+  assert.deepEqual(manifest.dependencies, {
+    '@remotish/vscode': 'workspace:*',
+    '@remotish/vscode-history': 'workspace:*',
+  });
 });
 
 test('internal diff command is not exposed as an SCM button or menu action', () => {

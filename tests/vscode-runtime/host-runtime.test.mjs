@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as vscode from 'vscode';
 import { activate } from '../../apps/demo-web/build/extension.js';
+import {
+  FIXTURE_WORKSPACE_ID,
+  installFixtureProvider,
+  prepareFixtureRepository,
+} from './fixture-provider-extension.mjs';
 
 function createMemento() {
   const values = new Map();
@@ -21,6 +26,7 @@ function createMemento() {
 
 async function activateDemo(t) {
   vscode.__test.reset();
+  const fixtureProvider = installFixtureProvider();
   const context = {
     workspaceState: createMemento(),
     globalState: createMemento(),
@@ -37,10 +43,12 @@ async function activateDemo(t) {
     subscriptions: [],
   };
   await activate(context);
+  await prepareFixtureRepository();
   t.after(() => {
     for (const disposable of [...context.subscriptions].reverse()) {
       disposable.dispose();
     }
+    fixtureProvider.dispose();
     vscode.__test.reset();
   });
   await settle();
@@ -77,7 +85,7 @@ test('vscode runtime: demo wires VFS, SCM, branch status and native history prov
   const opened = vscode.__test.externalCommands.find(
     (item) => item.command === 'vscode.openFolder',
   );
-  assert.equal(opened?.args[0].toString(), 'remotish://fixture-demo/');
+  assert.equal(opened?.args[0].toString(), `remotish://${FIXTURE_WORKSPACE_ID}/`);
 });
 
 test('vscode runtime: Timeline shows repository commits for the active file', async (t) => {
@@ -90,7 +98,7 @@ test('vscode runtime: Timeline shows repository commits for the active file', as
 
   const readme = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README.md',
   });
   const timeline = await registration.provider.provideTimeline(
@@ -107,11 +115,11 @@ test('vscode runtime: Timeline shows repository commits for the active file', as
   assert.equal(timeline.items[0]?.command?.command, 'vscode.diff');
   assert.equal(
     timeline.items[0]?.command?.arguments?.[0].toString(),
-    'remotish-base://fixture-demo/README.md?revision=C2',
+    `remotish-base://${FIXTURE_WORKSPACE_ID}/README.md?revision=C2`,
   );
   assert.equal(
     timeline.items[0]?.command?.arguments?.[1].toString(),
-    'remotish-base://fixture-demo/README.md?revision=C3',
+    `remotish-base://${FIXTURE_WORKSPACE_ID}/README.md?revision=C3`,
   );
   assert.equal(timeline.items[1]?.command?.command, 'vscode.open');
 });
@@ -121,7 +129,7 @@ test('vscode runtime: VFS stats use real session timestamps instead of the Unix 
   const provider = vscode.__test.fileSystemProviders.get('remotish').provider;
   const readme = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README.md',
   });
 
@@ -146,7 +154,7 @@ test('vscode runtime: working edit can be opened, staged, reverted, and publishe
   const provider = vscode.__test.fileSystemProviders.get('remotish').provider;
   const readme = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README.md',
   });
 
@@ -162,11 +170,11 @@ test('vscode runtime: working edit can be opened, staged, reverted, and publishe
     readme,
     cancellationToken(),
   );
-  assert.equal(original?.toString(), 'remotish-base://fixture-demo/README.md?revision=C3');
+  assert.equal(original?.toString(), `remotish-base://${FIXTURE_WORKSPACE_ID}/README.md?revision=C3`);
 
   await vscode.commands.executeCommand('remotish.openFile', changes.resourceStates[0]);
   const opened = vscode.__test.externalCommands.find((item) => item.command === 'vscode.open');
-  assert.equal(opened?.args[0].toString(), 'remotish://fixture-demo/README.md');
+  assert.equal(opened?.args[0].toString(), `remotish://${FIXTURE_WORKSPACE_ID}/README.md`);
 
   await vscode.commands.executeCommand('remotish.stage', changes.resourceStates[0]);
   assert.equal(staged.resourceStates.length, 1);
@@ -207,12 +215,12 @@ test('vscode runtime: commit publishes only staged files and leaves other change
   const provider = vscode.__test.fileSystemProviders.get('remotish').provider;
   const readme = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README.md',
   });
   const index = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/src/index.ts',
   });
 
@@ -236,7 +244,7 @@ test('vscode runtime: commit publishes only staged files and leaves other change
   assert.equal(changes.resourceStates.length, 1);
 
   sourceControl.inputBox.value = 'Publish selected file';
-  await vscode.commands.executeCommand('remotish.commitAndPush', 'fixture-demo');
+  await vscode.commands.executeCommand('remotish.commitAndPush', FIXTURE_WORKSPACE_ID);
   await settle();
 
   assert.equal(staged.resourceStates.length, 0);
@@ -258,7 +266,7 @@ test('vscode runtime: branch picker switches the same registered workspace', asy
   assert.equal(vscode.__test.statusBarItems[0]?.text, '$(git-branch) feature/test');
   assert.equal(sourceControl.historyProvider.currentHistoryItemRef.id, 'workspace:feature/test');
   assert.equal(sourceControl.historyProvider.currentHistoryItemRef.revision, 'F2');
-  assert.equal(sourceControl.rootUri.toString(), 'remotish://fixture-demo/');
+  assert.equal(sourceControl.rootUri.toString(), `remotish://${FIXTURE_WORKSPACE_ID}/`);
 });
 
 test('vscode runtime: history changed-file resources stay revision pinned', async (t) => {
@@ -277,12 +285,12 @@ test('vscode runtime: rename is a framework working-tree operation and can be re
   const provider = vscode.__test.fileSystemProviders.get('remotish').provider;
   const from = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README.md',
   });
   const to = vscode.Uri.from({
     scheme: 'remotish',
-    authority: 'fixture-demo',
+    authority: FIXTURE_WORKSPACE_ID,
     path: '/README-renamed.md',
   });
 

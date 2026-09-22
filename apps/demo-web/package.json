@@ -104,10 +104,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "remotish.demo.openFixture",
-        "title": "Remotish Demo: Open Fixture Repository"
-      },
-      {
         "command": "remotish.ensureRepository",
         "title": "Remotish: Ensure Remote Repository"
       },
@@ -226,8 +222,6 @@
     ]
   },
   "dependencies": {
-    "@remotish/adapter-fixture": "workspace:*",
-    "@remotish/core": "workspace:*",
     "@remotish/vscode": "workspace:*",
     "@remotish/vscode-history": "workspace:*"
   },

@@ -13,6 +13,7 @@ const packagePaths = [
   '../../adapters/github/package.json',
   '../../adapters/http-example/package.json',
   '../../apps/demo-web/package.json',
+  '../../extensions/fixture-provider/package.json',
 ];
 
 async function exists(url) {
@@ -28,28 +29,34 @@ test('repository supports the Node 22 and 24 LTS lines', () => {
   assert.equal(rootManifest.engines?.node, '>=22 <23 || >=24 <25');
 });
 
-test('VS Code web workspace URIs include an explicit root path', () => {
-  for (const scriptName of ['vscode:web', 'test:vscode-web', 'test:vscode-web:vsix']) {
-    assert.match(
-      rootManifest.scripts?.[scriptName] ?? '',
-      /--folder-uri=remotish:\/\/fixture-demo\//u,
-      `${scriptName} must open a workspace URI with a non-empty path`,
-    );
+test('VS Code web launchers load the host and fixture provider separately', () => {
+  for (const scriptName of ['vscode:web', 'test:vscode-web']) {
+    const script = rootManifest.scripts?.[scriptName] ?? '';
+    assert.match(script, /--extensionDevelopmentPath=apps\/demo-web/u);
+    assert.match(script, /--extensionPath=extensions\/fixture-provider/u);
+    assert.doesNotMatch(script, /--folder-uri=remotish:\/\/fixture-demo\//u);
   }
+
+  const packaged = rootManifest.scripts?.['test:vscode-web:vsix'] ?? '';
+  assert.match(packaged, /--extensionDevelopmentPath=artifacts\/vsix-smoke\/extension/u);
+  assert.match(packaged, /--extensionPath=artifacts\/vsix-smoke\/providers/u);
+  assert.doesNotMatch(packaged, /--folder-uri=remotish:\/\/fixture-demo\//u);
 });
 
-test('packaged VSIX smoke includes a separately packaged web provider', async () => {
+test('packaged VSIX smoke uses the promoted fixture provider extension', async () => {
   const providerManifest = JSON.parse(
-    await readFile(new URL('../fixtures/provider-extension/package.json', import.meta.url)),
+    await readFile(
+      new URL('../../extensions/fixture-provider/package.json', import.meta.url),
+    ),
   );
   assert.equal(providerManifest.browser, './dist/extension.js');
   assert.equal(providerManifest.main, undefined);
-  assert.deepEqual(
-    providerManifest.activationEvents,
-    [],
-    'fixture provider must stay packageable without acquiring eager activation events',
-  );
+  assert.deepEqual(providerManifest.activationEvents, ['onCommand:remotish.demo.openFixture']);
   assert.equal(providerManifest.extensionKind, undefined);
+  assert.deepEqual(providerManifest.dependencies, {
+    '@remotish/adapter-fixture': 'workspace:*',
+    '@remotish/adapter-sdk': 'workspace:*',
+  });
   assert.deepEqual(providerManifest.remotish, {
     provider: true,
     apiVersion: 1,
@@ -57,11 +64,21 @@ test('packaged VSIX smoke includes a separately packaged web provider', async ()
     displayName: 'Fixture Provider',
   });
 
-  assert.match(rootManifest.scripts?.['release:test-provider:vsix'] ?? '', /provider-vsix-smoke/u);
-  assert.match(rootManifest.scripts?.['test:vscode-web:vsix'] ?? '', /release:test-provider:vsix/u);
+  assert.match(
+    rootManifest.scripts?.['release:fixture-provider:vsix'] ?? '',
+    /extensions\/fixture-provider/u,
+  );
   assert.match(
     rootManifest.scripts?.['test:vscode-web:vsix'] ?? '',
-    /--extensionPath=artifacts\/vsix-smoke\/providers/u,
+    /release:fixture-provider:vsix/u,
+  );
+  assert.equal(
+    await exists(new URL('../fixtures/provider-extension/package.json', import.meta.url)),
+    false,
+  );
+  assert.equal(
+    await exists(new URL('../../scripts/package-provider-vsix-smoke.mjs', import.meta.url)),
+    false,
   );
 });
 
@@ -261,7 +278,7 @@ test('CI push checks target the repository default branch', async () => {
 test('release scripts delegate generic infrastructure to standard tooling', async () => {
   assert.equal(
     rootManifest.scripts?.clean,
-    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist',
+    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist extensions/fixture-provider/dist',
   );
   assert.equal(await exists(new URL('../../scripts/clean.mjs', import.meta.url)), false);
 
