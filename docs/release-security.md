@@ -25,7 +25,7 @@ A release build is expected to satisfy all of these controls:
 
 A failure in a release gate blocks artifact creation/publishing.
 
-The released `remotish-fixture-provider.vsix` is a deterministic demo/reference provider. It is not a production repository backend and is not published to the VS Code Marketplace.
+The generic Remotish host is released as `remotish.vsix`. The released `remotish-fixture-provider.vsix` is a deterministic demo/reference provider. It is not a production repository backend and is not published to the VS Code Marketplace.
 
 ## Consumer verification
 
@@ -33,7 +33,7 @@ Release consumers can verify integrity and provenance with the release's `SHA256
 
 ```sh
 sha256sum -c SHA256SUMS
-gh attestation verify remotish-demo.vsix -R HRAshton/remotish
+gh attestation verify remotish.vsix -R HRAshton/remotish
 gh attestation verify remotish-fixture-provider.vsix -R HRAshton/remotish
 ```
 
@@ -44,7 +44,7 @@ Use the repository/release coordinates that correspond to the artifact you downl
 `pnpm test:vscode-web:vsix` performs the important packaging-path check:
 
 1. builds the framework, host browser bundle, and fixture-provider browser bundle;
-2. packages `remotish-demo.vsix` and `remotish-fixture-provider.vsix` independently;
+2. packages `remotish.vsix` and `remotish-fixture-provider.vsix` independently;
 3. unpacks those exact locally produced VSIXes into the smoke-test layout;
 4. injects the test bundle only into the unpacked host smoke-test copy;
 5. runs provider discovery/lazy activation plus host command and virtual-filesystem behavior under Code-OSS Web.

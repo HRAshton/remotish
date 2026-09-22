@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-const vsixPath = resolve(process.argv[2] ?? 'artifacts/remotish-demo.vsix');
+const vsixPath = resolve(process.argv[2] ?? 'artifacts/remotish.vsix');
 const providerVsixPath = resolve(process.argv[3] ?? 'artifacts/remotish-fixture-provider.vsix');
 const smokeRoot = resolve('artifacts/vsix-smoke');
 const extensionRoot = resolve(smokeRoot, 'extension');
