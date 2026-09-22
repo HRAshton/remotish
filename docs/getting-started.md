@@ -17,66 +17,73 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm vscode:web
 ```
 
-The demo uses the deterministic `FixtureAdapter`. It opens the fixture as a `remotish://` workspace and exercises the real Remotish virtual filesystem, Source Control integration, branch UX, history and persistence layers.
+The launcher loads the generic Remotish host and `extensions/fixture-provider` as separate browser extensions. Run **Remotish Demo: Open Fixture Repository** to prepare and open the deterministic fixture through the public provider discovery/`remotish.openRepository` path. The resulting canonical `remotish://.../` workspace then exercises the real virtual filesystem, Source Control integration, branch UX, history and persistence layers.
 
 Useful actions to try in VS Code:
 
-1. Edit or create a file in the fixture workspace.
-2. Open **Source Control** and inspect **Changes**.
-3. Open a change to view a diff against the pinned base revision.
-4. Stage one or more paths and enter a commit message.
-5. Run **Commit & Push**.
-6. Switch branches or create a branch from the branch control.
-7. Open file Timeline / SCM history when running the controlled host with the required API proposals.
+1. Run **Remotish Demo: Open Fixture Repository**.
+2. Edit or create a file in the fixture workspace.
+3. Open **Source Control** and inspect **Changes**.
+4. Open a change to view a diff against the pinned base revision.
+5. Stage one or more paths and enter a commit message.
+6. Run **Commit & Push**.
+7. Switch branches or create a branch from the branch control.
+8. Open file Timeline / SCM history when running the controlled host with the required API proposals.
 
 ## The minimum composition
 
-A real integration has three parts:
+For an independently installed provider, Remotish keeps the generic host and repository-specific adapter in separate extensions:
 
 ```text
-adapter                  framework core                 VS Code host
-   │                           │                            │
-   ├─ remote reads/writes ───► RemotishWorkspace ───────► VFS + SCM
-   │                           │                            │
-   └─ repository semantics     └─ overlay + persistence    └─ editor UX
+provider extension                    Remotish host
+      │                                   │
+      ├─ RemotishAdapterProviderV1 ──────► provider discovery
+      │                                   │
+      └─ RemotishAdapter ────────────────► RemotishWorkspace + VFS/SCM/history
 ```
 
-The demo composition is intentionally small:
+The host only starts generic infrastructure:
 
 ```ts
-import { FixtureAdapter } from '@remotish/adapter-fixture';
-import { RemotishWorkspace } from '@remotish/core';
-import {
-  createWorkingUri,
-  RemotishVsCodeHost,
-  StorageUriWorkspaceStorage,
-} from '@remotish/vscode';
+import { RemotishProviderHost } from '@remotish/vscode';
 import { RemotishHistoryHost } from '@remotish/vscode-history';
 import * as vscode from 'vscode';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const host = new RemotishVsCodeHost();
-  const history = new RemotishHistoryHost(host);
-
-  const storage = new StorageUriWorkspaceStorage(
-    context.storageUri ?? context.globalStorageUri,
-    'my-extension',
-  );
-
-  const workspace = await RemotishWorkspace.open(new FixtureAdapter(), storage);
-  const unregister = host.registry.register('demo', workspace);
-
-  context.subscriptions.push(host, history, unregister);
-
-  await vscode.commands.executeCommand(
-    'vscode.openFolder',
-    createWorkingUri('demo'),
-    false,
-  );
+  const providers = new RemotishProviderHost(context);
+  const history = new RemotishHistoryHost(providers.host);
+  context.subscriptions.push(providers, history);
 }
 ```
 
-`RemotishHistoryHost` is optional. It is isolated because SCM history and Timeline use proposal-sensitive Code-OSS APIs. The base VFS/SCM host is `RemotishVsCodeHost`.
+The provider extension returns the public SDK contract and constructs its adapter only when requested:
+
+```ts
+import { FixtureAdapter } from '@remotish/adapter-fixture';
+import {
+  REMOTISH_ADAPTER_PROVIDER_API_VERSION,
+  type RemotishAdapterProviderV1,
+} from '@remotish/adapter-sdk';
+
+export async function activate(): Promise<RemotishAdapterProviderV1> {
+  return {
+    apiVersion: REMOTISH_ADAPTER_PROVIDER_API_VERSION,
+    id: 'fixture-provider',
+    displayName: 'Fixture Provider',
+    validateRepository(repository) {
+      const keys = Object.keys(repository).sort();
+      if (keys.length !== 1 || keys[0] !== 'repository' || repository.repository !== 'demo') {
+        throw new Error('Expected repository=demo only.');
+      }
+    },
+    createAdapter() {
+      return new FixtureAdapter();
+    },
+  };
+}
+```
+
+The complete fixture provider also implements `restoreWorkspace()` and owns the demo-open command. See [Provider extensions](provider-extensions.md) for the discovery marker, restoration, stable workspace identity, and bootstrap rules. Embedded products can still compose `RemotishWorkspace` and `RemotishVsCodeHost` directly; that lower-level path is documented in [VS Code integration](vscode-integration.md).
 
 ## Replace the fixture with your backend
 

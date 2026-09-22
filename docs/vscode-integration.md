@@ -157,16 +157,16 @@ Do the same for `remotish-base`.
 
 ## Workspace Trust
 
-Do not copy the demo's trust declaration blindly. The fixture demo can support untrusted workspaces because workspace-controlled data cannot choose request origins, credentials, executable paths, or local commands.
+Do not copy the demo declarations blindly. The generic `apps/demo-web` host can support untrusted workspaces because it does not own provider credentials, provider network origins, executable paths, or local commands. The deterministic `extensions/fixture-provider` can also support untrusted workspaces because workspace-controlled data cannot select any of those privileged resources.
 
-A production adapter must reassess trust if workspace contents/settings can influence:
+A production provider extension must reassess trust if workspace contents/settings can influence:
 
 - authentication or token selection;
 - network destinations;
 - executable paths or local processes;
 - privileged product operations.
 
-Use restricted/limited behavior when appropriate.
+The host's trust declaration does not make a provider trusted. Use restricted/limited provider behavior when appropriate.
 
 ## Multi-repository hosts
 
@@ -174,4 +174,4 @@ One `RemotishVsCodeHost` may register multiple workspaces under different IDs. E
 
 ## Complete reference
 
-See [`apps/demo-web/src/extension.ts`](../apps/demo-web/src/extension.ts) for the smallest complete composition and [`apps/demo-web/package.json`](../apps/demo-web/package.json) for manifest contributions.
+See [`apps/demo-web/src/extension.ts`](../apps/demo-web/src/extension.ts) for the generic Remotish host composition, [`extensions/fixture-provider/src/extension.ts`](../extensions/fixture-provider/src/extension.ts) for an independently discovered provider, and [`apps/demo-web/package.json`](../apps/demo-web/package.json) for host manifest contributions.
