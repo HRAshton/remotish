@@ -38,6 +38,12 @@ module.exports = {
       to: { path: '^adapters/' },
     },
     {
+      name: 'provider-extensions-use-public-adapter-contracts',
+      severity: 'error',
+      from: { path: '^extensions/' },
+      to: { path: '^packages/(core|vscode|vscode-history)/' },
+    },
+    {
       name: 'vscode-api-only-in-vscode-layers',
       severity: 'error',
       from: { path: '^(packages/(adapter-sdk|core)/|adapters/)' },

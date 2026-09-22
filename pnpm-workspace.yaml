@@ -2,6 +2,7 @@ packages:
   - 'packages/*'
   - 'adapters/*'
   - 'apps/*'
+  - 'extensions/*'
 
 # pnpm is pinned by packageManager and CI; keep the lockfile focused on project dependencies.
 pmOnFail: ignore

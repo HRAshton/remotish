@@ -54,9 +54,9 @@ The Web test is a smoke/integration gate, not a pixel assertion suite.
 
 ## Workspace Trust
 
-`apps/demo-web` declares untrusted workspace support because its fixture cannot use workspace-controlled data to choose credentials, request origins, executable paths or local command execution.
+`apps/demo-web` is the generic Remotish host. It can support untrusted workspaces because the host itself does not let workspace-controlled data select provider credentials, network origins, executable paths, or local command execution. The deterministic `extensions/fixture-provider` independently declares untrusted-workspace support for the same reason.
 
-Production integrations must reassess this. If workspace data/settings can influence privileged behavior, use restricted/limited support rather than copying the demo declaration.
+Production provider extensions must make their own trust decision. The host's trust declaration does not grant a provider permission to run in an untrusted workspace. If provider workspace data/settings can influence privileged behavior, use restricted/limited support rather than copying the fixture-provider declaration.
 
 ## Resource labels and workspace roots
 

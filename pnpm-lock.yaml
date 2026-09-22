@@ -86,18 +86,21 @@ importers:
 
   apps/demo-web:
     dependencies:
-      '@remotish/adapter-fixture':
-        specifier: workspace:*
-        version: link:../../packages/adapter-fixture
-      '@remotish/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@remotish/vscode':
         specifier: workspace:*
         version: link:../../packages/vscode
       '@remotish/vscode-history':
         specifier: workspace:*
         version: link:../../packages/vscode-history
+
+  extensions/fixture-provider:
+    dependencies:
+      '@remotish/adapter-fixture':
+        specifier: workspace:*
+        version: link:../../packages/adapter-fixture
+      '@remotish/adapter-sdk':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sdk
 
   packages/adapter-fixture:
     dependencies:

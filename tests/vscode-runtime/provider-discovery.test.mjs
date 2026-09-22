@@ -138,6 +138,26 @@ test('provider discovery inspects manifests without activating providers', async
   assert.equal(second.count, 0);
 });
 
+test('repository commands discover providers installed after host activation', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  const context = createContext({ root: '/dynamic-provider-install' });
+  await activate(context);
+  t.after(() => disposeContext(context));
+
+  const activations = { count: 0 };
+  installFixtureProvider({ activations });
+
+  const result = await vscode.commands.executeCommand(REMOTISH_OPEN_REPOSITORY_COMMAND, request());
+
+  assert.equal(activations.count, 1);
+  const opened = vscode.__test.externalCommands.find(
+    (item) => item.command === 'vscode.openFolder',
+  );
+  assert.equal(opened?.args[0].toString(), result.uri);
+});
+
 test('opening one repository lazily activates only its provider and opens the canonical root', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
@@ -279,7 +299,7 @@ test('concurrent identical preparation coalesces adapter work and keeps caller-s
   assert.equal(source.resourceUri.endsWith('/src/index.ts'), true);
   assert.equal(readme.branch, 'feature/test');
   assert.equal(source.branch, 'feature/test');
-  assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
+  assert.equal(vscode.__test.sourceControls.length, 1, 'one canonical provider workspace');
 });
 
 test('concurrent alias descriptors serialize before opening canonical persisted state', async (t) => {
@@ -354,7 +374,7 @@ test('concurrent alias descriptors serialize before opening canonical persisted 
     1,
     'only one adapter may open canonical branch state for the shared workspace',
   );
-  assert.equal(vscode.__test.sourceControls.length, 2, 'demo + one canonical provider workspace');
+  assert.equal(vscode.__test.sourceControls.length, 1, 'one canonical provider workspace');
 });
 
 test('generic secret filtering normalizes camelCase descriptor keys', async (t) => {
@@ -432,7 +452,11 @@ test('routing metadata failure does not publish a canonical workspace', async (t
     vscode.commands.executeCommand(REMOTISH_ENSURE_REPOSITORY_COMMAND, request()),
     /memento unavailable/u,
   );
-  assert.equal(vscode.__test.sourceControls.length, 1, 'only the bundled demo is registered');
+  assert.equal(
+    vscode.__test.sourceControls.length,
+    0,
+    'failed preparation must not register a workspace',
+  );
 });
 
 test('canonical reload lazily restores provider state and preserves local overlay', async (t) => {
