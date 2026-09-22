@@ -263,7 +263,9 @@ A browser/static provider must use a `browser` extension entry point and support
 
 ## Refresh and dynamic installation
 
-`remotish.refreshProviders` forces a manifest rescan. Canonical restoration also rescans once when its persisted provider is not currently known, allowing a provider installed during the session to be used on retry.
+`remotish.refreshProviders` forces a manifest rescan. Repository commands and canonical restoration
+also rescan once when the requested provider is not currently known, allowing a provider installed
+during the session to be used without restarting the Remotish host.
 
 Discovery caches only extension-host-lifetime metadata and activated provider instances. Provider objects are never serialized.
 

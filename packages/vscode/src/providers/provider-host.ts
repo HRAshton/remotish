@@ -332,7 +332,15 @@ export class RemotishProviderHost implements vscode.Disposable {
 
   private async resolveProvider(providerId: string): Promise<RegisteredProvider> {
     const normalized = normalizeProviderId(providerId);
-    return this.providers.get(normalized) ?? this.discovery.activate(normalized);
+    const registered = this.providers.get(normalized);
+    if (registered) {
+      return registered;
+    }
+
+    if (!this.discovery.get(normalized)) {
+      this.discovery.refresh();
+    }
+    return this.discovery.activate(normalized);
   }
 
   private async serializeWorkspace<T>(

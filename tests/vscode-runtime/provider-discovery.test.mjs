@@ -138,6 +138,29 @@ test('provider discovery inspects manifests without activating providers', async
   assert.equal(second.count, 0);
 });
 
+test('repository commands discover providers installed after host activation', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+
+  const context = createContext({ root: '/dynamic-provider-install' });
+  await activate(context);
+  t.after(() => disposeContext(context));
+
+  const activations = { count: 0 };
+  installFixtureProvider({ activations });
+
+  const result = await vscode.commands.executeCommand(
+    REMOTISH_OPEN_REPOSITORY_COMMAND,
+    request(),
+  );
+
+  assert.equal(activations.count, 1);
+  const opened = vscode.__test.externalCommands.find(
+    (item) => item.command === 'vscode.openFolder',
+  );
+  assert.equal(opened?.args[0].toString(), result.uri);
+});
+
 test('opening one repository lazily activates only its provider and opens the canonical root', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());
