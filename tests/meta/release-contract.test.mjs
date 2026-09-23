@@ -15,6 +15,7 @@ const packagePaths = [
   '../../adapters/rpc/package.json',
   '../../apps/demo-web/package.json',
   '../../extensions/fixture-provider/package.json',
+  '../../extensions/browser-rpc-provider/package.json',
 ];
 
 async function exists(url) {
@@ -277,7 +278,7 @@ test('CI push checks target the repository default branch', async () => {
 test('release scripts delegate generic infrastructure to standard tooling', async () => {
   assert.equal(
     rootManifest.scripts?.clean,
-    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist extensions/fixture-provider/dist',
+    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist extensions/fixture-provider/dist extensions/browser-rpc-provider/dist',
   );
   assert.equal(await exists(new URL('../../scripts/clean.mjs', import.meta.url)), false);
 

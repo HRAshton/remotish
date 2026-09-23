@@ -102,6 +102,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vscode-history
 
+  extensions/browser-rpc-provider:
+    dependencies:
+      '@remotish/adapter-rpc':
+        specifier: workspace:*
+        version: link:../../adapters/rpc
+      '@remotish/adapter-sdk':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sdk
+
   extensions/fixture-provider:
     dependencies:
       '@remotish/adapter-fixture':

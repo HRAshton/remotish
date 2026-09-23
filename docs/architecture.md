@@ -31,6 +31,12 @@ A clean workspace is bound to a real remote revision. Remotish does not create l
 
 `@remotish/adapter-rpc` is a browser-safe, transport-neutral adapter. It forwards the SDK repository contract through a versioned, validated RPC protocol; a separate transport owns connection and authentication. It has no editor or SCM-service behavior.
 
+The independent Browser RPC provider extension owns one static `browser-rpc` provider and a
+session-local endpoint broker. Trusted transport origin is separate from endpoint claims; the
+broker enforces origin-compatible, unambiguous target selection before constructing `RpcAdapter`.
+Endpoints are dynamic browser sessions, not dynamically discovered Remotish providers. The browser
+transport and endpoint implementations are separate follow-up work.
+
 Dependency Cruiser enforces package-layer and circular-dependency rules. Knip checks dead files/dependency declarations and TypeDoc validates the exported TypeScript API documentation.
 
 ## Package responsibilities

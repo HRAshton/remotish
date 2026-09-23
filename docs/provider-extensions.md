@@ -89,6 +89,22 @@ The marker is routing metadata, not a trust boundary. Adapter construction still
 
 Two installed extensions may not claim the same provider ID. Remotish rejects the ambiguity instead of choosing based on extension enumeration or installation order.
 
+The Browser RPC integration follows this same static rule: the installed
+`remotish-browser-rpc-provider` extension declares exactly one `browser-rpc` provider. A browser
+tab/session registers a temporary RPC endpoint with that provider's in-memory broker; it does not
+register another Remotish provider. Merely opening a Bitbucket, GitHub, or other SCM tab cannot
+change provider discovery. Discovery reads the manifest only and does not connect to an endpoint.
+
+Browser RPC descriptors currently contain only a `target` URL. The provider rejects other fields,
+embedded credentials, queries, fragments, and HTTP except on loopback. Endpoint selection requires
+the normalized target and trusted transport origin to agree. Duplicate matching endpoints fail as
+ambiguous rather than selecting one by registration order. The broker waits at most 30 seconds for
+an endpoint; cancellation is available to broker callers. The V1 provider factory has no
+`AbortSignal` parameter, so a host repository command cannot yet cancel that wait directly.
+The browser transport and real endpoints are not yet implemented. Browser RPC currently has no
+provider-owned reconstruction record or `restoreWorkspace()` implementation, so it supports only
+session-local `remotish.ensureRepository` preparation, not canonical navigation/reload.
+
 ## Lazy activation
 
 Providers are activated only when they are needed, for example when:

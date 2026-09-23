@@ -30,6 +30,9 @@
     },
     {
       "path": "./extensions/fixture-provider"
+    },
+    {
+      "path": "./extensions/browser-rpc-provider"
     }
   ]
 }
