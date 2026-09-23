@@ -19,6 +19,7 @@ test('reference adapters depend on the public adapter SDK, not framework interna
   for (const path of [
     '../../adapters/github/package.json',
     '../../adapters/http-example/package.json',
+    '../../adapters/rpc/package.json',
     '../../packages/adapter-fixture/package.json',
   ]) {
     const manifest = JSON.parse(await readFile(new URL(path, import.meta.url)));

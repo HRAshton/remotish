@@ -12,6 +12,7 @@ const packagePaths = [
   '../../packages/vscode-history/package.json',
   '../../adapters/github/package.json',
   '../../adapters/http-example/package.json',
+  '../../adapters/rpc/package.json',
   '../../apps/demo-web/package.json',
   '../../extensions/fixture-provider/package.json',
 ];
