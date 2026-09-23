@@ -262,5 +262,6 @@ Use the smallest reference that matches your problem:
 - [`@remotish/adapter-http`](../adapters/http-example/README.md) - small fetch-only transport and explicit wire validation.
 - [`@remotish/adapter-github`](../adapters/github/README.md) - production-style pagination, binary reads, authentication and lease-protected publication.
 - [`@remotish/adapter-fixture`](../packages/adapter-fixture/README.md) - deterministic in-memory behavior for tests.
+- [`@remotish/adapter-rpc`](../adapters/rpc/README.md) - versioned repository RPC over a caller-supplied transport.
 
 For exact method/result semantics, continue with [Adapter contract](adapter-contract.md).

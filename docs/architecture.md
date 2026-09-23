@@ -29,6 +29,8 @@ A clean workspace is bound to a real remote revision. Remotish does not create l
 
 `@remotish/adapter-fixture` implements only the adapter SDK and is used as a deterministic reference. Adapters never depend on core or VS Code packages.
 
+`@remotish/adapter-rpc` is a browser-safe, transport-neutral adapter. It forwards the SDK repository contract through a versioned, validated RPC protocol; a separate transport owns connection and authentication. It has no editor or SCM-service behavior.
+
 Dependency Cruiser enforces package-layer and circular-dependency rules. Knip checks dead files/dependency declarations and TypeDoc validates the exported TypeScript API documentation.
 
 ## Package responsibilities
