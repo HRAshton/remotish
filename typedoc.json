@@ -7,7 +7,8 @@
     "packages/vscode-history/src/index.ts",
     "packages/adapter-fixture/src/index.ts",
     "adapters/http-example/src/index.ts",
-    "adapters/github/src/index.ts"
+    "adapters/github/src/index.ts",
+    "adapters/rpc/src/index.ts"
   ],
   "entryPointStrategy": "expand",
   "readme": "none",

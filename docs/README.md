@@ -15,6 +15,8 @@ Read these in order:
 
 If your backend is conventional HTTP, also inspect [`@remotish/adapter-http`](../adapters/http-example/README.md). For a production-style public API integration, inspect [`@remotish/adapter-github`](../adapters/github/README.md).
 
+For a transport-neutral, versioned repository protocol, inspect [`@remotish/adapter-rpc`](../adapters/rpc/README.md).
+
 ## VS Code / Code-OSS integrators
 
 - [VS Code integration](vscode-integration.md) - compose `RemotishWorkspace`, `RemotishVsCodeHost`, persistence and optional history.
@@ -35,4 +37,5 @@ If your backend is conventional HTTP, also inspect [`@remotish/adapter-http`](..
 | [`@remotish/adapter-fixture`](../packages/adapter-fixture/README.md) | Deterministic behavioral reference used by tests and the demo |
 | [`@remotish/adapter-http`](../adapters/http-example/README.md) | Minimal browser-first HTTP mapping |
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
+| [`@remotish/adapter-rpc`](../adapters/rpc/README.md) | Transport-neutral, versioned repository RPC adapter |
 | [`apps/demo-web`](../apps/demo-web/README.md) | Complete VS Code Web composition |

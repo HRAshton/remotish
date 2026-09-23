@@ -62,6 +62,7 @@ A successful commit is already published remotely. Remotish does not create loca
 @remotish/vscode-history    native SCM history + file Timeline integration
 @remotish/adapter-http      small HTTP protocol example
 @remotish/adapter-github    production-style GitHub reference adapter
+@remotish/adapter-rpc       transport-neutral, versioned RPC adapter
 extensions/fixture-provider  deterministic demo/reference provider extension
 apps/demo-web               browser-safe Remotish host extension
 ```

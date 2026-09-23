@@ -23,6 +23,9 @@
       "path": "./adapters/github"
     },
     {
+      "path": "./adapters/rpc"
+    },
+    {
       "path": "./apps/demo-web"
     },
     {

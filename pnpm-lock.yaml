@@ -20,6 +20,9 @@ importers:
       '@remotish/adapter-http':
         specifier: workspace:*
         version: link:adapters/http-example
+      '@remotish/adapter-rpc':
+        specifier: workspace:*
+        version: link:adapters/rpc
       '@remotish/adapter-sdk':
         specifier: workspace:*
         version: link:packages/adapter-sdk
@@ -79,6 +82,12 @@ importers:
         version: link:../../packages/adapter-sdk
 
   adapters/http-example:
+    dependencies:
+      '@remotish/adapter-sdk':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sdk
+
+  adapters/rpc:
     dependencies:
       '@remotish/adapter-sdk':
         specifier: workspace:*
