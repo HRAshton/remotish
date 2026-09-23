@@ -1,0 +1,33 @@
+{
+  "name": "remotish-browser-rpc-provider",
+  "displayName": "Remotish Browser RPC Provider",
+  "description": "SCM-agnostic browser RPC provider for Remotish.",
+  "version": "0.1.0-beta.12",
+  "publisher": "hrashton",
+  "license": "0BSD",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HRAshton/remotish.git"
+  },
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "browser": "./dist/extension.js",
+  "capabilities": {
+    "virtualWorkspaces": true
+  },
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "browser-rpc",
+    "displayName": "Browser RPC"
+  },
+  "dependencies": {
+    "@remotish/adapter-rpc": "workspace:*",
+    "@remotish/adapter-sdk": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty false"
+  }
+}
