@@ -71,8 +71,10 @@ paginated commit history, commit changes, normal commit-and-publish, and branch 
 Normal commits send binary additions/modifications and deletions to Bitbucket's source API with
 `branch` and `parents=baseRevision`. Bitbucket atomically rejects a moved branch head with HTTP 409,
 which Remotish reports as `REMOTE_CHANGED`. A successful result is already published at the returned
-revision. A network failure or malformed response after sending a write is ambiguous; Remotish
-does not retry it and retains its publication-recovery protection.
+revision. Bitbucket's successful source-upload response has an empty body; the endpoint validates
+the created commit SHA from the response `Location` header before reporting success. A network
+failure, missing/malformed `Location`, or other malformed response after sending a write is
+ambiguous; Remotish does not retry it and retains its publication-recovery protection.
 
 Force-with-lease and amend remain unavailable: Bitbucket's REST API does not provide the atomic
 ref replacement needed for those operations. Commits above a 16 MiB payload budget or more than

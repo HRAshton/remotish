@@ -373,7 +373,10 @@ test('Bitbucket file redirects are unsupported without following or leaking the 
 
 test('Bitbucket normal commit publishes binary additions, modifications and deletions atomically', async () => {
   const { adapter, calls } = fixture({
-    [`${api}/src`]: Response.json(commit(second, [revision]), { status: 201 }),
+    [`${api}/src`]: new Response(null, {
+      status: 201,
+      headers: { location: `${api}/commit/${second}` },
+    }),
   });
   const result = await adapter.commit({
     type: 'commit',
@@ -393,9 +396,7 @@ test('Bitbucket normal commit publishes binary additions, modifications and dele
     commit: {
       revision: second,
       parents: [revision],
-      message: 'A commit',
-      author: { name: 'Example Author <author@example.test>' },
-      authoredAt: '2026-09-24T12:00:00+00:00',
+      message: 'Publish bytes',
     },
   });
   const [{ url, init }] = calls;
@@ -451,10 +452,24 @@ test('Bitbucket stale-head conflict is settled, but dispatched failures remain a
   );
   assert.equal(dispatches, 1);
 
-  const malformed = fixture({
-    [`${api}/src`]: Response.json(commit(second, [parent]), { status: 201 }),
-  });
-  await assert.rejects(malformed.adapter.commit(request), errorCode('UNKNOWN'));
+  for (const response of [
+    new Response(null, { status: 201 }),
+    new Response(null, {
+      status: 201,
+      headers: { location: `https://evil.example/2.0/repositories/acme/widgets/commit/${second}` },
+    }),
+    new Response(null, {
+      status: 201,
+      headers: { location: `${api}/commit/${second}?token=secret` },
+    }),
+    new Response(null, {
+      status: 201,
+      headers: { location: `${api}/commit/not-a-sha` },
+    }),
+  ]) {
+    const malformed = fixture({ [`${api}/src`]: response });
+    await assert.rejects(malformed.adapter.commit(request), errorCode('UNKNOWN'));
+  }
 });
 
 test('Bitbucket rejects unsupported and oversized commits before dispatch', async () => {

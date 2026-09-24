@@ -263,7 +263,7 @@ export class BitbucketEndpoint {
   }
 
   private async commit(value: unknown, signal: AbortSignal): Promise<CommitResult> {
-    let prepared: CommitRejected | { form: FormData; baseRevision: string };
+    let prepared: CommitRejected | { form: FormData; baseRevision: string; message: string };
     try {
       prepared = this.prepareCommit(value);
     } catch {
@@ -284,14 +284,21 @@ export class BitbucketEndpoint {
       return { status: 'rejected', reason: 'REMOTE_CHANGED' };
     }
     this.requireStatus(response, 201);
-    const info = commitInfo(await this.responseJson(response, signal));
-    if (info.parents.length !== 1 || info.parents[0] !== prepared.baseRevision) {
-      throw malformed('published commit parent');
-    }
-    return { status: 'success', revision: info.revision, commit: info };
+    const publishedRevision = createdCommitRevision(response, this.basePath);
+    return {
+      status: 'success',
+      revision: publishedRevision,
+      commit: {
+        revision: publishedRevision,
+        parents: [prepared.baseRevision],
+        message: prepared.message,
+      },
+    };
   }
 
-  private prepareCommit(value: unknown): CommitRejected | { form: FormData; baseRevision: string } {
+  private prepareCommit(
+    value: unknown,
+  ): CommitRejected | { form: FormData; baseRevision: string; message: string } {
     const input = object(value, 'commit request');
     // These modes cannot be implemented with Bitbucket's source API without an unsafe ref rewrite.
     if (input.type !== 'commit' || object(input.push, 'commit push').mode !== 'normal') {
@@ -380,7 +387,7 @@ export class BitbucketEndpoint {
         );
       }
     }
-    return { form, baseRevision };
+    return { form, baseRevision, message };
   }
 
   private async createBranch(name: string, target: string, signal: AbortSignal): Promise<Branch> {
@@ -624,6 +631,35 @@ function revision(value: unknown): string {
 function remoteRevision(value: unknown, label: string): string {
   if (typeof value !== 'string' || !SHA.test(value)) {
     throw malformed(label);
+  }
+  return value.toLowerCase();
+}
+
+function createdCommitRevision(response: Response, basePath: string): string {
+  const location = response.headers.get('location');
+  if (!location || location.length > 2048) {
+    throw malformed('published commit location');
+  }
+  let url: URL;
+  try {
+    url = new URL(location, API_ORIGIN);
+  } catch {
+    throw malformed('published commit location');
+  }
+  const prefix = `${basePath}/commit/`;
+  if (
+    url.origin !== API_ORIGIN ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !url.pathname.startsWith(prefix)
+  ) {
+    throw malformed('published commit location');
+  }
+  const value = url.pathname.slice(prefix.length);
+  if (!SHA.test(value) || url.pathname !== `${prefix}${value}`) {
+    throw malformed('published commit location');
   }
   return value.toLowerCase();
 }
