@@ -31,8 +31,10 @@ mapping stays here; the RPC adapter, Browser RPC provider, host, and core remain
 
    Keep the template's `@sandbox DOM` line and enable Tampermonkey's `ISOLATED_WORLD` on Chromium.
    Tampermonkey documents fallback to another enabled world if isolation is disabled; do not use
-   a page-world fallback for this token-holding script. The build checks metadata but cannot
-   verify the installed manager's execution setting.
+   a page-world fallback for this token-holding script. The build checks metadata, and startup
+   refuses to use the key or token unless `GM_info.sandboxMode` reports `dom`. Verify the actual
+   execution world in the installed Tampermonkey configuration as well; see the provider's
+   [isolation pitfall](../../extensions/browser-rpc-provider/README.md#customer-developer-setup).
 
 The example supports repository pages on `https://bitbucket.org/<workspace>/<repo-slug>` and
 their child pages. Other origins, non-repository pages, and malformed slugs do not register an

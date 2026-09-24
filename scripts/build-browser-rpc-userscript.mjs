@@ -40,6 +40,7 @@ if (
   sandboxes.length !== 1 ||
   !/^\/\/ @sandbox\s+DOM\s*$/u.test(sandboxes[0]) ||
   [
+    'GM_info',
     'GM_getValue',
     'GM_setValue',
     'GM_deleteValue',

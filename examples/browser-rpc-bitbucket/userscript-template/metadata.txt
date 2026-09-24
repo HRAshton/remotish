@@ -7,6 +7,7 @@
 // @match        https://code.example.invalid/*
 // @match        https://bitbucket.org/*
 // @grant        GM_getValue
+// @grant        GM_info
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        GM_listValues

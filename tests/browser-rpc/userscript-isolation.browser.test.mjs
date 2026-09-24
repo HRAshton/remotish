@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
 
@@ -19,6 +21,48 @@ test('both userscript templates request only the isolated DOM sandbox', async ()
       ['// @sandbox      DOM'],
       path,
     );
+  }
+});
+
+test('both bundled userscripts refuse raw, js, and missing sandbox modes before key import', async () => {
+  for (const [path, origin] of [
+    ['extensions/browser-rpc-provider/userscript-template/entry.ts', 'https://code.example.test'],
+    ['examples/browser-rpc-bitbucket/userscript-template/entry.ts', 'https://bitbucket.org'],
+  ]) {
+    const entry = fileURLToPath(new URL(`../../${path}`, import.meta.url));
+    const contents = (await readFile(entry, 'utf8'))
+      .replaceAll('.invalid', '.test')
+      .replace('REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY', 'A'.repeat(43));
+    const { outputFiles } = await build({
+      stdin: { contents, resolveDir: dirname(entry), sourcefile: 'entry.ts', loader: 'ts' },
+      bundle: true,
+      write: false,
+      platform: 'browser',
+      format: 'iife',
+      target: 'es2022',
+    });
+    for (const sandboxMode of ['raw', 'js', undefined]) {
+      const errors = [];
+      let keyImports = 0;
+      runInNewContext(outputFiles[0].text, {
+        GM_info: sandboxMode === undefined ? undefined : { sandboxMode },
+        location: { origin, href: `${origin}/acme/widgets` },
+        crypto: {
+          subtle: {
+            importKey: () => {
+              keyImports += 1;
+              return Promise.resolve({});
+            },
+          },
+        },
+        atob,
+        btoa,
+        console: { error: (message) => errors.push(message) },
+      });
+      await new Promise(setImmediate);
+      assert.deepEqual(errors, ['Remotish userscript requires Tampermonkey isolated DOM sandbox.']);
+      assert.equal(keyImports, 0, `${path}: ${sandboxMode}`);
+    }
   }
 });
 

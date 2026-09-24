@@ -13,6 +13,7 @@ const endpointOrigins = ['https://scm.example.invalid'];
 const pairingKey = 'REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY';
 
 declare const GM_getValue: GmStorage['getValue'];
+declare const GM_info: { readonly sandboxMode: string };
 declare const GM_setValue: GmStorage['setValue'];
 declare const GM_deleteValue: GmStorage['deleteValue'];
 declare const GM_listValues: GmStorage['listValues'];
@@ -29,6 +30,10 @@ const storage: GmStorage = {
 };
 
 async function main(): Promise<void> {
+  if (typeof GM_info === 'undefined' || GM_info.sandboxMode !== 'dom') {
+    console.error('Remotish userscript requires Tampermonkey isolated DOM sandbox.');
+    return;
+  }
   const key = await importBridgeKey(pairingKey);
   const origin = globalThis.location.origin;
   if (origin === hostOrigin) {

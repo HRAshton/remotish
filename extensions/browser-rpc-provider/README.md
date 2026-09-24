@@ -34,8 +34,15 @@ userscript, so two separately installed scripts cannot share this mailbox.
 Keep `@sandbox DOM` in the metadata and enable Tampermonkey's isolated-world execution on
 Chromium. Tampermonkey may fall back to another enabled world if `ISOLATED_WORLD` is disabled;
 do not use such a configuration for a key-holding script. The builder rejects missing or changed
-`@sandbox DOM`, but it cannot verify a customer's Tampermonkey settings. A page-world script can
-intercept browser globals and compromise both the pairing key and endpoint credentials.
+`@sandbox DOM`. At startup the script also refuses to use the key unless `GM_info.sandboxMode`
+reports `dom`.
+
+Isolation pitfall: Tampermonkey documents fallback to another enabled world, but its public
+`GM_info` reference does not specify whether `sandboxMode` reports the selected world after such
+a fallback or only the requested mode. The runtime guard is defense in depth, not proof of actual
+isolation. Qualify the installed Chromium/Tampermonkey configuration before using real secrets;
+if `ISOLATED_WORLD` is unavailable or uncertain, do not run this key-holding userscript. A
+page-world script can intercept browser globals and compromise the key and endpoint credentials.
 
 Generate a fresh 256-bit base64url key locally (for example,
 `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`). Put it in

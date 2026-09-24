@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
-test('userscript builder rejects missing, raw, duplicate, and misplaced sandbox directives', async () => {
+test('userscript builder requires isolated sandbox metadata and GM_info grant', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'remotish-userscript-build-'));
   try {
     const entry = join(directory, 'entry.ts');
@@ -29,6 +29,7 @@ test('userscript builder rejects missing, raw, duplicate, and misplaced sandbox 
       metadata.replace('@sandbox      DOM', '@sandbox      raw'),
       metadata.replace('@sandbox      DOM', '@sandbox      DOM\n// @sandbox      raw'),
       `${metadata.replace(/^\/\/ @sandbox.*\r?\n/mu, '')}\n// @sandbox      DOM\n`,
+      metadata.replace(/^\/\/ @grant\s+GM_info\r?\n/mu, ''),
     ]) {
       await writeFile(metadataFile, invalid);
       const result = spawnSync(
