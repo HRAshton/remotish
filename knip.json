@@ -8,7 +8,10 @@
     "packages/*": {},
     "adapters/*": {},
     "apps/demo-web": {},
-    "extensions/*": {}
+    "extensions/*": {},
+    "extensions/browser-rpc-provider": {
+      "entry": ["userscript-template/entry.ts"]
+    }
   },
   "ignoreDependencies": ["vscode"]
 }

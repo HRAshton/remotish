@@ -7,6 +7,7 @@ coverage/
 build/
 .pnpm-store/
 .vscode-test-web/
+extensions/browser-rpc-provider/local/
 
 /*.md
 !README.md

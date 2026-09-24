@@ -64,6 +64,7 @@ A successful commit is already published remotely. Remotish does not create loca
 @remotish/adapter-github    production-style GitHub reference adapter
 @remotish/adapter-rpc       transport-neutral, versioned RPC adapter
 extensions/fixture-provider  deterministic demo/reference provider extension
+extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
 apps/demo-web               browser-safe Remotish host extension
 ```
 

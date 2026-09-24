@@ -129,8 +129,8 @@ export function decodeRpcResponse(operation: RpcOperation, value: unknown): unkn
 /** Encode exact bytes without text decoding or Node APIs. */
 export function encodeRpcBytes(bytes: Uint8Array): { readonly base64: string } {
   let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
   }
   return { base64: btoa(binary) };
 }
@@ -139,8 +139,24 @@ export function encodeRpcBytes(bytes: Uint8Array): { readonly base64: string } {
 export function decodeRpcBytes(value: unknown): Uint8Array {
   const data = record(value, 'bytes', ['base64']);
   const base64 = string(data.base64, 'bytes.base64');
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(base64)) {
+  // A repeated-group regex can overflow V8's stack on multi-megabyte files.
+  if (base64.length % 4 !== 0) {
     throw invalid('bytes.base64');
+  }
+  for (let index = 0; index < base64.length; index += 1) {
+    const code = base64.charCodeAt(index);
+    if (
+      !(
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        (code >= 48 && code <= 57) ||
+        code === 43 ||
+        code === 47 ||
+        (code === 61 && index >= base64.length - 2)
+      )
+    ) {
+      throw invalid('bytes.base64');
+    }
   }
   let binary: string;
   try {

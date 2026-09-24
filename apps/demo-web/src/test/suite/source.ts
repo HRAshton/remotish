@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-
+import { runBrowserRpcSmoke } from './browser-rpc.js';
 import { run as runWebSmoke } from './index.js';
 
 export async function run(): Promise<void> {
@@ -17,4 +17,5 @@ export async function run(): Promise<void> {
     throw new Error('Browser RPC provider activated during manifest-only discovery.');
   }
   await runWebSmoke();
+  await runBrowserRpcSmoke();
 }

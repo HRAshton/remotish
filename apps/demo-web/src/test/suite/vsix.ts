@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-
+import { runBrowserRpcSmoke } from './browser-rpc.js';
 import { run as runWebSmoke } from './index.js';
 
 export async function run(): Promise<void> {
@@ -23,5 +23,13 @@ export async function run(): Promise<void> {
   }
   if (!prepared.uri.startsWith('remotish://fixture-provider-')) {
     throw new Error('Packaged fixture provider did not produce a canonical Remotish workspace.');
+  }
+  const browserRpc = vscode.extensions.getExtension('hrashton.remotish-browser-rpc-provider');
+  if (!browserRpc || browserRpc.isActive) {
+    throw new Error('Packaged Browser RPC provider is missing or activated before request.');
+  }
+  await runBrowserRpcSmoke();
+  if (!browserRpc.isActive) {
+    throw new Error('Packaged Browser RPC provider did not activate on bridge configuration.');
   }
 }
