@@ -1,0 +1,17 @@
+// ==UserScript==
+// @name         Remotish Bitbucket Data Center Browser RPC (customer configured)
+// @namespace    https://example.invalid/remotish
+// @version      1
+// @description  Bitbucket Data Center 9.4 endpoint; configure local bridge and access token.
+// @sandbox      DOM
+// @match        https://code.example.invalid/*
+// @match        https://bitbucket.example.invalid/*
+// @grant        GM_getValue
+// @grant        GM_info
+// @grant        GM_setValue
+// @grant        GM_deleteValue
+// @grant        GM_listValues
+// @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
+// @grant        GM_registerMenuCommand
+// ==/UserScript==

@@ -39,6 +39,12 @@
     },
     {
       "path": "./examples/browser-rpc-bitbucket/tsconfig.userscript.json"
+    },
+    {
+      "path": "./examples/browser-rpc-bitbucket-datacenter"
+    },
+    {
+      "path": "./examples/browser-rpc-bitbucket-datacenter/tsconfig.userscript.json"
     }
   ]
 }

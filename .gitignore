@@ -9,6 +9,7 @@ build/
 .vscode-test-web/
 extensions/browser-rpc-provider/local/
 examples/browser-rpc-bitbucket/local/
+examples/browser-rpc-bitbucket-datacenter/local/
 
 /*.md
 !README.md
