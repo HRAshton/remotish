@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { FixtureAdapter } from '@remotish/adapter-fixture';
 import { decodeRpcRequest, encodeRpcSuccess } from '@remotish/adapter-rpc';
-import { RemotishError } from '@remotish/adapter-sdk';
+import {
+  REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+  REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
+  RemotishError,
+} from '@remotish/adapter-sdk';
 import { RemotishProviderHost } from '@remotish/vscode';
 import * as vscode from 'vscode';
 import {
@@ -148,6 +152,60 @@ test('bootstrap URI rejects unknown versions, ambiguous fields, and secret-beari
     `remotish-rpc://open/v1/${Buffer.from('https://example.com/repo?token=secret').toString('base64url')}`,
   ]) {
     assert.throws(() => decodeBrowserRpcBootstrapUri(uri), errorCode('INVALID_REQUEST'));
+  }
+});
+
+test('branch bootstrap rejects an older host before repository preparation', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+  const state = memento();
+  const bootstrap = new BrowserRpcBootstrapFileSystem(context(state, 'older-host'));
+  t.after(() => bootstrap.dispose());
+  let preparations = 0;
+  const workspaceId = 'browser-rpc-00000000000000000000000000000000';
+  const prepare = vscode.commands.registerCommand('remotish.ensureRepository', () => {
+    preparations += 1;
+    return { version: 1, workspaceId, uri: `remotish://${workspaceId}/` };
+  });
+  t.after(() => prepare.dispose());
+
+  bootstrap.stat(bootstrapUri('feature/a'));
+  await new Promise(setImmediate);
+  assert.equal(preparations, 0);
+  assert.equal(state.values.size, 0);
+  assert.equal(
+    vscode.__test.externalCommands.some((item) => item.command === 'vscode.openFolder'),
+    false,
+  );
+
+  // The optional branch contract does not block links that do not select a branch.
+  bootstrap.stat(bootstrapUri());
+  await new Promise(setImmediate);
+  assert.equal(preparations, 1);
+});
+
+test('prepared branch command validates its version and fields', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+  const host = new RemotishProviderHost(context(memento(), 'branch-contract'));
+  t.after(() => host.dispose());
+  assert.deepEqual(
+    await vscode.commands.executeCommand(REMOTISH_SELECT_PREPARED_BRANCH_COMMAND, {
+      version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
+      operation: 'check',
+    }),
+    { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION },
+  );
+  for (const [request, code] of [
+    [{ version: 2, operation: 'check' }, 'UNSUPPORTED'],
+    [{ version: 1, operation: 'check', token: 'secret' }, 'INVALID_REQUEST'],
+    [{ version: 1, operation: 'select', workspaceId: 'missing' }, 'INVALID_REQUEST'],
+    [{ version: 1, operation: 'other' }, 'INVALID_REQUEST'],
+  ]) {
+    await assert.rejects(
+      vscode.commands.executeCommand(REMOTISH_SELECT_PREPARED_BRANCH_COMMAND, request),
+      errorCode(code),
+    );
   }
 });
 
@@ -341,10 +399,17 @@ test('a stale preparation cannot switch the branch after its replacement navigat
     }
     return result;
   });
-  const select = vscode.commands.registerCommand('remotish.selectPreparedBranch', (_, branch) => {
-    selections.push(branch);
-    selectedBranch = branch;
-  });
+  const select = vscode.commands.registerCommand(
+    REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+    (request) => {
+      assert.equal(request.version, REMOTISH_SELECT_PREPARED_BRANCH_VERSION);
+      if (request.operation === 'select') {
+        selections.push(request.branch);
+        selectedBranch = request.branch;
+      }
+      return { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION };
+    },
+  );
   let signalNavigation;
   const navigated = new Promise((resolve) => {
     signalNavigation = resolve;
@@ -388,13 +453,18 @@ test('a newer branch selection waits for an already-started selection', async (t
   });
   let selectedBranch = 'main';
   const select = vscode.commands.registerCommand(
-    'remotish.selectPreparedBranch',
-    async (_, branch) => {
-      if (branch === 'feature/a') {
+    REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+    async (request) => {
+      assert.equal(request.version, REMOTISH_SELECT_PREPARED_BRANCH_VERSION);
+      if (request.operation === 'check') {
+        return { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION };
+      }
+      if (request.branch === 'feature/a') {
         signalFirstSelection();
         await firstSelectionDone;
       }
-      selectedBranch = branch;
+      selectedBranch = request.branch;
+      return { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION };
     },
   );
   let signalNavigation;

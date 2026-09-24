@@ -26,6 +26,8 @@ export type {
   RemotishRepositoryCommandV1,
   RemotishRepositoryRequest,
   RemotishRepositoryResultV1,
+  RemotishSelectPreparedBranchCommandV1,
+  RemotishSelectPreparedBranchResultV1,
 } from './provider.js';
 /** Public provider-extension contract and provider-neutral repository commands. */
 export {
@@ -34,6 +36,8 @@ export {
   REMOTISH_OPEN_REPOSITORY_COMMAND,
   REMOTISH_REFRESH_PROVIDERS_COMMAND,
   REMOTISH_REPOSITORY_COMMAND_VERSION,
+  REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+  REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
 } from './provider.js';
 /** Public immutable repository and history model. */
 export type {

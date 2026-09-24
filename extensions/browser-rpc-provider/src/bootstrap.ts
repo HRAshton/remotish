@@ -1,8 +1,11 @@
 import {
   REMOTISH_ENSURE_REPOSITORY_COMMAND,
   REMOTISH_REPOSITORY_COMMAND_VERSION,
+  REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+  REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
   RemotishError,
   type RemotishRepositoryRequest,
+  type RemotishSelectPreparedBranchCommandV1,
 } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
 import {
@@ -15,7 +18,6 @@ import { normalizeBrowserRpcTarget } from './target.js';
 const RESTORE_PREFIX = 'remotish.browserRpc.restore.v1.';
 const WORKSPACE_ID = /^browser-rpc-[0-9a-f]{32}$/u;
 const PROVIDER_ID = 'browser-rpc';
-const SELECT_PREPARED_BRANCH_COMMAND = 'remotish.selectPreparedBranch';
 
 interface RestoreRecordV1 {
   readonly version: 1;
@@ -124,6 +126,24 @@ export class BrowserRpcBootstrapFileSystem implements vscode.FileSystemProvider,
     request: BrowserRpcBootstrapRequest,
     generation: number,
   ): Promise<void> {
+    if (request.branch !== undefined) {
+      let support: unknown;
+      try {
+        support = await vscode.commands.executeCommand<unknown>(
+          REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+          {
+            version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
+            operation: 'check',
+          } satisfies RemotishSelectPreparedBranchCommandV1,
+        );
+      } catch {
+        throw unsupportedPreparedBranchHost();
+      }
+      requirePreparedBranchResult(support);
+    }
+    if (this.disposed || this.generation !== generation) {
+      return;
+    }
     const result = await vscode.commands.executeCommand<unknown>(
       REMOTISH_ENSURE_REPOSITORY_COMMAND,
       {
@@ -140,11 +160,16 @@ export class BrowserRpcBootstrapFileSystem implements vscode.FileSystemProvider,
         return;
       }
       if (request.branch !== undefined) {
-        await vscode.commands.executeCommand(
-          SELECT_PREPARED_BRANCH_COMMAND,
-          workspaceId,
-          request.branch,
+        const selected = await vscode.commands.executeCommand<unknown>(
+          REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+          {
+            version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
+            operation: 'select',
+            workspaceId,
+            branch: request.branch,
+          } satisfies RemotishSelectPreparedBranchCommandV1,
         );
+        requirePreparedBranchResult(selected);
       }
       if (this.disposed || this.generation !== generation) {
         return;
@@ -169,6 +194,25 @@ export class BrowserRpcBootstrapFileSystem implements vscode.FileSystemProvider,
     );
     await finalize;
   }
+}
+
+function requirePreparedBranchResult(value: unknown): void {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== 1 ||
+    (value as Record<string, unknown>).version !== REMOTISH_SELECT_PREPARED_BRANCH_VERSION
+  ) {
+    throw unsupportedPreparedBranchHost();
+  }
+}
+
+function unsupportedPreparedBranchHost(): RemotishError {
+  return new RemotishError(
+    'UNSUPPORTED',
+    'Branch-selecting Browser RPC links require a compatible Remotish host.',
+  );
 }
 
 /** Restore only repository identity; the host recovers the core-owned selected branch. */

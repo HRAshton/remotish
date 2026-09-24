@@ -3,11 +3,15 @@ import {
   REMOTISH_OPEN_REPOSITORY_COMMAND,
   REMOTISH_REFRESH_PROVIDERS_COMMAND,
   REMOTISH_REPOSITORY_COMMAND_VERSION,
+  REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+  REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
   type RemotishAdapterProviderV1,
   RemotishError,
   type RemotishRepositoryCommandV1,
   type RemotishRepositoryRequest,
   type RemotishRepositoryResultV1,
+  type RemotishSelectPreparedBranchCommandV1,
+  type RemotishSelectPreparedBranchResultV1,
 } from '@remotish/adapter-sdk';
 import { type Disposable as CoreDisposable, RemotishWorkspace } from '@remotish/core';
 import * as vscode from 'vscode';
@@ -23,7 +27,6 @@ import {
 import { createStableWorkspaceId, verifyStableWorkspaceId } from './workspace-id.js';
 
 const HOST_RESTORE_PREFIX = 'remotish.restore.v1.';
-const SELECT_PREPARED_BRANCH_COMMAND = 'remotish.selectPreparedBranch';
 const SECRET_DESCRIPTOR_KEYS = new Set([
   'access_token',
   'api_token',
@@ -119,8 +122,14 @@ export class RemotishProviderHost implements vscode.Disposable {
         this.discovery.refresh(),
       ),
       vscode.commands.registerCommand(
-        SELECT_PREPARED_BRANCH_COMMAND,
-        (workspaceId: unknown, branch: unknown) => this.selectPreparedBranch(workspaceId, branch),
+        REMOTISH_SELECT_PREPARED_BRANCH_COMMAND,
+        async (value: unknown): Promise<RemotishSelectPreparedBranchResultV1> => {
+          const command = requirePreparedBranchCommand(value);
+          if (command.operation === 'select') {
+            await this.selectPreparedBranch(command.workspaceId, command.branch);
+          }
+          return { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION };
+        },
       ),
     );
   }
@@ -141,10 +150,7 @@ export class RemotishProviderHost implements vscode.Disposable {
     return this.prepareRepository(request);
   }
 
-  private async selectPreparedBranch(workspaceId: unknown, branch: unknown): Promise<void> {
-    if (typeof workspaceId !== 'string' || typeof branch !== 'string' || !branch.trim()) {
-      throw new RemotishError('INVALID_REQUEST', 'A prepared workspace and branch are required.');
-    }
+  private async selectPreparedBranch(workspaceId: string, branch: string): Promise<void> {
     await this.serializeWorkspace(workspaceId, async () => {
       const workspace = this.host.registry.require(workspaceId).workspace;
       if (workspace.branch !== branch) {
@@ -379,6 +385,42 @@ export class RemotishProviderHost implements vscode.Disposable {
       }
     }
   }
+}
+
+function requirePreparedBranchCommand(value: unknown): RemotishSelectPreparedBranchCommandV1 {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new RemotishError('INVALID_REQUEST', 'Prepared branch command requires an object.');
+  }
+  const input = value as Record<string, unknown>;
+  if (input.version !== REMOTISH_SELECT_PREPARED_BRANCH_VERSION) {
+    throw new RemotishError('UNSUPPORTED', 'Unsupported prepared branch command version.');
+  }
+  if (input.operation === 'check') {
+    if (Object.keys(input).some((key) => key !== 'version' && key !== 'operation')) {
+      throw new RemotishError('INVALID_REQUEST', 'Unknown prepared branch command field.');
+    }
+    return { version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION, operation: 'check' };
+  }
+  if (input.operation !== 'select') {
+    throw new RemotishError('INVALID_REQUEST', 'Unknown prepared branch operation.');
+  }
+  if (
+    Object.keys(input).some(
+      (key) => !['version', 'operation', 'workspaceId', 'branch'].includes(key),
+    ) ||
+    typeof input.workspaceId !== 'string' ||
+    !input.workspaceId.trim() ||
+    typeof input.branch !== 'string' ||
+    !input.branch.trim()
+  ) {
+    throw new RemotishError('INVALID_REQUEST', 'Invalid prepared branch selection.');
+  }
+  return {
+    version: REMOTISH_SELECT_PREPARED_BRANCH_VERSION,
+    operation: 'select',
+    workspaceId: input.workspaceId,
+    branch: input.branch,
+  };
 }
 
 function preparationKey(

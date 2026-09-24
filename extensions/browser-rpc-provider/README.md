@@ -78,10 +78,13 @@ Replace the Code-OSS origin and target for your deployment, then URL-encode the 
 `remotish-rpc://` URI as the outer `folder` value. The extension must already have its bridge
 pairing key configured. Code-OSS mounts a temporary read-only folder while the provider waits up
 to 30 seconds for a matching endpoint. Open the compatible SCM tab during that wait. On success,
-the provider calls `remotish.ensureRepository`, persists `{ version: 1, target }` in its own
-global state, then opens the returned canonical `remotish://<stable-workspace-id>/` root. It does
-not call `remotish.openRepository` as a second preparation step. Closing the temporary folder
-cancels late navigation; after a timeout or other failure, reopen the link to retry.
+the provider calls `remotish.ensureRepository`, selects the requested branch if present, persists
+`{ version: 1, target }` in its own global state, then opens the returned canonical
+`remotish://<stable-workspace-id>/` root. Branch-bearing links require a host supporting the
+SDK's versioned `remotish.selectPreparedBranch` command; the provider checks that support before
+repository preparation. It does not call `remotish.openRepository` as a second preparation step.
+Closing the temporary folder cancels late navigation; after a timeout or other failure, reopen
+the link to retry.
 
 On a later Code-OSS restart, `restoreWorkspace()` returns that validated target. The host then
 reconnects to an endpoint and recomputes the stable workspace ID before registering the canonical

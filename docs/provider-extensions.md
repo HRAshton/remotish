@@ -181,6 +181,16 @@ The V1 result shape is:
 }
 ```
 
+Providers that must select a branch only after identity preparation use the separate
+`REMOTISH_SELECT_PREPARED_BRANCH_COMMAND` from the SDK. Its V1 request is either
+`{ version: 1, operation: 'check' }` or
+`{ version: 1, operation: 'select', workspaceId, branch }`; both return `{ version: 1 }` after
+successful completion. Browser RPC checks this command before `ensureRepository` for a
+branch-bearing link, then selects the branch only while that bootstrap attempt is current. An
+older host without the command fails the check before repository preparation; links without a
+branch do not require it. Branch selection is serialized with host workspace preparation, and
+the provider persists its record and navigates only after the selection succeeds.
+
 Unknown command versions and unknown fields are rejected.
 
 ## Provider-owned restoration data
