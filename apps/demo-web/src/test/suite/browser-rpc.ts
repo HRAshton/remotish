@@ -1,8 +1,10 @@
 import { FixtureAdapter } from '@remotish/adapter-fixture';
 import { decodeRpcRequest, encodeRpcFailure, encodeRpcSuccess } from '@remotish/adapter-rpc';
+import { RemotishError } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
 
 const CHANNEL = 'remotish-browser-rpc-v1';
+export const BROWSER_RPC_SMOKE_TARGET = 'https://example.com/browser-rpc-smoke';
 
 function base64Url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
@@ -27,7 +29,9 @@ function filePayload(value: unknown): { revision: string; path: string } {
 }
 
 /** Packaged-extension smoke uses a deterministic, key-holding test endpoint, not a live SCM. */
-export async function runBrowserRpcSmoke(): Promise<void> {
+export async function withBrowserRpcFixtureEndpoint(
+  run: (target: string) => Promise<void>,
+): Promise<void> {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const keyString = base64Url(bytes);
   const key = await crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
@@ -36,7 +40,7 @@ export async function runBrowserRpcSmoke(): Promise<void> {
   const endpointId = [...crypto.getRandomValues(new Uint8Array(16))]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
-  const target = 'https://example.com/browser-rpc-smoke';
+  const target = BROWSER_RPC_SMOKE_TARGET;
   const fixture = new FixtureAdapter();
   let failure: unknown;
   channel.onmessage = (event) => {
@@ -99,28 +103,38 @@ export async function runBrowserRpcSmoke(): Promise<void> {
       typeof frame.requestId === 'string'
     ) {
       const request = decodeRpcRequest(frame.request);
-      let result: unknown;
-      switch (request.operation) {
-        case 'getRepository':
-          result = await fixture.getRepository();
-          break;
-        case 'getBranches':
-          result = await fixture.getBranches();
-          break;
-        case 'readDirectory':
-          {
+      let response: unknown;
+      try {
+        let result: unknown;
+        switch (request.operation) {
+          case 'getRepository':
+            result = await fixture.getRepository();
+            break;
+          case 'getBranches':
+            result = await fixture.getBranches();
+            break;
+          case 'readDirectory': {
             const payload = filePayload(request.payload);
             result = await fixture.readDirectory(payload.revision, payload.path);
+            break;
           }
-          break;
-        case 'readFile':
-          {
+          case 'readFile': {
             const payload = filePayload(request.payload);
             result = await fixture.readFile(payload.revision, payload.path);
+            break;
           }
-          break;
-        default:
-          result = undefined;
+          default:
+            result = undefined;
+        }
+        response =
+          result === undefined
+            ? encodeRpcFailure('UNSUPPORTED')
+            : encodeRpcSuccess(request.operation, result);
+      } catch (error) {
+        if (!(error instanceof RemotishError)) {
+          throw error;
+        }
+        response = encodeRpcFailure(error.code);
       }
       channel.postMessage(
         await encryptFrame({
@@ -129,15 +143,23 @@ export async function runBrowserRpcSmoke(): Promise<void> {
           hostId: frame.hostId,
           endpointId,
           requestId: frame.requestId,
-          response:
-            result === undefined
-              ? encodeRpcFailure('UNSUPPORTED')
-              : encodeRpcSuccess(request.operation, result),
+          response,
         }),
       );
     }
   }
   try {
+    await run(target);
+    if (failure) {
+      throw new Error(`Browser RPC test endpoint rejected transport traffic: ${String(failure)}`);
+    }
+  } finally {
+    channel.close();
+  }
+}
+
+export async function runBrowserRpcSmoke(): Promise<void> {
+  await withBrowserRpcFixtureEndpoint(async (target) => {
     const prepared = await vscode.commands.executeCommand<{ readonly uri: string }>(
       'remotish.ensureRepository',
       { version: 1, provider: 'browser-rpc', repository: { target } },
@@ -152,10 +174,5 @@ export async function runBrowserRpcSmoke(): Promise<void> {
     if (content.join(',') !== '0,1,2,127,128,255') {
       throw new Error('Browser RPC filesystem did not preserve binary bytes.');
     }
-    if (failure) {
-      throw new Error('Browser RPC test endpoint rejected transport traffic.');
-    }
-  } finally {
-    channel.close();
-  }
+  });
 }

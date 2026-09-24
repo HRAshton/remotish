@@ -143,6 +143,7 @@ const storageDirectories = new Set();
 const logOutputChannels = [];
 const installedExtensions = [];
 const extensionsChanged = new EventEmitter();
+const workspaceFoldersChanged = new EventEmitter();
 
 export const extensions = {
   get all() {
@@ -171,6 +172,8 @@ export const commands = {
 };
 
 export const workspace = {
+  workspaceFolders: undefined,
+  onDidChangeWorkspaceFolders: workspaceFoldersChanged.event,
   fs: {
     async createDirectory(uri) {
       storageDirectories.add(storageKey(uri));
@@ -403,6 +406,10 @@ export const __test = {
   storageFiles,
   storageDirectories,
   installedExtensions,
+  setWorkspaceFolders(folders) {
+    workspace.workspaceFolders = folders;
+    workspaceFoldersChanged.fire({ added: folders ?? [], removed: [] });
+  },
   installExtension({ id, packageJSON = {}, activate = async () => undefined }) {
     let activation;
     const extension = {
@@ -459,6 +466,7 @@ export const __test = {
       installedExtensions.splice(0);
     }
     logOutputChannels.splice(0);
+    workspace.workspaceFolders = undefined;
   },
 };
 

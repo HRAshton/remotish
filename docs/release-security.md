@@ -17,7 +17,7 @@ A release build is expected to satisfy all of these controls:
 - the canonical `pnpm run ci` gate runs declaration-contract, lint, build/test, production-dependency policy and native pnpm SBOM checks before packaging.
 - the browser host, deterministic fixture-provider, and Browser RPC provider extensions are bundled and packaged with exact-version development dependencies declared in the root `package.json`; VS Code proposal declarations are committed under `types/vscode-proposed`, and release-contract tests keep their set aligned with the pinned 1.138.0 host and enabled proposals.
 - VSIX contents are governed by each extension's `.vscodeignore`; the exact locally produced host and provider packages are unpacked and smoke-tested together under Code-OSS Web.
-- the packaged smoke verifies manifest-only provider discovery, lazy provider activation, Browser RPC handshake and repository preparation, and host virtual-filesystem behavior.
+- the packaged smoke verifies manifest-only provider discovery, lazy provider activation, Browser RPC handshake and repository preparation, a real `?folder=remotish-rpc://...` bootstrap launch, and host virtual-filesystem behavior.
 - SHA-256 checksums cover all three VSIXes, the source archive, SBOM, and tracked third-party notices.
 - provenance attestations use GitHub OIDC via `actions/attest` and cover all three VSIXes plus the other release artifacts.
 - a validated CycloneDX JSON SBOM is generated and associated with the Remotish host VSIX.
@@ -48,7 +48,7 @@ Use the repository/release coordinates that correspond to the artifact you downl
 2. packages `remotish.vsix`, `remotish-fixture-provider.vsix`, and `remotish-browser-rpc-provider.vsix` independently;
 3. unpacks those exact locally produced VSIXes into the smoke-test layout;
 4. injects the test bundle only into the unpacked host smoke-test copy;
-5. runs provider discovery/lazy activation, Browser RPC handshake and binary filesystem read, plus host command and virtual-filesystem behavior under Code-OSS Web.
+5. runs provider discovery/lazy activation, Browser RPC handshake and binary filesystem read, a separate Browser RPC bootstrap-folder URL launch, plus host command and virtual-filesystem behavior under Code-OSS Web.
 
 The packaged file sets are controlled by each extension's `.vscodeignore`; `vsce ls --no-dependencies` is the standard way to inspect them when changing packaging rules. Release-contract tests pin the host ignore rules and verify both provider manifests/package paths.
 

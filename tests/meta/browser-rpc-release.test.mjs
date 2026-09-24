@@ -24,6 +24,7 @@ test('Browser RPC provider is a licensed, browser-only packaged extension', () =
   assert.equal(manifest.main, undefined);
   assert.equal(manifest.private, true);
   assert.equal(manifest.publisher, 'hrashton');
+  assert.ok(manifest.activationEvents.includes('onFileSystem:remotish-rpc'));
   assert.deepEqual(manifest.capabilities.untrustedWorkspaces, {
     supported: false,
     description:

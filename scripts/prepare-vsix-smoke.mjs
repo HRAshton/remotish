@@ -16,12 +16,15 @@ const browserRpcArchiveRoot = resolve(smokeRoot, 'browser-rpc-archive');
 const browserRpcRoot = resolve(providersRoot, 'remotish-browser-rpc-provider');
 const testBundle = resolve('apps/demo-web/dist/test/suite/vsix.js');
 const packagedTestBundle = resolve(extensionRoot, 'dist/test/suite/vsix.js');
+const bootstrapTestBundle = resolve('apps/demo-web/dist/test/suite/bootstrap.js');
+const packagedBootstrapTestBundle = resolve(extensionRoot, 'dist/test/suite/bootstrap.js');
 
 rmSync(smokeRoot, { recursive: true, force: true });
 mkdirSync(smokeRoot, { recursive: true });
 execFileSync('unzip', ['-q', vsixPath, '-d', smokeRoot], { stdio: 'inherit' });
 mkdirSync(dirname(packagedTestBundle), { recursive: true });
 cpSync(testBundle, packagedTestBundle);
+cpSync(bootstrapTestBundle, packagedBootstrapTestBundle);
 
 mkdirSync(providerArchiveRoot, { recursive: true });
 execFileSync('unzip', ['-q', providerVsixPath, '-d', providerArchiveRoot], { stdio: 'inherit' });

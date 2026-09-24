@@ -34,8 +34,10 @@ A clean workspace is bound to a real remote revision. Remotish does not create l
 The independent Browser RPC provider extension owns one static `browser-rpc` provider and a
 session-local endpoint broker. Trusted transport origin is separate from endpoint claims; the
 broker enforces origin-compatible, unambiguous target selection before constructing `RpcAdapter`.
-Endpoints are dynamic browser sessions, not dynamically discovered Remotish providers. The browser
-transport and endpoint implementations are separate follow-up work.
+Endpoints are dynamic browser sessions, not dynamically discovered Remotish providers. The
+browser-wide transport carries only versioned repository RPC. A separate `remotish-rpc://`
+bootstrap URI resolves a target through the provider before navigation to a stable canonical
+`remotish://` workspace; provider-owned reconstruction stores only the target.
 
 Dependency Cruiser enforces package-layer and circular-dependency rules. Knip checks dead files/dependency declarations and TypeDoc validates the exported TypeScript API documentation.
 

@@ -14,10 +14,17 @@ const sdkSource = await readFile(
 test('adapter SDK owns the versioned provider compatibility surface', () => {
   assert.match(providerSource, /REMOTISH_ADAPTER_PROVIDER_API_VERSION = 1 as const/u);
   assert.match(providerSource, /REMOTISH_REPOSITORY_COMMAND_VERSION = 1 as const/u);
+  assert.match(providerSource, /REMOTISH_SELECT_PREPARED_BRANCH_VERSION = 1 as const/u);
+  assert.match(
+    providerSource,
+    /REMOTISH_SELECT_PREPARED_BRANCH_COMMAND = 'remotish\.selectPreparedBranch'/u,
+  );
   assert.match(providerSource, /interface RemotishAdapterProviderV1/u);
   assert.match(providerSource, /restoreWorkspace\?/u);
   assert.match(providerSource, /interface RemotishRepositoryCommandV1/u);
   assert.match(providerSource, /interface RemotishRepositoryResultV1/u);
+  assert.match(providerSource, /type RemotishSelectPreparedBranchCommandV1/u);
+  assert.match(providerSource, /interface RemotishSelectPreparedBranchResultV1/u);
   assert.match(sdkSource, /from '\.\/provider\.js'/u);
 });
 

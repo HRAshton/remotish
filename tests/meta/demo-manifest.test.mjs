@@ -19,6 +19,7 @@ test('host manifest is WebWorker-compatible and activates for provider commands'
   for (const command of [
     'remotish.ensureRepository',
     'remotish.openRepository',
+    'remotish.selectPreparedBranch',
     'remotish.refreshProviders',
   ]) {
     assert.ok(activationEvents.has(`onCommand:${command}`), `Missing activation for ${command}`);
@@ -40,6 +41,7 @@ test('host manifest contributes every public framework command', () => {
   assert.equal(contributed.has('remotish.demo.openFixture'), false);
   assert.ok(contributed.has('remotish.ensureRepository'));
   assert.ok(contributed.has('remotish.openRepository'));
+  assert.ok(contributed.has('remotish.selectPreparedBranch'));
   assert.ok(contributed.has('remotish.refreshProviders'));
 });
 
@@ -114,6 +116,7 @@ test('context-only SCM commands are hidden from the Command Palette', () => {
     'remotish.revertAll',
     'remotish.ensureRepository',
     'remotish.openRepository',
+    'remotish.selectPreparedBranch',
   ]) {
     assert.equal(hidden.get(command), 'false', `${command} should be context-only`);
   }

@@ -105,9 +105,10 @@ The browser transport uses a customer-scoped Tampermonkey userscript installed o
 configured host and endpoint origins. The userscript binds endpoint origin to its execution
 context, and a customer-generated pairing key authenticates encrypted cross-tab messages. See the
 [Browser RPC provider setup and trust model](../extensions/browser-rpc-provider/README.md) for
-composition details. Browser RPC currently has no provider-owned reconstruction record or
-`restoreWorkspace()` implementation, so it supports only session-local
-`remotish.ensureRepository` preparation, not canonical navigation/reload.
+composition details. Browser RPC's separate `remotish-rpc://` bootstrap folder waits for an
+endpoint, persists a target-only provider reconstruction record after `remotish.ensureRepository`,
+and opens the canonical `remotish://` root. Its `restoreWorkspace()` returns that target; the host
+rechecks stable identity and preserves core-owned branch and overlay state.
 
 ## Lazy activation
 
@@ -179,6 +180,16 @@ The V1 result shape is:
   resourceUri?: string,
 }
 ```
+
+Providers that must select a branch only after identity preparation use the separate
+`REMOTISH_SELECT_PREPARED_BRANCH_COMMAND` from the SDK. Its V1 request is either
+`{ version: 1, operation: 'check' }` or
+`{ version: 1, operation: 'select', workspaceId, branch }`; both return `{ version: 1 }` after
+successful completion. Browser RPC checks this command before `ensureRepository` for a
+branch-bearing link, then selects the branch only while that bootstrap attempt is current. An
+older host without the command fails the check before repository preparation; links without a
+branch do not require it. Branch selection is serialized with host workspace preparation, and
+the provider persists its record and navigates only after the selection succeeds.
 
 Unknown command versions and unknown fields are rejected.
 
@@ -268,6 +279,12 @@ remotish-bitbucket://open/?version=1&workspace=acme&repository=backend&branch=ma
 ```
 
 Its bootstrap extension parses and validates that provider-specific URI, authenticates when necessary, then invokes `remotish.ensureRepository`. After it persists its reconstruction record, it opens the canonical `uri` returned by that call directly.
+
+Browser RPC uses `remotish-rpc://open/v1/<base64url-utf8-target>?branch=<base64url-utf8-branch>` as its
+versioned temporary folder URI. Code-OSS Web accepts it through `?folder=`; the full inner URI
+must be URL-encoded as that outer parameter. The target is a normalized, credential-free HTTPS
+URL (or loopback HTTP for development). The branch is optional and never persisted in provider
+reconstruction data. See the [concrete Browser RPC link](../extensions/browser-rpc-provider/README.md#bootstrap-web-link).
 
 `remotish.openRepository` is the one-step alternative when no provider work is required between preparation and navigation. Do not invoke it after a successful `remotish.ensureRepository` for the same repository, because `openRepository` performs repository preparation itself.
 

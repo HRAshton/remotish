@@ -13,9 +13,8 @@ The endpoint broker keeps registrations in memory. It checks authenticated users
 an endpoint's target claim, rejects ambiguous matches, and bounds waits to 30 seconds. Endpoint
 session capabilities are validated before the transport-neutral `RpcAdapter` is returned. A live
 compatible endpoint may replace a reloaded tab for later calls; re-pairing also reconnects on the
-next call from an existing adapter. An ambiguous in-flight publication is never retried. This
-provider does not yet implement canonical workspace restoration, so it
-supports session-local `remotish.ensureRepository` preparation but not navigation/reload.
+next call from an existing adapter. An ambiguous in-flight publication is never retried. The
+provider persists only a credential-free target for canonical workspace restoration.
 
 ## Customer-developer setup
 
@@ -61,6 +60,36 @@ Install that output in Tampermonkey, open the endpoint tab, and request
 `{ "provider": "browser-rpc", "repository": { "target": "https://your-scm.example/repo" } }`
 through `remotish.ensureRepository`. The `target` must exactly match the endpoint's target after
 URL normalization. Source-only template files and customer secrets are not included in the VSIX.
+
+## Bootstrap web link
+
+The unresolved repository link uses `remotish-rpc://open/v1/<target>`, where `<target>` is the
+base64url encoding of the UTF-8 normalized repository URL, without padding. An optional
+`?branch=<base64url-utf8-branch>` selects an initial branch; it is not part of the repository
+descriptor or stable workspace ID. A branch such as `feature/test` therefore stays in the query
+as `ZmVhdHVyZS90ZXN0`, not in a path segment. For example, this Code-OSS Web URL opens a bootstrap folder for
+`https://example.com/browser-rpc-smoke`:
+
+```text
+https://code-oss.example/?folder=remotish-rpc%3A%2F%2Fopen%2Fv1%2FaHR0cHM6Ly9leGFtcGxlLmNvbS9icm93c2VyLXJwYy1zbW9rZQ
+```
+
+Replace the Code-OSS origin and target for your deployment, then URL-encode the complete
+`remotish-rpc://` URI as the outer `folder` value. The extension must already have its bridge
+pairing key configured. Code-OSS mounts a temporary read-only folder while the provider waits up
+to 30 seconds for a matching endpoint. Open the compatible SCM tab during that wait. On success,
+the provider calls `remotish.ensureRepository`, selects the requested branch if present, persists
+`{ version: 1, target }` in its own global state, then opens the returned canonical
+`remotish://<stable-workspace-id>/` root. Branch-bearing links require a host supporting the
+SDK's versioned `remotish.selectPreparedBranch` command; the provider checks that support before
+repository preparation. It does not call `remotish.openRepository` as a second preparation step.
+Closing the temporary folder cancels late navigation; after a timeout or other failure, reopen
+the link to retry.
+
+On a later Code-OSS restart, `restoreWorkspace()` returns that validated target. The host then
+reconnects to an endpoint and recomputes the stable workspace ID before registering the canonical
+workspace. The selected branch and working overlay remain in core-owned state. Missing endpoints,
+pairing errors, or failed restoration never delete that overlay.
 
 ## Transport and trust
 

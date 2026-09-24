@@ -31,6 +31,7 @@
     "onFileSystem:remotish-base",
     "onCommand:remotish.ensureRepository",
     "onCommand:remotish.openRepository",
+    "onCommand:remotish.selectPreparedBranch",
     "onCommand:remotish.refreshProviders"
   ],
   "capabilities": {
@@ -110,6 +111,10 @@
       {
         "command": "remotish.openRepository",
         "title": "Remotish: Open Remote Repository"
+      },
+      {
+        "command": "remotish.selectPreparedBranch",
+        "title": "Remotish: Select Prepared Branch"
       },
       {
         "command": "remotish.refreshProviders",
@@ -198,6 +203,10 @@
         },
         {
           "command": "remotish.openRepository",
+          "when": "false"
+        },
+        {
+          "command": "remotish.selectPreparedBranch",
           "when": "false"
         }
       ]
