@@ -79,9 +79,10 @@ ambiguous; Remotish does not retry it and retains its publication-recovery prote
 Force-with-lease and amend remain unavailable: Bitbucket's REST API does not provide the atomic
 ref replacement needed for those operations. Commits above a 16 MiB payload budget or more than
 1000 changes are rejected before dispatch; the Browser RPC transport also rejects unsendable
-frames locally. The source API reserves root paths such as `message` and `branch` as form fields;
-uploads to those exact paths, or paths with control characters or invalid Unicode, are rejected.
-Before dispatching a modification, the endpoint reads that file's metadata at `baseRevision`.
+frames locally. Multipart file parts carry a filename, so root files named `message`, `branch`,
+`parents`, or `files` remain writable even though those names are also source API metadata fields.
+Paths with control characters or invalid Unicode are rejected. Before dispatching a modification,
+the endpoint reads that file's metadata at `baseRevision`.
 Ordinary files, including files Bitbucket labels `binary`, can be modified. Existing files marked
 `link`, `executable`, `subrepository`, or with an unknown future attribute are rejected as
 `UNSUPPORTED` rather than silently changing their repository semantics. Additions create ordinary

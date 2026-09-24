@@ -481,6 +481,41 @@ test('Bitbucket rejects attributed modifications before publication', async () =
   assert.equal((await binaryOnly.adapter.commit(request)).status, 'success');
 });
 
+test('Bitbucket multipart commits allow root filenames that match metadata fields', async () => {
+  const { adapter, calls } = fixture({
+    [`${api}/src`]: new Response(null, {
+      status: 201,
+      headers: { location: `${api}/commit/${second}` },
+    }),
+  });
+  const names = ['message', 'branch', 'parents', 'files'];
+  const result = await adapter.commit({
+    type: 'commit',
+    branch: 'main',
+    baseRevision: revision,
+    message: 'Publish metadata-named files',
+    changes: names.map((path, index) => ({
+      type: 'add',
+      path,
+      content: new Uint8Array([index + 1]),
+    })),
+    push: { mode: 'normal' },
+  });
+  assert.equal(result.status, 'success');
+  const publication = calls.find(
+    ({ url, init }) => url === `${api}/src` && init.method === 'POST',
+  );
+  assert.ok(publication);
+  for (const [index, name] of names.entries()) {
+    const fileParts = publication.init.body
+      .getAll(name)
+      .filter((value) => value instanceof Blob);
+    assert.equal(fileParts.length, 1, name);
+    assert.equal(fileParts[0].name, name);
+    assert.deepEqual(new Uint8Array(await fileParts[0].arrayBuffer()), new Uint8Array([index + 1]));
+  }
+});
+
 test('Bitbucket stale-head conflict is settled, but dispatched failures remain ambiguous', async () => {
   const request = {
     type: 'commit',
@@ -550,7 +585,6 @@ test('Bitbucket rejects unsupported and oversized commits before dispatch', asyn
   for (const request of [
     { ...normal, push: { mode: 'force-with-lease', expectedRevision: revision } },
     { ...normal, type: 'amend', push: { mode: 'force-with-lease', expectedRevision: revision } },
-    { ...normal, changes: [{ type: 'add', path: 'message', content: binary }] },
     { ...normal, changes: [{ type: 'add', path: 'bad\ud800path', content: binary }] },
     { ...normal, changes: [{ type: 'delete', path: 'bad\npath' }] },
     { ...normal, branch: '../invalid' },

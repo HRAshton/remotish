@@ -24,7 +24,6 @@ const MAX_PAGES = 100;
 const MAX_LIST_ITEMS = 10_000;
 const SHA = /^[0-9a-f]{40}$/iu;
 const SLUG = /^[a-z0-9][a-z0-9._-]*$/iu;
-const SOURCE_FIELDS = new Set(['branch', 'parents', 'message', 'author', 'close_branch', 'files']);
 
 export type BitbucketTokenSource = () => string | undefined | Promise<string | undefined>;
 
@@ -364,13 +363,6 @@ export class BitbucketEndpoint {
       if (change.type === 'delete') {
         validated.push({ type: 'delete', path });
       } else if (change.type === 'add' || change.type === 'modify') {
-        if (SOURCE_FIELDS.has(path)) {
-          return {
-            status: 'rejected',
-            reason: 'UNSUPPORTED',
-            message: 'Bitbucket cannot upload a file whose path is a source control field.',
-          };
-        }
         if (!(change.content instanceof Uint8Array)) {
           throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket commit bytes.');
         }
