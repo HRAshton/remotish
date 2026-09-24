@@ -81,6 +81,12 @@ ref replacement needed for those operations. Commits above a 16 MiB payload budg
 1000 changes are rejected before dispatch; the Browser RPC transport also rejects unsendable
 frames locally. The source API reserves root paths such as `message` and `branch` as form fields;
 uploads to those exact paths, or paths with control characters or invalid Unicode, are rejected.
+Before dispatching a modification, the endpoint reads that file's metadata at `baseRevision`.
+Ordinary files, including files Bitbucket labels `binary`, can be modified. Existing files marked
+`link`, `executable`, `subrepository`, or with an unknown future attribute are rejected as
+`UNSUPPORTED` rather than silently changing their repository semantics. Additions create ordinary
+files and deletions remain supported. This example deliberately fails closed instead of growing a
+Bitbucket-specific file-mode concept into the Remotish adapter SDK.
 Files above 16 MiB and oversized/overlong listings fail explicitly; they are never truncated.
 Bitbucket LFS media redirects are not followed and fail as
 `UNSUPPORTED`. Missing/invalid credentials, insufficient permission, missing paths, rate limits,

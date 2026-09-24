@@ -44,6 +44,7 @@ function fixture(routes = {}) {
     [`${api}/src/${revision}/assets/sample.bin?format=meta`]: {
       type: 'commit_file',
       path: 'assets/sample.bin',
+      attributes: [],
     },
     [`${api}/src/${revision}/assets/sample.bin`]: binary,
     [`${api}/commits/feature%2Ftest?pagelen=1`]: {
@@ -373,6 +374,11 @@ test('Bitbucket file redirects are unsupported without following or leaking the 
 
 test('Bitbucket normal commit publishes binary additions, modifications and deletions atomically', async () => {
   const { adapter, calls } = fixture({
+    [`${api}/src/${revision}/assets/old.bin?format=meta`]: {
+      type: 'commit_file',
+      path: 'assets/old.bin',
+      attributes: ['binary'],
+    },
     [`${api}/src`]: new Response(null, {
       status: 201,
       headers: { location: `${api}/commit/${second}` },
@@ -399,7 +405,13 @@ test('Bitbucket normal commit publishes binary additions, modifications and dele
       message: 'Publish bytes',
     },
   });
-  const [{ url, init }] = calls;
+  assert.equal(calls[0].url, `${api}/src/${revision}/assets/old.bin?format=meta`);
+  assert.equal(calls[0].init.method, 'GET');
+  const publication = calls.find(
+    ({ url, init }) => url === `${api}/src` && init.method === 'POST',
+  );
+  assert.ok(publication);
+  const { url, init } = publication;
   assert.equal(url, `${api}/src`);
   assert.equal(init.method, 'POST');
   assert.equal(init.redirect, 'manual');
@@ -415,6 +427,58 @@ test('Bitbucket normal commit publishes binary additions, modifications and dele
     new Uint8Array(await init.body.get('assets/old.bin').arrayBuffer()),
     new Uint8Array([255, 0]),
   );
+});
+
+test('Bitbucket rejects attributed modifications before publication', async () => {
+  const request = {
+    type: 'commit',
+    branch: 'main',
+    baseRevision: revision,
+    message: 'Update tool',
+    changes: [{ type: 'modify', path: 'bin/tool', content: new Uint8Array([65]) }],
+    push: { mode: 'normal' },
+  };
+  for (const attribute of ['link', 'executable', 'subrepository', 'future-mode']) {
+    const { adapter, calls } = fixture({
+      [`${api}/src/${revision}/bin/tool?format=meta`]: {
+        type: 'commit_file',
+        path: 'bin/tool',
+        attributes: [attribute],
+      },
+    });
+    assert.deepEqual(await adapter.commit(request), {
+      status: 'rejected',
+      reason: 'UNSUPPORTED',
+      message: 'Bitbucket cannot safely modify a file with repository attributes.',
+    });
+    assert.equal(
+      calls.some(({ url, init }) => url === `${api}/src` && init.method === 'POST'),
+      false,
+      attribute,
+    );
+  }
+
+  const malformed = fixture({
+    [`${api}/src/${revision}/bin/tool?format=meta`]: {
+      type: 'commit_file',
+      path: 'bin/tool',
+      attributes: 'executable',
+    },
+  });
+  await assert.rejects(malformed.adapter.commit(request), errorCode('UNKNOWN'));
+
+  const binaryOnly = fixture({
+    [`${api}/src/${revision}/bin/tool?format=meta`]: {
+      type: 'commit_file',
+      path: 'bin/tool',
+      attributes: ['binary'],
+    },
+    [`${api}/src`]: new Response(null, {
+      status: 201,
+      headers: { location: `${api}/commit/${second}` },
+    }),
+  });
+  assert.equal((await binaryOnly.adapter.commit(request)).status, 'success');
 });
 
 test('Bitbucket stale-head conflict is settled, but dispatched failures remain ambiguous', async () => {

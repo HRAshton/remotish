@@ -19,6 +19,7 @@ const MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 const MAX_COMMIT_BYTES = 16 * 1024 * 1024;
 const MAX_COMMIT_CHANGES = 1000;
+const MAX_ATTRIBUTE_PROBES = 8;
 const MAX_PAGES = 100;
 const MAX_LIST_ITEMS = 10_000;
 const SHA = /^[0-9a-f]{40}$/iu;
@@ -26,6 +27,13 @@ const SLUG = /^[a-z0-9][a-z0-9._-]*$/iu;
 const SOURCE_FIELDS = new Set(['branch', 'parents', 'message', 'author', 'close_branch', 'files']);
 
 export type BitbucketTokenSource = () => string | undefined | Promise<string | undefined>;
+
+interface PreparedCommit {
+  readonly form: FormData;
+  readonly baseRevision: string;
+  readonly message: string;
+  readonly modifiedPaths: readonly string[];
+}
 
 /** Derive the sole repository claim from a Bitbucket tab, never from page globals or RPC data. */
 export function createBitbucketEndpoint(
@@ -263,7 +271,7 @@ export class BitbucketEndpoint {
   }
 
   private async commit(value: unknown, signal: AbortSignal): Promise<CommitResult> {
-    let prepared: CommitRejected | { form: FormData; baseRevision: string; message: string };
+    let prepared: CommitRejected | PreparedCommit;
     try {
       prepared = this.prepareCommit(value);
     } catch {
@@ -276,6 +284,14 @@ export class BitbucketEndpoint {
     }
     if ('status' in prepared) {
       return prepared;
+    }
+    const attributeRejection = await this.checkModificationAttributes(
+      prepared.baseRevision,
+      prepared.modifiedPaths,
+      signal,
+    );
+    if (attributeRejection) {
+      return attributeRejection;
     }
     // Bitbucket atomically asserts that parents is the current head of branch, returning 409
     // when it moved. Never retry this non-idempotent publication after an ambiguous failure.
@@ -296,9 +312,7 @@ export class BitbucketEndpoint {
     };
   }
 
-  private prepareCommit(
-    value: unknown,
-  ): CommitRejected | { form: FormData; baseRevision: string; message: string } {
+  private prepareCommit(value: unknown): CommitRejected | PreparedCommit {
     const input = object(value, 'commit request');
     // These modes cannot be implemented with Bitbucket's source API without an unsafe ref rewrite.
     if (input.type !== 'commit' || object(input.push, 'commit push').mode !== 'normal') {
@@ -324,6 +338,7 @@ export class BitbucketEndpoint {
     const validated: Array<
       { type: 'delete'; path: string } | { type: 'file'; path: string; content: Uint8Array }
     > = [];
+    const modifiedPaths: string[] = [];
     const seen = new Set<string>();
     let size = 0;
     for (const item of changes) {
@@ -361,6 +376,9 @@ export class BitbucketEndpoint {
         }
         size += change.content.byteLength;
         validated.push({ type: 'file', path, content: change.content });
+        if (change.type === 'modify') {
+          modifiedPaths.push(path);
+        }
       } else {
         throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket commit change.');
       }
@@ -387,7 +405,43 @@ export class BitbucketEndpoint {
         );
       }
     }
-    return { form, baseRevision, message };
+    return { form, baseRevision, message, modifiedPaths };
+  }
+
+  private async checkModificationAttributes(
+    baseRevision: string,
+    paths: readonly string[],
+    signal: AbortSignal,
+  ): Promise<CommitRejected | undefined> {
+    for (let offset = 0; offset < paths.length; offset += MAX_ATTRIBUTE_PROBES) {
+      const batch = paths.slice(offset, offset + MAX_ATTRIBUTE_PROBES);
+      const attributes = await Promise.all(
+        batch.map((path) => this.getFileAttributes(baseRevision, path, signal)),
+      );
+      if (attributes.some((values) => values.some((value) => value !== 'binary'))) {
+        return {
+          status: 'rejected',
+          reason: 'UNSUPPORTED',
+          message: 'Bitbucket cannot safely modify a file with repository attributes.',
+        };
+      }
+    }
+    return undefined;
+  }
+
+  private async getFileAttributes(
+    valueRevision: string,
+    valuePath: string,
+    signal: AbortSignal,
+  ): Promise<readonly string[]> {
+    const source = this.sourcePath(valueRevision, valuePath);
+    const metadata = object(await this.getJson(`${source}?format=meta`, signal), 'file metadata');
+    if (metadata.type !== 'commit_file' || remotePath(metadata.path, 'file.path') !== valuePath) {
+      throw new RemotishError('NOT_FOUND', 'Bitbucket path is not a file.');
+    }
+    return list(metadata.attributes, 'file.attributes').map((value) =>
+      text(value, 'file.attribute'),
+    );
   }
 
   private async createBranch(name: string, target: string, signal: AbortSignal): Promise<Branch> {
