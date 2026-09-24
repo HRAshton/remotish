@@ -49,6 +49,9 @@ and returns the operation's domain result. Implement only the nine defined repos
 the runtime encodes success or an error code. Keep site credentials and API calls entirely inside
 this endpoint implementation. Do not obtain a handler, token, or origin from page globals; bundle
 trusted handler code into the same userscript. The template deliberately supplies no SCM backend.
+For a concrete read-only implementation, see the
+[Bitbucket Cloud userscript example](../../examples/browser-rpc-bitbucket/README.md). It is not
+bundled in the provider VSIX and requires its own customer-managed Bitbucket token.
 
 Build the local copy with the repository's pinned tool:
 
