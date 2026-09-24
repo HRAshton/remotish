@@ -221,6 +221,23 @@ test('provider waits for a matching endpoint then forwards RPC calls through the
   broker.dispose();
 });
 
+test('existing adapter accepts an effectively identical capability set after endpoint reload', async () => {
+  const broker = new BrowserRpcEndpointBroker();
+  const first = broker.register({ origin: 'https://example.com' }, fakeEndpoint());
+  const adapter = await createBrowserRpcProvider(broker).createAdapter({ target });
+  first.dispose();
+  const replacement = broker.register(
+    { origin: 'https://example.com' },
+    {
+      ...fakeEndpoint(),
+      session: { version: 1, capabilities: { commits: false, createBranch: false } },
+    },
+  );
+  assert.equal((await adapter.getRepository()).id, 'fixture/demo');
+  replacement.dispose();
+  broker.dispose();
+});
+
 test('host discovers manifest without activation and activates only for repository preparation', async (t) => {
   vscode.__test.reset();
   t.after(() => vscode.__test.reset());

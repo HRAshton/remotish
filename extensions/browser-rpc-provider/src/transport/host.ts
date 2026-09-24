@@ -1,4 +1,10 @@
-import { decodeRpcRequest, decodeRpcSession, type RpcRequest } from '@remotish/adapter-rpc';
+import {
+  decodeRpcRequest,
+  decodeRpcSession,
+  encodeRpcFailure,
+  encodeRpcSuccess,
+  type RpcRequest,
+} from '@remotish/adapter-rpc';
 import { RemotishError } from '@remotish/adapter-sdk';
 import type { BrowserRpcEndpointBroker } from '../broker.js';
 import { normalizeBrowserRpcTarget } from '../target.js';
@@ -275,9 +281,25 @@ export class BrowserRpcHostTransport {
             request: raw,
           },
           () => this.pending.has(requestId),
-        ).catch(() => {
-          finish(undefined, new RemotishError('OFFLINE', 'Browser RPC transport failed.'));
-        });
+        )
+          .then((outcome) => {
+            if (outcome === 'unsendable') {
+              // Encryption rejected this frame before postMessage: publication did not start.
+              finish(
+                raw.operation === 'commit'
+                  ? encodeRpcSuccess('commit', {
+                      status: 'rejected',
+                      reason: 'UNSUPPORTED',
+                      message: 'Browser RPC commit exceeds the transport size limit.',
+                    })
+                  : encodeRpcFailure('INVALID_REQUEST'),
+              );
+            }
+          })
+          .catch(() => {
+            // A postMessage failure may be ambiguous, especially for commit publication.
+            finish(undefined, new RemotishError('OFFLINE', 'Browser RPC transport failed.'));
+          });
       }
     });
   }
@@ -285,14 +307,24 @@ export class BrowserRpcHostTransport {
   private async send(
     frame: BrowserRpcFrame,
     stillNeeded: () => boolean = () => true,
-  ): Promise<void> {
+  ): Promise<'sent' | 'skipped' | 'unsendable'> {
     if (this.disposed) {
       throw new RemotishError('OFFLINE', 'Browser RPC bridge disconnected.');
     }
-    const packet = await encryptFrame(this.key, frame);
+    let packet: string;
+    try {
+      packet = await encryptFrame(this.key, frame);
+    } catch (error) {
+      if (error instanceof RemotishError && error.code === 'INVALID_REQUEST') {
+        return 'unsendable';
+      }
+      throw error;
+    }
     if (!this.disposed && stillNeeded()) {
       this.channel.postMessage(packet);
+      return 'sent';
     }
+    return 'skipped';
   }
 }
 

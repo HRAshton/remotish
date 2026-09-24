@@ -12,8 +12,9 @@ normal Remotish request field, not part of the descriptor.
 The endpoint broker keeps registrations in memory. It checks authenticated userscript origin before
 an endpoint's target claim, rejects ambiguous matches, and bounds waits to 30 seconds. Endpoint
 session capabilities are validated before the transport-neutral `RpcAdapter` is returned. A live
-compatible endpoint may replace a reloaded tab for later calls; an ambiguous in-flight publication
-is never retried. This provider does not yet implement canonical workspace restoration, so it
+compatible endpoint may replace a reloaded tab for later calls; re-pairing also reconnects on the
+next call from an existing adapter. An ambiguous in-flight publication is never retried. This
+provider does not yet implement canonical workspace restoration, so it
 supports session-local `remotish.ensureRepository` preparation but not navigation/reload.
 
 ## Customer-developer setup
@@ -79,7 +80,9 @@ every five seconds; an endpoint absent for fifteen seconds is removed. Calls tim
 seconds, cancellation is best-effort across tabs, and late responses cannot settle a new request.
 There are at most 32 registered endpoints and 32 pending host requests. Each decoded frame is
 limited to 24 MiB, each encrypted packet to 32 MiB of base64url text, and retained mailbox packets
-to 96 MiB of text. A file exceeding these limits fails explicitly, never truncates. A browser/tab
+to 96 MiB of text. A locally unsendable commit returns a settled `UNSUPPORTED` rejection without
+publishing; an oversized file response returns `INVALID_REQUEST`. Failures after dispatch remain
+uncertain for publication. Files never truncate. A browser/tab
 crash may leave mailbox data
 until the ninety-second retention sweep. Authentication tokens never enter pairing, descriptors,
 workspace state, or generic RPC diagnostics.

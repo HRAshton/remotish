@@ -307,14 +307,28 @@ export class BrowserRpcUserscriptEndpoint {
     request: Extract<BrowserRpcFrame, { kind: 'request' }>,
     response: unknown,
   ): Promise<void> {
-    await this.send({
+    const frame: BrowserRpcFrame = {
       version: 1,
       kind: 'response',
       hostId: request.hostId,
       endpointId: this.endpointId,
       requestId: request.requestId,
       response,
-    });
+    };
+    let packet: string;
+    try {
+      packet = await encryptFrame(this.key, frame);
+    } catch (error) {
+      if (!(error instanceof RemotishError) || error.code !== 'INVALID_REQUEST') {
+        throw error;
+      }
+      // Serialization failed before storage: a small error response is safe to send once.
+      packet = await encryptFrame(this.key, {
+        ...frame,
+        response: encodeRpcFailure('INVALID_REQUEST'),
+      });
+    }
+    await this.mailbox.send(packet);
   }
 
   private async send(frame: BrowserRpcFrame): Promise<void> {

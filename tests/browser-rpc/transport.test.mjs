@@ -3,9 +3,14 @@ import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import { FixtureAdapter } from '@remotish/adapter-fixture';
 import { RemotishError } from '@remotish/adapter-sdk';
+import { MemoryWorkspaceStorage, RemotishWorkspace } from '@remotish/core';
+import * as vscode from 'vscode';
 
 import { BrowserRpcEndpointBroker } from '../../extensions/browser-rpc-provider/build/broker.js';
-import { createBrowserRpcProvider } from '../../extensions/browser-rpc-provider/build/extension.js';
+import {
+  activate as activateProvider,
+  createBrowserRpcProvider,
+} from '../../extensions/browser-rpc-provider/build/extension.js';
 import { GmMailbox } from '../../extensions/browser-rpc-provider/build/transport/gm-mailbox.js';
 import { BrowserRpcHostTransport } from '../../extensions/browser-rpc-provider/build/transport/host.js';
 import {
@@ -390,4 +395,165 @@ test('a sixteen-megabyte binary file round-trips within the explicit packet limi
   assert.equal(read.length, bytes.length);
   assert.equal(read[0], 255);
   assert.equal(read[read.length - 1], 128);
+});
+
+test('an unsendable commit is settled without entering uncertain-publication recovery', async (t) => {
+  let published = 0;
+  const handler = fixtureHandler();
+  handler.session = { version: 1, capabilities: { commits: true } };
+  const original = handler.handle;
+  handler.handle = (request, signal) => {
+    if (request.operation === 'commit') {
+      published += 1;
+    }
+    return original(request, signal);
+  };
+  const { broker, bus, key } = await setup(t, handler);
+  const adapter = await createBrowserRpcProvider(broker).createAdapter({ target });
+  const workspace = await RemotishWorkspace.open(adapter, new MemoryWorkspaceStorage());
+  await workspace.writeFile('large.bin', new Uint8Array(18 * 1024 * 1024), {
+    create: true,
+    overwrite: true,
+  });
+  const result = await workspace.commitAndPush('Too large for this transport');
+  assert.deepEqual(result, {
+    status: 'rejected',
+    reason: 'UNSUPPORTED',
+    message: 'Browser RPC commit exceeds the transport size limit.',
+  });
+  assert.equal(published, 0);
+  const frames = await Promise.all(bus.packets.map((packet) => decryptFrame(key, packet)));
+  assert.equal(
+    frames.some((frame) => frame.kind === 'request' && frame.request.operation === 'commit'),
+    false,
+  );
+  assert.equal(workspace.baseRevision, 'C3');
+  await workspace.writeFile('README.md', new TextEncoder().encode('still editable\n'), {
+    create: false,
+    overwrite: true,
+  });
+});
+
+test('a postMessage failure during publication remains an uncertain outcome', async (t) => {
+  const handler = fixtureHandler();
+  handler.session = { version: 1, capabilities: { commits: true } };
+  const { broker, host } = await setup(t, handler);
+  const adapter = await createBrowserRpcProvider(broker).createAdapter({ target });
+  const workspace = await RemotishWorkspace.open(adapter, new MemoryWorkspaceStorage());
+  await workspace.writeFile('README.md', new TextEncoder().encode('local change\n'), {
+    create: false,
+    overwrite: true,
+  });
+  host.channel.postMessage = () => {
+    throw new Error('ambiguous browser dispatch failure');
+  };
+  await assert.rejects(
+    workspace.commitAndPush('Keep publication uncertain'),
+    (error) => error instanceof RemotishError && error.code === 'OFFLINE',
+  );
+  await assert.rejects(
+    workspace.writeFile('README.md', new TextEncoder().encode('do not mutate\n'), {
+      create: false,
+      overwrite: true,
+    }),
+    /uncertain outcome/u,
+  );
+});
+
+test('an oversized file response returns an explicit error instead of timing out', async (t) => {
+  const handler = fixtureHandler();
+  const original = handler.handle;
+  handler.handle = (request, signal) =>
+    request.operation === 'readFile'
+      ? Promise.resolve(new Uint8Array(18 * 1024 * 1024))
+      : original(request, signal);
+  const { broker } = await setup(t, handler);
+  const adapter = await createBrowserRpcProvider(broker).createAdapter({ target });
+  await assert.rejects(
+    adapter.readFile('C3', 'assets/sample.bin'),
+    (error) => error instanceof RemotishError && error.code === 'INVALID_REQUEST',
+  );
+});
+
+test('an open adapter reconnects after the customer rotates the pairing key', async (t) => {
+  vscode.__test.reset();
+  const previousLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  const previousChannel = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel');
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { origin: 'https://scm.example' },
+  });
+  const bus = new Bus();
+  Object.defineProperty(globalThis, 'BroadcastChannel', {
+    configurable: true,
+    value: class {
+      channel = bus.channel();
+      get onmessage() {
+        return this.channel.onmessage;
+      }
+      set onmessage(handler) {
+        this.channel.onmessage = handler;
+      }
+      postMessage(value) {
+        this.channel.postMessage(value);
+      }
+      close() {
+        this.channel.close();
+      }
+    },
+  });
+  const secrets = new Map();
+  const context = {
+    secrets: {
+      get: async (name) => secrets.get(name),
+      store: async (name, value) => {
+        secrets.set(name, value);
+      },
+    },
+    subscriptions: [],
+  };
+  const provider = activateProvider(context);
+  let firstEndpoint;
+  let firstRelay;
+  let secondEndpoint;
+  let secondRelay;
+  t.after(async () => {
+    await secondEndpoint?.dispose();
+    secondRelay?.dispose();
+    await firstEndpoint?.dispose();
+    firstRelay?.dispose();
+    for (const subscription of context.subscriptions) {
+      subscription.dispose();
+    }
+    if (previousLocation) {
+      Object.defineProperty(globalThis, 'location', previousLocation);
+    } else {
+      Reflect.deleteProperty(globalThis, 'location');
+    }
+    if (previousChannel) {
+      Object.defineProperty(globalThis, 'BroadcastChannel', previousChannel);
+    } else {
+      Reflect.deleteProperty(globalThis, 'BroadcastChannel');
+    }
+    vscode.__test.reset();
+  });
+  const storage = new Storage();
+  const firstKeyString = randomBytes(32).toString('base64url');
+  const firstKey = await importBridgeKey(firstKeyString);
+  await vscode.commands.executeCommand('remotish.browserRpc.configureBridge', firstKeyString);
+  firstRelay = new BrowserRpcUserscriptHostRelay(storage, firstKey, bus.channel());
+  firstEndpoint = new BrowserRpcUserscriptEndpoint(storage, firstKey, fixtureHandler());
+  await firstEndpoint.start();
+  const adapter = await provider.createAdapter({ target });
+  assert.equal((await adapter.getRepository()).id, 'fixture/demo');
+
+  const secondKeyString = randomBytes(32).toString('base64url');
+  const secondKey = await importBridgeKey(secondKeyString);
+  await vscode.commands.executeCommand('remotish.browserRpc.configureBridge', secondKeyString);
+  await firstEndpoint.dispose();
+  firstRelay.dispose();
+  secondRelay = new BrowserRpcUserscriptHostRelay(storage, secondKey, bus.channel());
+  secondEndpoint = new BrowserRpcUserscriptEndpoint(storage, secondKey, fixtureHandler());
+  await secondEndpoint.start();
+  assert.equal((await adapter.getRepository()).id, 'fixture/demo');
 });

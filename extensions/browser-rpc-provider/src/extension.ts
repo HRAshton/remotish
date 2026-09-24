@@ -30,14 +30,15 @@ export function createBrowserRpcProvider(
       const target = decodeBrowserRpcRepository(repository);
       await connect();
       const endpoint = await broker.waitFor(target);
-      const capabilities = JSON.stringify(decodeRpcSession(endpoint.session).capabilities);
+      const capabilities = capabilitySignature(endpoint.session);
       // Every call resolves a live endpoint, so tab reloads can recover without retrying writes.
       // A different capability contract cannot be routed through an existing synchronous adapter.
       return new RpcAdapter(
         {
           async request(request, options) {
+            await connect();
             const current = broker.find(target) ?? (await broker.waitFor(target, options));
-            if (JSON.stringify(decodeRpcSession(current.session).capabilities) !== capabilities) {
+            if (capabilitySignature(current.session) !== capabilities) {
               throw new RemotishError('UNSUPPORTED', 'Browser RPC endpoint capabilities changed.');
             }
             return current.transport.request(request, options);
@@ -47,6 +48,17 @@ export function createBrowserRpcProvider(
       );
     },
   };
+}
+
+function capabilitySignature(session: unknown): string {
+  const capabilities = decodeRpcSession(session).capabilities;
+  return JSON.stringify([
+    capabilities.commits,
+    capabilities.forceWithLease === true,
+    capabilities.amend === true,
+    capabilities.createBranch === true,
+    capabilities.deleteBranch === true,
+  ]);
 }
 
 /** Activation does not pair or connect; a repository request starts the transport on demand. */
