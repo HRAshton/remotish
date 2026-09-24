@@ -190,6 +190,10 @@ test('concurrent bootstrap reads wait for an endpoint, persist before navigation
   assert.deepEqual(events, ['persist', 'navigate']);
   assert.equal(extension.isActive, true);
   assert.equal(providerState.values.size, 1);
+  const [workspaceId] = [...providerState.values.keys()].map((key) =>
+    key.slice('remotish.browserRpc.restore.v1.'.length),
+  );
+  assert.equal(host.host.registry.require(workspaceId).workspace.branch, 'feature/test');
   assert.deepEqual([...providerState.values.values()][0], { version: 1, target });
   await bootstrap.stat(bootstrapUri('feature/test'));
   assert.deepEqual(events, ['persist', 'navigate']);
@@ -304,6 +308,113 @@ test('leaving the bootstrap folder cancels late navigation without writing a rec
     vscode.__test.externalCommands.some((item) => item.command === 'vscode.openFolder'),
     false,
   );
+});
+
+test('a stale preparation cannot switch the branch after its replacement navigates', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+  const state = memento();
+  const bootstrap = new BrowserRpcBootstrapFileSystem(context(state, 'stale-bootstrap'));
+  t.after(() => bootstrap.dispose());
+  const workspaceId = 'browser-rpc-00000000000000000000000000000000';
+  const result = { version: 1, workspaceId, uri: `remotish://${workspaceId}/` };
+  let releaseFirst;
+  const first = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  let signalStarted;
+  const started = new Promise((resolve) => {
+    signalStarted = resolve;
+  });
+  let preparations = 0;
+  let selectedBranch = 'main';
+  const selections = [];
+  const prepare = vscode.commands.registerCommand('remotish.ensureRepository', async (request) => {
+    preparations += 1;
+    if (preparations === 1) {
+      signalStarted();
+      await first;
+    }
+    // Model the old host behavior: a branch carried by preparation mutates before it returns.
+    if (request.branch) {
+      selectedBranch = request.branch;
+    }
+    return result;
+  });
+  const select = vscode.commands.registerCommand('remotish.selectPreparedBranch', (_, branch) => {
+    selections.push(branch);
+    selectedBranch = branch;
+  });
+  let signalNavigation;
+  const navigated = new Promise((resolve) => {
+    signalNavigation = resolve;
+  });
+  const open = vscode.commands.registerCommand('vscode.openFolder', () => signalNavigation());
+  t.after(() => {
+    prepare.dispose();
+    select.dispose();
+    open.dispose();
+  });
+
+  bootstrap.stat(bootstrapUri('feature/a'));
+  await started;
+  bootstrap.cancel();
+  bootstrap.stat(bootstrapUri('main'));
+  await navigated;
+  releaseFirst();
+  await first;
+  await new Promise(setImmediate);
+  assert.equal(preparations, 2);
+  assert.deepEqual(selections, ['main']);
+  assert.equal(selectedBranch, 'main');
+  assert.deepEqual([...state.values.values()], [{ version: 1, target }]);
+});
+
+test('a newer branch selection waits for an already-started selection', async (t) => {
+  vscode.__test.reset();
+  t.after(() => vscode.__test.reset());
+  const bootstrap = new BrowserRpcBootstrapFileSystem(context(memento(), 'selection-order'));
+  t.after(() => bootstrap.dispose());
+  const workspaceId = 'browser-rpc-00000000000000000000000000000000';
+  const result = { version: 1, workspaceId, uri: `remotish://${workspaceId}/` };
+  const prepare = vscode.commands.registerCommand('remotish.ensureRepository', () => result);
+  let signalFirstSelection;
+  const firstSelection = new Promise((resolve) => {
+    signalFirstSelection = resolve;
+  });
+  let releaseFirstSelection;
+  const firstSelectionDone = new Promise((resolve) => {
+    releaseFirstSelection = resolve;
+  });
+  let selectedBranch = 'main';
+  const select = vscode.commands.registerCommand(
+    'remotish.selectPreparedBranch',
+    async (_, branch) => {
+      if (branch === 'feature/a') {
+        signalFirstSelection();
+        await firstSelectionDone;
+      }
+      selectedBranch = branch;
+    },
+  );
+  let signalNavigation;
+  const navigated = new Promise((resolve) => {
+    signalNavigation = resolve;
+  });
+  const open = vscode.commands.registerCommand('vscode.openFolder', () => signalNavigation());
+  t.after(() => {
+    prepare.dispose();
+    select.dispose();
+    open.dispose();
+  });
+
+  bootstrap.stat(bootstrapUri('feature/a'));
+  await firstSelection;
+  bootstrap.cancel();
+  bootstrap.stat(bootstrapUri('main'));
+  releaseFirstSelection();
+  await navigated;
+  assert.equal(selectedBranch, 'main');
 });
 
 test('navigation failure retains reconstruction data without repeated background preparation', async (t) => {

@@ -23,6 +23,7 @@ import {
 import { createStableWorkspaceId, verifyStableWorkspaceId } from './workspace-id.js';
 
 const HOST_RESTORE_PREFIX = 'remotish.restore.v1.';
+const SELECT_PREPARED_BRANCH_COMMAND = 'remotish.selectPreparedBranch';
 const SECRET_DESCRIPTOR_KEYS = new Set([
   'access_token',
   'api_token',
@@ -117,6 +118,10 @@ export class RemotishProviderHost implements vscode.Disposable {
       vscode.commands.registerCommand(REMOTISH_REFRESH_PROVIDERS_COMMAND, () =>
         this.discovery.refresh(),
       ),
+      vscode.commands.registerCommand(
+        SELECT_PREPARED_BRANCH_COMMAND,
+        (workspaceId: unknown, branch: unknown) => this.selectPreparedBranch(workspaceId, branch),
+      ),
     );
   }
 
@@ -134,6 +139,18 @@ export class RemotishProviderHost implements vscode.Disposable {
     request: RemotishRepositoryCommandV1,
   ): Promise<RemotishRepositoryResultV1> {
     return this.prepareRepository(request);
+  }
+
+  private async selectPreparedBranch(workspaceId: unknown, branch: unknown): Promise<void> {
+    if (typeof workspaceId !== 'string' || typeof branch !== 'string' || !branch.trim()) {
+      throw new RemotishError('INVALID_REQUEST', 'A prepared workspace and branch are required.');
+    }
+    await this.serializeWorkspace(workspaceId, async () => {
+      const workspace = this.host.registry.require(workspaceId).workspace;
+      if (workspace.branch !== branch) {
+        await workspace.switchBranch(branch);
+      }
+    });
   }
 
   dispose(): void {

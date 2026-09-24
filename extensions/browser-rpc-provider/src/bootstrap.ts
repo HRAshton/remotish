@@ -15,6 +15,7 @@ import { normalizeBrowserRpcTarget } from './target.js';
 const RESTORE_PREFIX = 'remotish.browserRpc.restore.v1.';
 const WORKSPACE_ID = /^browser-rpc-[0-9a-f]{32}$/u;
 const PROVIDER_ID = 'browser-rpc';
+const SELECT_PREPARED_BRANCH_COMMAND = 'remotish.selectPreparedBranch';
 
 interface RestoreRecordV1 {
   readonly version: 1;
@@ -29,6 +30,7 @@ export class BrowserRpcBootstrapFileSystem implements vscode.FileSystemProvider,
   });
   readonly onDidChangeFile = this.changes.event;
   private readonly attempts = new Map<string, Promise<void>>();
+  private finalizationTail: Promise<void> = Promise.resolve();
   private disposed: boolean = false;
   private generation = 0;
 
@@ -128,26 +130,44 @@ export class BrowserRpcBootstrapFileSystem implements vscode.FileSystemProvider,
         version: REMOTISH_REPOSITORY_COMMAND_VERSION,
         provider: PROVIDER_ID,
         repository: { target: request.target },
-        ...(request.branch === undefined ? {} : { branch: request.branch }),
       },
     );
     const workspaceId = decodePreparedWorkspaceId(result);
-    if (this.disposed || this.generation !== generation) {
-      return;
-    }
-    // The provider-owned record must be durable before openFolder can restart the extension host.
-    await this.context.globalState.update(`${RESTORE_PREFIX}${workspaceId}`, {
-      version: 1,
-      target: request.target,
-    } satisfies RestoreRecordV1);
-    if (this.disposed || this.generation !== generation) {
-      return;
-    }
-    await vscode.commands.executeCommand(
-      'vscode.openFolder',
-      vscode.Uri.from({ scheme: 'remotish', authority: workspaceId, path: '/' }),
-      false,
+    // Branch selection is a mutation. Keep older finalizations ahead of newer ones so an
+    // already-started selection cannot finish after a replacement bootstrap navigates.
+    const finalize = this.finalizationTail.then(async () => {
+      if (this.disposed || this.generation !== generation) {
+        return;
+      }
+      if (request.branch !== undefined) {
+        await vscode.commands.executeCommand(
+          SELECT_PREPARED_BRANCH_COMMAND,
+          workspaceId,
+          request.branch,
+        );
+      }
+      if (this.disposed || this.generation !== generation) {
+        return;
+      }
+      // The provider-owned record must be durable before openFolder can restart the host.
+      await this.context.globalState.update(`${RESTORE_PREFIX}${workspaceId}`, {
+        version: 1,
+        target: request.target,
+      } satisfies RestoreRecordV1);
+      if (this.disposed || this.generation !== generation) {
+        return;
+      }
+      await vscode.commands.executeCommand(
+        'vscode.openFolder',
+        vscode.Uri.from({ scheme: 'remotish', authority: workspaceId, path: '/' }),
+        false,
+      );
+    });
+    this.finalizationTail = finalize.then(
+      () => undefined,
+      () => undefined,
     );
+    await finalize;
   }
 }
 

@@ -1,5 +1,6 @@
 import { FixtureAdapter } from '@remotish/adapter-fixture';
 import { decodeRpcRequest, encodeRpcFailure, encodeRpcSuccess } from '@remotish/adapter-rpc';
+import { RemotishError } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
 
 const CHANNEL = 'remotish-browser-rpc-v1';
@@ -29,7 +30,7 @@ function filePayload(value: unknown): { revision: string; path: string } {
 
 /** Packaged-extension smoke uses a deterministic, key-holding test endpoint, not a live SCM. */
 export async function withBrowserRpcFixtureEndpoint(
-  run: (target: string, repositoryRequest: Promise<void>) => Promise<void>,
+  run: (target: string) => Promise<void>,
 ): Promise<void> {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const keyString = base64Url(bytes);
@@ -41,10 +42,6 @@ export async function withBrowserRpcFixtureEndpoint(
     .join('');
   const target = BROWSER_RPC_SMOKE_TARGET;
   const fixture = new FixtureAdapter();
-  let signalRepositoryRequest: () => void = () => {};
-  const repositoryRequest = new Promise<void>((resolve) => {
-    signalRepositoryRequest = resolve;
-  });
   let failure: unknown;
   channel.onmessage = (event) => {
     receive(event.data).catch((error: unknown) => {
@@ -106,28 +103,38 @@ export async function withBrowserRpcFixtureEndpoint(
       typeof frame.requestId === 'string'
     ) {
       const request = decodeRpcRequest(frame.request);
-      let result: unknown;
-      switch (request.operation) {
-        case 'getRepository':
-          result = await fixture.getRepository();
-          break;
-        case 'getBranches':
-          result = await fixture.getBranches();
-          break;
-        case 'readDirectory':
-          {
+      let response: unknown;
+      try {
+        let result: unknown;
+        switch (request.operation) {
+          case 'getRepository':
+            result = await fixture.getRepository();
+            break;
+          case 'getBranches':
+            result = await fixture.getBranches();
+            break;
+          case 'readDirectory': {
             const payload = filePayload(request.payload);
             result = await fixture.readDirectory(payload.revision, payload.path);
+            break;
           }
-          break;
-        case 'readFile':
-          {
+          case 'readFile': {
             const payload = filePayload(request.payload);
             result = await fixture.readFile(payload.revision, payload.path);
+            break;
           }
-          break;
-        default:
-          result = undefined;
+          default:
+            result = undefined;
+        }
+        response =
+          result === undefined
+            ? encodeRpcFailure('UNSUPPORTED')
+            : encodeRpcSuccess(request.operation, result);
+      } catch (error) {
+        if (!(error instanceof RemotishError)) {
+          throw error;
+        }
+        response = encodeRpcFailure(error.code);
       }
       channel.postMessage(
         await encryptFrame({
@@ -136,21 +143,15 @@ export async function withBrowserRpcFixtureEndpoint(
           hostId: frame.hostId,
           endpointId,
           requestId: frame.requestId,
-          response:
-            result === undefined
-              ? encodeRpcFailure('UNSUPPORTED')
-              : encodeRpcSuccess(request.operation, result),
+          response,
         }),
       );
-      if (request.operation === 'getRepository') {
-        signalRepositoryRequest();
-      }
     }
   }
   try {
-    await run(target, repositoryRequest);
+    await run(target);
     if (failure) {
-      throw new Error('Browser RPC test endpoint rejected transport traffic.');
+      throw new Error(`Browser RPC test endpoint rejected transport traffic: ${String(failure)}`);
     }
   } finally {
     channel.close();
