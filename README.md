@@ -66,7 +66,7 @@ A successful commit is already published remotely. Remotish does not create loca
 extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
 apps/demo-web               browser-safe Remotish host extension
-examples/browser-rpc-bitbucket  read-only Bitbucket Cloud userscript example
+examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
 ```
 
 Adapters depend on `@remotish/adapter-sdk`, not on VS Code or core internals.

@@ -73,6 +73,9 @@ function fixture(routes = {}) {
     if (value instanceof Response) {
       return value;
     }
+    if (typeof value === 'function') {
+      return value(init);
+    }
     if (value instanceof Uint8Array) {
       return new Response(value);
     }
@@ -140,7 +143,10 @@ test('Bitbucket endpoint derives exact target from repository tab only', () => {
   assert.equal(first?.target, 'https://bitbucket.org/acme/widgets');
   assert.equal(secondTab?.target, 'https://bitbucket.org/acme/other');
   assert.notEqual(first?.target, secondTab?.target);
-  assert.deepEqual(first?.session, { version: 1, capabilities: { commits: false } });
+  assert.deepEqual(first?.session, {
+    version: 1,
+    capabilities: { commits: true, createBranch: true, deleteBranch: true },
+  });
 });
 
 test('two Bitbucket repository tabs route only to their exact target', async () => {
@@ -221,10 +227,12 @@ test('Bitbucket read contract preserves identity, binary bytes, branches and his
     { type: 'deleted', path: 'old.txt' },
     { type: 'renamed', path: 'after.txt', previousPath: 'before.txt' },
   ]);
-  assert.equal(adapter.capabilities.commits, false);
-  assert.equal(adapter.commit, undefined);
-  assert.equal(adapter.createBranch, undefined);
-  assert.equal(adapter.deleteBranch, undefined);
+  assert.equal(adapter.capabilities.commits, true);
+  assert.equal(typeof adapter.commit, 'function');
+  assert.equal(typeof adapter.createBranch, 'function');
+  assert.equal(typeof adapter.deleteBranch, 'function');
+  assert.equal(adapter.capabilities.forceWithLease, undefined);
+  assert.equal(adapter.capabilities.amend, undefined);
   assert.ok(
     calls.every(
       ({ url, init }) =>
@@ -361,4 +369,175 @@ test('Bitbucket file redirects are unsupported without following or leaking the 
     ),
     errorCode('OFFLINE'),
   );
+});
+
+test('Bitbucket normal commit publishes binary additions, modifications and deletions atomically', async () => {
+  const { adapter, calls } = fixture({
+    [`${api}/src`]: Response.json(commit(second, [revision]), { status: 201 }),
+  });
+  const result = await adapter.commit({
+    type: 'commit',
+    branch: 'feature/test',
+    baseRevision: revision,
+    message: 'Publish bytes',
+    changes: [
+      { type: 'add', path: 'new.bin', content: binary },
+      { type: 'modify', path: 'assets/old.bin', content: new Uint8Array([255, 0]) },
+      { type: 'delete', path: 'removed.txt' },
+    ],
+    push: { mode: 'normal' },
+  });
+  assert.deepEqual(result, {
+    status: 'success',
+    revision: second,
+    commit: {
+      revision: second,
+      parents: [revision],
+      message: 'A commit',
+      author: { name: 'Example Author <author@example.test>' },
+      authoredAt: '2026-09-24T12:00:00+00:00',
+    },
+  });
+  const [{ url, init }] = calls;
+  assert.equal(url, `${api}/src`);
+  assert.equal(init.method, 'POST');
+  assert.equal(init.redirect, 'manual');
+  assert.equal(init.credentials, 'omit');
+  assert.equal(init.headers.Authorization, 'Bearer read-only-test-token');
+  assert.equal(init.headers['Content-Type'], undefined);
+  assert.equal(init.body.get('branch'), 'feature/test');
+  assert.equal(init.body.get('parents'), revision);
+  assert.equal(init.body.get('message'), 'Publish bytes');
+  assert.deepEqual(init.body.getAll('files'), ['removed.txt']);
+  assert.deepEqual(new Uint8Array(await init.body.get('new.bin').arrayBuffer()), binary);
+  assert.deepEqual(
+    new Uint8Array(await init.body.get('assets/old.bin').arrayBuffer()),
+    new Uint8Array([255, 0]),
+  );
+});
+
+test('Bitbucket stale-head conflict is settled, but dispatched failures remain ambiguous', async () => {
+  const request = {
+    type: 'commit',
+    branch: 'main',
+    baseRevision: revision,
+    message: 'Update',
+    changes: [{ type: 'add', path: 'new.txt', content: new Uint8Array([65]) }],
+    push: { mode: 'normal' },
+  };
+  const conflict = fixture({ [`${api}/src`]: new Response('', { status: 409 }) });
+  assert.deepEqual(await conflict.adapter.commit(request), {
+    status: 'rejected',
+    reason: 'REMOTE_CHANGED',
+  });
+  assert.equal(conflict.calls.length, 1);
+
+  let dispatches = 0;
+  const endpoint = createBitbucketEndpoint(
+    'https://bitbucket.org/acme/widgets',
+    () => 'token',
+    async () => {
+      dispatches += 1;
+      throw new TypeError('connection failed after dispatch');
+    },
+  );
+  assert.ok(endpoint);
+  await assert.rejects(
+    endpoint.handle(
+      { version: 1, operation: 'commit', payload: request },
+      new AbortController().signal,
+    ),
+    errorCode('OFFLINE'),
+  );
+  assert.equal(dispatches, 1);
+
+  const malformed = fixture({
+    [`${api}/src`]: Response.json(commit(second, [parent]), { status: 201 }),
+  });
+  await assert.rejects(malformed.adapter.commit(request), errorCode('UNKNOWN'));
+});
+
+test('Bitbucket rejects unsupported and oversized commits before dispatch', async () => {
+  const { endpoint, calls } = fixture();
+  const normal = {
+    type: 'commit',
+    branch: 'main',
+    baseRevision: revision,
+    message: 'Update',
+    changes: [{ type: 'add', path: 'new.bin', content: binary }],
+    push: { mode: 'normal' },
+  };
+  const signal = new AbortController().signal;
+  for (const request of [
+    { ...normal, push: { mode: 'force-with-lease', expectedRevision: revision } },
+    { ...normal, type: 'amend', push: { mode: 'force-with-lease', expectedRevision: revision } },
+    { ...normal, changes: [{ type: 'add', path: 'message', content: binary }] },
+    { ...normal, changes: [{ type: 'add', path: 'bad\ud800path', content: binary }] },
+    { ...normal, changes: [{ type: 'delete', path: 'bad\npath' }] },
+    { ...normal, branch: '../invalid' },
+    { ...normal, baseRevision: 'not-a-hash' },
+    { ...normal, changes: [normal.changes[0], normal.changes[0]] },
+    {
+      ...normal,
+      changes: [{ type: 'add', path: 'large.bin', content: new Uint8Array(16 * 1024 * 1024 + 1) }],
+    },
+  ]) {
+    assert.equal(
+      (await endpoint.handle({ version: 1, operation: 'commit', payload: request }, signal)).reason,
+      'UNSUPPORTED',
+    );
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('Bitbucket branch creation and deletion use scoped refs endpoints', async () => {
+  const { adapter, calls } = fixture({
+    [`${api}/refs/branches`]: Response.json(
+      { name: 'feature/test', target: { hash: second } },
+      { status: 201 },
+    ),
+    [`${api}/refs/branches/feature%2Ftest`]: new Response(null, { status: 204 }),
+  });
+  assert.deepEqual(await adapter.createBranch('feature/test', second), {
+    name: 'feature/test',
+    revision: second,
+  });
+  await adapter.deleteBranch('feature/test');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    name: 'feature/test',
+    target: { hash: second },
+  });
+  assert.equal(calls[1].url, `${api}/refs/branches/feature%2Ftest`);
+  assert.equal(calls[1].init.method, 'DELETE');
+  assert.equal(calls[1].init.body, undefined);
+});
+
+test('Bitbucket branch writes fail closed on invalid input and responses', async () => {
+  const invalid = fixture();
+  await assert.rejects(
+    invalid.adapter.createBranch('../main', second),
+    errorCode('INVALID_REQUEST'),
+  );
+  await assert.rejects(
+    invalid.adapter.createBranch('feature/test', 'not-a-hash'),
+    errorCode('INVALID_REQUEST'),
+  );
+  await assert.rejects(invalid.adapter.deleteBranch('main.lock'), errorCode('INVALID_REQUEST'));
+  assert.equal(invalid.calls.length, 0);
+  const wrongTarget = fixture({
+    [`${api}/refs/branches`]: Response.json(
+      { name: 'feature/test', target: { hash: parent } },
+      { status: 201 },
+    ),
+  });
+  await assert.rejects(
+    wrongTarget.adapter.createBranch('feature/test', second),
+    errorCode('UNKNOWN'),
+  );
+  const forbidden = fixture({
+    [`${api}/refs/branches/main`]: new Response('', { status: 403 }),
+  });
+  await assert.rejects(forbidden.adapter.deleteBranch('main'), errorCode('FORBIDDEN'));
 });

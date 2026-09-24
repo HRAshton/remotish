@@ -55,7 +55,7 @@ async function main(): Promise<void> {
     return;
   }
   target = handler.target;
-  GM_registerMenuCommand('Set read-only Bitbucket repository token', () => {
+  GM_registerMenuCommand('Set Bitbucket repository read/write token', () => {
     const value = globalThis.prompt('Bitbucket repository access token (blank removes it):');
     if (value === null) {
       return;

@@ -1,6 +1,6 @@
 # Bitbucket Cloud Browser RPC reference endpoint
 
-This is a read-only Tampermonkey example for Bitbucket Cloud. It is source-only: no built
+This is a Tampermonkey read/write example for Bitbucket Cloud. It is source-only: no built
 userscript or Bitbucket credential is included in Remotish VSIXes. The source archive contains
 the example template, but no customer configuration. The Bitbucket REST API
 mapping stays here; the RPC adapter, Browser RPC provider, host, and core remain SCM-neutral.
@@ -23,10 +23,10 @@ mapping stays here; the RPC adapter, Browser RPC provider, host, and core remain
 
 4. Install `artifacts/remotish-bitbucket.user.js` in Tampermonkey. Open a Bitbucket repository
    page such as `https://bitbucket.org/acme/widgets`. In that tab's Tampermonkey menu, choose
-   **Set read-only Bitbucket repository token** and enter a Bitbucket repository access token with
-   repository-read scope. The token is stored per exact repository target in this userscript's
-   local GM storage, not in Code-OSS, Remotish workspace state, the bridge key, or a URL. Protect
-   your browser profile and revoke the token when no longer needed. The Bitbucket website login
+   **Set Bitbucket repository read/write token** and enter a Bitbucket repository access token with
+   repository-read and repository-write scopes. The token is stored per exact repository target
+   in this userscript's local GM storage, not in Code-OSS, Remotish workspace state, the bridge key,
+   or a URL. Protect your browser profile and revoke the token when no longer needed. The Bitbucket website login
    alone is not used as REST API authentication.
 
    Keep the template's `@sandbox DOM` line and enable Tampermonkey's `ISOLATED_WORLD` on Chromium.
@@ -60,16 +60,29 @@ seconds for the matching Bitbucket tab. After repository preparation it opens th
 `remotish://browser-rpc-<stable-id>/` workspace. If the tab is absent or closes, reopen the link
 after opening the tab. A later tab reload creates a new endpoint session. Existing workspaces can
 reconnect; an ambiguous publication is never retried.
+After replacing the read-only example with this write-enabled version, reopen the Code-OSS
+workspace so its adapter acquires the new capabilities; an already-open read-only adapter is not
+upgraded in place.
 
 ## Behavior and limits
 
 The endpoint implements repository metadata, immutable directory and binary-file reads, branches,
-paginated commit history, and commit changes. It advertises `commits: false` and implements no
-branch creation/deletion. Remotish may still hold a local working overlay, but this endpoint
-cannot publish it. Files above 16 MiB and oversized/overlong listings fail explicitly; they are
-never truncated. Bitbucket LFS media redirects are not followed and fail as `UNSUPPORTED`.
-Missing/invalid credentials,
-insufficient permission, missing paths, rate limits, and service failures map to Remotish errors.
+paginated commit history, commit changes, normal commit-and-publish, and branch creation/deletion.
+Normal commits send binary additions/modifications and deletions to Bitbucket's source API with
+`branch` and `parents=baseRevision`. Bitbucket atomically rejects a moved branch head with HTTP 409,
+which Remotish reports as `REMOTE_CHANGED`. A successful result is already published at the returned
+revision. A network failure or malformed response after sending a write is ambiguous; Remotish
+does not retry it and retains its publication-recovery protection.
+
+Force-with-lease and amend remain unavailable: Bitbucket's REST API does not provide the atomic
+ref replacement needed for those operations. Commits above a 16 MiB payload budget or more than
+1000 changes are rejected before dispatch; the Browser RPC transport also rejects unsendable
+frames locally. The source API reserves root paths such as `message` and `branch` as form fields;
+uploads to those exact paths, or paths with control characters or invalid Unicode, are rejected.
+Files above 16 MiB and oversized/overlong listings fail explicitly; they are never truncated.
+Bitbucket LFS media redirects are not followed and fail as
+`UNSUPPORTED`. Missing/invalid credentials, insufficient permission, missing paths, rate limits,
+and service failures map to Remotish errors.
 
 Repository identity uses Bitbucket's repository UUID, not the mutable workspace/repository slug.
 A rename or transfer therefore retains the underlying identity, but the stored Browser RPC target

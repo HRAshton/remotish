@@ -4,6 +4,8 @@ import {
   type CommitChange,
   type CommitInfo,
   type CommitPage,
+  type CommitRejected,
+  type CommitResult,
   type DirectoryEntry,
   normalizeRepoPath,
   RemotishError,
@@ -15,10 +17,13 @@ const API_ORIGIN = 'https://api.bitbucket.org';
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
 // Base64 plus RPC and encrypted-frame overhead must fit the 24 MiB transport frame.
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
+const MAX_COMMIT_BYTES = 16 * 1024 * 1024;
+const MAX_COMMIT_CHANGES = 1000;
 const MAX_PAGES = 100;
 const MAX_LIST_ITEMS = 10_000;
 const SHA = /^[0-9a-f]{40}$/iu;
 const SLUG = /^[a-z0-9][a-z0-9._-]*$/iu;
+const SOURCE_FIELDS = new Set(['branch', 'parents', 'message', 'author', 'close_branch', 'files']);
 
 export type BitbucketTokenSource = () => string | undefined | Promise<string | undefined>;
 
@@ -55,10 +60,13 @@ export function createBitbucketEndpoint(
   return new BitbucketEndpoint(workspace, slug, token, fetcher);
 }
 
-/** Read-only Bitbucket Cloud repository semantics over official REST API V2 endpoints. */
+/** Bitbucket Cloud repository semantics over official REST API V2 endpoints. */
 export class BitbucketEndpoint {
   readonly target: string;
-  readonly session = { version: 1, capabilities: { commits: false } } as const;
+  readonly session = {
+    version: 1,
+    capabilities: { commits: true, createBranch: true, deleteBranch: true },
+  } as const;
   private readonly basePath: string;
 
   constructor(
@@ -90,9 +98,16 @@ export class BitbucketEndpoint {
       case 'getCommitChanges':
         return this.getCommitChanges(revisionPayload(request.payload), signal);
       case 'commit':
-      case 'createBranch':
+        return this.commit(request.payload, signal);
+      case 'createBranch': {
+        const payload = object(request.payload, 'create branch request');
+        return this.createBranch(branchName(payload.name), revision(payload.revision), signal);
+      }
       case 'deleteBranch':
-        throw new RemotishError('UNSUPPORTED', 'Bitbucket reference endpoint is read-only.');
+        return this.deleteBranch(
+          branchName(object(request.payload, 'delete branch request').name),
+          signal,
+        );
     }
   }
 
@@ -125,7 +140,7 @@ export class BitbucketEndpoint {
       const name = text(data.name, 'branch.name');
       return {
         name,
-        revision: revision(target.hash),
+        revision: remoteRevision(target.hash, 'branch.target.hash'),
         isDefault: name === repository.defaultBranch,
       };
     });
@@ -247,6 +262,157 @@ export class BitbucketEndpoint {
     });
   }
 
+  private async commit(value: unknown, signal: AbortSignal): Promise<CommitResult> {
+    let prepared: CommitRejected | { form: FormData; baseRevision: string };
+    try {
+      prepared = this.prepareCommit(value);
+    } catch {
+      // Preparation is entirely local. Nothing was sent, so core can settle its journal.
+      return {
+        status: 'rejected',
+        reason: 'UNSUPPORTED',
+        message: 'Invalid Bitbucket commit request.',
+      };
+    }
+    if ('status' in prepared) {
+      return prepared;
+    }
+    // Bitbucket atomically asserts that parents is the current head of branch, returning 409
+    // when it moved. Never retry this non-idempotent publication after an ambiguous failure.
+    const response = await this.request(`${this.basePath}/src`, 'POST', signal, prepared.form);
+    if (response.status === 409) {
+      return { status: 'rejected', reason: 'REMOTE_CHANGED' };
+    }
+    this.requireStatus(response, 201);
+    const info = commitInfo(await this.responseJson(response, signal));
+    if (info.parents.length !== 1 || info.parents[0] !== prepared.baseRevision) {
+      throw malformed('published commit parent');
+    }
+    return { status: 'success', revision: info.revision, commit: info };
+  }
+
+  private prepareCommit(value: unknown): CommitRejected | { form: FormData; baseRevision: string } {
+    const input = object(value, 'commit request');
+    // These modes cannot be implemented with Bitbucket's source API without an unsafe ref rewrite.
+    if (input.type !== 'commit' || object(input.push, 'commit push').mode !== 'normal') {
+      return { status: 'rejected', reason: 'UNSUPPORTED' };
+    }
+    const branch = branchName(input.branch);
+    const baseRevision = revision(input.baseRevision);
+    const message = stringValue(input.message, 'commit.message');
+    const changes = list(input.changes, 'commit.changes');
+    if (
+      !message.trim() ||
+      !wellFormed(message) ||
+      message.length > 10_000 ||
+      !changes.length ||
+      changes.length > MAX_COMMIT_CHANGES
+    ) {
+      return {
+        status: 'rejected',
+        reason: 'UNSUPPORTED',
+        message: 'Bitbucket commit exceeds supported limits.',
+      };
+    }
+    const validated: Array<
+      { type: 'delete'; path: string } | { type: 'file'; path: string; content: Uint8Array }
+    > = [];
+    const seen = new Set<string>();
+    let size = 0;
+    for (const item of changes) {
+      const change = object(item, 'commit change');
+      const path = remotePath(change.path, 'commit change.path');
+      if (
+        !wellFormed(path) ||
+        [...path].some(
+          (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+        )
+      ) {
+        return {
+          status: 'rejected',
+          reason: 'UNSUPPORTED',
+          message: 'Bitbucket path cannot be represented in multipart form.',
+        };
+      }
+      if (seen.has(path)) {
+        throw new RemotishError('INVALID_REQUEST', 'Duplicate Bitbucket commit path.');
+      }
+      seen.add(path);
+      size += path.length * 4 + 256;
+      if (change.type === 'delete') {
+        validated.push({ type: 'delete', path });
+      } else if (change.type === 'add' || change.type === 'modify') {
+        if (SOURCE_FIELDS.has(path)) {
+          return {
+            status: 'rejected',
+            reason: 'UNSUPPORTED',
+            message: 'Bitbucket cannot upload a file whose path is a source control field.',
+          };
+        }
+        if (!(change.content instanceof Uint8Array)) {
+          throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket commit bytes.');
+        }
+        size += change.content.byteLength;
+        validated.push({ type: 'file', path, content: change.content });
+      } else {
+        throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket commit change.');
+      }
+      if (size > MAX_COMMIT_BYTES) {
+        return {
+          status: 'rejected',
+          reason: 'UNSUPPORTED',
+          message: 'Bitbucket commit exceeds the transport size limit.',
+        };
+      }
+    }
+    const form = new FormData();
+    form.set('branch', branch);
+    form.set('parents', baseRevision);
+    form.set('message', message);
+    for (const change of validated) {
+      if (change.type === 'delete') {
+        form.append('files', change.path);
+      } else {
+        form.append(
+          change.path,
+          new Blob([change.content.slice()], { type: 'application/octet-stream' }),
+          change.path.split('/').at(-1),
+        );
+      }
+    }
+    return { form, baseRevision };
+  }
+
+  private async createBranch(name: string, target: string, signal: AbortSignal): Promise<Branch> {
+    const response = await this.request(
+      `${this.basePath}/refs/branches`,
+      'POST',
+      signal,
+      JSON.stringify({ name, target: { hash: target } }),
+      'application/json',
+    );
+    this.requireStatus(response, 201);
+    const data = object(await this.responseJson(response, signal), 'created branch');
+    const actual = object(data.target, 'created branch.target');
+    if (
+      data.name !== name ||
+      remoteRevision(actual.hash, 'created branch.target.hash') !== target
+    ) {
+      throw malformed('created branch');
+    }
+    return { name, revision: target };
+  }
+
+  private async deleteBranch(name: string, signal: AbortSignal): Promise<null> {
+    const response = await this.request(
+      `${this.basePath}/refs/branches/${encodeURIComponent(name)}`,
+      'DELETE',
+      signal,
+    );
+    this.requireStatus(response, 204);
+    return null;
+  }
+
   private sourcePath(valueRevision: string, path: string): string {
     const suffix = path ? `/${path.split('/').map(encodeURIComponent).join('/')}` : '/';
     return `${this.basePath}/src/${revision(valueRevision)}${suffix}`;
@@ -297,14 +463,54 @@ export class BitbucketEndpoint {
 
   private async getJson(path: string, signal: AbortSignal): Promise<unknown> {
     const bytes = await this.getBytes(path, MAX_JSON_BYTES, signal);
+    return parseJson(bytes);
+  }
+
+  private async responseJson(response: Response, signal: AbortSignal): Promise<unknown> {
+    return parseJson(await this.responseBytes(response, MAX_JSON_BYTES, signal));
+  }
+
+  private async request(
+    path: string,
+    method: 'GET' | 'POST' | 'DELETE',
+    signal: AbortSignal,
+    body?: FormData | string,
+    contentType?: string,
+  ): Promise<Response> {
+    const credential = await this.credential();
+    let response: Response;
     try {
-      return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      response = await this.fetcher(new URL(path, API_ORIGIN), {
+        method,
+        headers: {
+          Authorization: `Bearer ${credential}`,
+          Accept: 'application/json',
+          ...(contentType ? { 'Content-Type': contentType } : {}),
+        },
+        ...(body === undefined ? {} : { body }),
+        credentials: 'omit',
+        redirect: 'manual',
+        signal,
+      });
     } catch {
-      throw malformed('JSON response');
+      throw new RemotishError(
+        signal.aborted ? 'CANCELLED' : 'OFFLINE',
+        'Bitbucket API request failed.',
+      );
     }
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new RemotishError('UNSUPPORTED', 'Bitbucket API redirect is not supported.');
+    }
+    return response;
   }
 
   private async getBytes(path: string, limit: number, signal: AbortSignal): Promise<Uint8Array> {
+    const response = await this.request(path, 'GET', signal);
+    this.requireStatus(response, 200);
+    return this.responseBytes(response, limit, signal);
+  }
+
+  private async credential(): Promise<string> {
     let credential: string | undefined;
     try {
       credential = await this.token();
@@ -321,25 +527,11 @@ export class BitbucketEndpoint {
     ) {
       throw new RemotishError('UNAUTHORIZED', 'Configure a Bitbucket repository access token.');
     }
-    let response: Response;
-    try {
-      response = await this.fetcher(new URL(path, API_ORIGIN), {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${credential}`, Accept: 'application/json' },
-        credentials: 'omit',
-        redirect: 'manual',
-        signal,
-      });
-    } catch {
-      throw new RemotishError(
-        signal.aborted ? 'CANCELLED' : 'OFFLINE',
-        'Bitbucket API request failed.',
-      );
-    }
-    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
-      throw new RemotishError('UNSUPPORTED', 'Bitbucket API redirect is not supported.');
-    }
-    if (!response.ok) {
+    return credential;
+  }
+
+  private requireStatus(response: Response, expected: number): void {
+    if (response.status !== expected) {
       const code =
         response.status === 401
           ? 'UNAUTHORIZED'
@@ -354,9 +546,13 @@ export class BitbucketEndpoint {
                   : 'UNKNOWN';
       throw new RemotishError(code, `Bitbucket API request failed (${code}).`);
     }
-    if (response.status !== 200) {
-      throw new RemotishError('UNKNOWN', 'Bitbucket API returned an incomplete response.');
-    }
+  }
+
+  private async responseBytes(
+    response: Response,
+    limit: number,
+    signal: AbortSignal,
+  ): Promise<Uint8Array> {
     const length = response.headers.get('content-length');
     if (length !== null && Number(length) > limit) {
       throw new RemotishError('UNSUPPORTED', 'Bitbucket response exceeds the supported size.');
@@ -425,6 +621,57 @@ function revision(value: unknown): string {
   return result.toLowerCase();
 }
 
+function remoteRevision(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !SHA.test(value)) {
+    throw malformed(label);
+  }
+  return value.toLowerCase();
+}
+
+function branchName(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !value ||
+    value.length > 255 ||
+    value === '@' ||
+    value.startsWith('-') ||
+    value.includes('..') ||
+    value.includes('@{') ||
+    value.includes('//') ||
+    value.endsWith('/') ||
+    value.endsWith('.') ||
+    /[~^:?*\\]/u.test(value) ||
+    value.includes('[') ||
+    [...value].some(
+      (character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+    ) ||
+    value.split('/').some((part) => part.startsWith('.') || part.endsWith('.lock'))
+  ) {
+    throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket branch name.');
+  }
+  if (!wellFormed(value)) {
+    throw new RemotishError('INVALID_REQUEST', 'Invalid Bitbucket branch name.');
+  }
+  return value;
+}
+
+function wellFormed(value: string): boolean {
+  try {
+    encodeURIComponent(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseJson(bytes: Uint8Array): unknown {
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    throw malformed('JSON response');
+  }
+}
+
 function repoPath(value: string): string {
   try {
     if (normalizeRepoPath(value) === value) {
@@ -460,7 +707,7 @@ function remotePath(value: unknown, label: string): string {
 function commitInfo(value: unknown): CommitInfo {
   const data = object(value, 'commit');
   const parents = list(data.parents, 'commit.parents').map((parent) =>
-    revision(object(parent, 'parent').hash),
+    remoteRevision(object(parent, 'parent').hash, 'commit parent.hash'),
   );
   const author = data.author === undefined ? undefined : object(data.author, 'commit.author');
   const rawAuthor = author === undefined ? undefined : optionalText(author.raw, 'author.raw');
@@ -473,7 +720,7 @@ function commitInfo(value: unknown): CommitInfo {
     throw malformed('commit.date');
   }
   return {
-    revision: revision(data.hash),
+    revision: remoteRevision(data.hash, 'commit.hash'),
     parents,
     message: stringValue(data.message, 'commit.message'),
     ...(rawAuthor ? { author: { name: rawAuthor } } : {}),
