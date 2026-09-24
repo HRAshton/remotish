@@ -26,7 +26,8 @@ export type BitbucketTokenSource = () => string | undefined | Promise<string | u
 export function createBitbucketEndpoint(
   pageUrl: string,
   token: BitbucketTokenSource,
-  fetcher: typeof fetch = fetch,
+  // Keep the isolated world's native receiver when the endpoint calls this as a member.
+  fetcher: typeof fetch = fetch.bind(globalThis),
 ): BitbucketEndpoint | undefined {
   let page: URL;
   try {
@@ -326,7 +327,7 @@ export class BitbucketEndpoint {
         method: 'GET',
         headers: { Authorization: `Bearer ${credential}`, Accept: 'application/json' },
         credentials: 'omit',
-        redirect: 'error',
+        redirect: 'manual',
         signal,
       });
     } catch {
@@ -334,6 +335,9 @@ export class BitbucketEndpoint {
         signal.aborted ? 'CANCELLED' : 'OFFLINE',
         'Bitbucket API request failed.',
       );
+    }
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new RemotishError('UNSUPPORTED', 'Bitbucket API redirect is not supported.');
     }
     if (!response.ok) {
       const code =

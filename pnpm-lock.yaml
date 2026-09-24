@@ -59,6 +59,9 @@ importers:
       knip:
         specifier: 6.36.0
         version: 6.36.0
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0
       remark-cli:
         specifier: 12.0.1
         version: 12.0.1(supports-color@9.4.0)

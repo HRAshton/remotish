@@ -29,6 +29,11 @@ mapping stays here; the RPC adapter, Browser RPC provider, host, and core remain
    your browser profile and revoke the token when no longer needed. The Bitbucket website login
    alone is not used as REST API authentication.
 
+   Keep the template's `@sandbox DOM` line and enable Tampermonkey's `ISOLATED_WORLD` on Chromium.
+   Tampermonkey documents fallback to another enabled world if isolation is disabled; do not use
+   a page-world fallback for this token-holding script. The build checks metadata but cannot
+   verify the installed manager's execution setting.
+
 The example supports repository pages on `https://bitbucket.org/<workspace>/<repo-slug>` and
 their child pages. Other origins, non-repository pages, and malformed slugs do not register an
 endpoint. A request target must be the exact canonical URL without a trailing slash, such as
@@ -60,7 +65,8 @@ The endpoint implements repository metadata, immutable directory and binary-file
 paginated commit history, and commit changes. It advertises `commits: false` and implements no
 branch creation/deletion. Remotish may still hold a local working overlay, but this endpoint
 cannot publish it. Files above 16 MiB and oversized/overlong listings fail explicitly; they are
-never truncated. Bitbucket LFS media redirects are not followed. Missing/invalid credentials,
+never truncated. Bitbucket LFS media redirects are not followed and fail as `UNSUPPORTED`.
+Missing/invalid credentials,
 insufficient permission, missing paths, rate limits, and service failures map to Remotish errors.
 
 Repository identity uses Bitbucket's repository UUID, not the mutable workspace/repository slug.

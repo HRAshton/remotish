@@ -3,6 +3,7 @@
 // @namespace    https://example.invalid/remotish
 // @version      1
 // @description  Read-only Bitbucket Cloud endpoint; configure local bridge and repository token.
+// @sandbox      DOM
 // @match        https://code.example.invalid/*
 // @match        https://bitbucket.org/*
 // @grant        GM_getValue

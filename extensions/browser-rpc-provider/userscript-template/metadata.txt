@@ -3,6 +3,7 @@
 // @namespace    https://example.invalid/remotish
 // @version      1
 // @description  Customer-scoped Remotish bridge; replace all example origins before installing.
+// @sandbox      DOM
 // @match        https://code.example.invalid/*
 // @match        https://scm.example.invalid/*
 // @grant        GM_getValue

@@ -31,6 +31,11 @@ origins. Never use a catch-all `@match`. For
 multiple SCM origins, add each exact origin to both places. The userscript must be **one script
 installed on both host and endpoint origins**: Tampermonkey `GM_*` storage is isolated per
 userscript, so two separately installed scripts cannot share this mailbox.
+Keep `@sandbox DOM` in the metadata and enable Tampermonkey's isolated-world execution on
+Chromium. Tampermonkey may fall back to another enabled world if `ISOLATED_WORLD` is disabled;
+do not use such a configuration for a key-holding script. The builder rejects missing or changed
+`@sandbox DOM`, but it cannot verify a customer's Tampermonkey settings. A page-world script can
+intercept browser globals and compromise both the pairing key and endpoint credentials.
 
 Generate a fresh 256-bit base64url key locally (for example,
 `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`). Put it in
@@ -97,10 +102,11 @@ pairing errors, or failed restoration never delete that overlay.
 ## Transport and trust
 
 The host extension's browser worker and the host-side userscript relay exchange AES-256-GCM packets
-over `BroadcastChannel`. The same userscript relays packets through per-script `GM_*` storage to
-the endpoint tab, in bounded chunks. Page scripts can observe or replay broadcast ciphertext but
-cannot forge authenticated frames without the pairing key. The endpoint runtime derives its origin
-from `location.origin`; the handler cannot supply it. This origin binding assumes the customer
+over `BroadcastChannel`. With Tampermonkey's `ISOLATED_WORLD` enabled, the same userscript relays
+packets through per-script `GM_*` storage to the endpoint tab, in bounded chunks. In that mode,
+page scripts can observe or replay broadcast ciphertext but cannot forge authenticated frames
+without the pairing key. The endpoint runtime derives its origin from `location.origin`; the
+handler cannot supply it. This origin binding assumes the customer
 installs only trusted endpoint code in the key-holding userscript on the configured `@match`
 origins. A malicious or compromised key-holding userscript can claim any origin; no browser bridge
 can independently repair that trust violation.

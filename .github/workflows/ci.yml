@@ -46,6 +46,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:vscode-web
+      - run: pnpm test:userscript-browser
       - run: pnpm test:vscode-web:vsix
 
   github-public:

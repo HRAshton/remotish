@@ -230,7 +230,7 @@ test('Bitbucket read contract preserves identity, binary bytes, branches and his
       ({ url, init }) =>
         url.startsWith(api) &&
         init.credentials === 'omit' &&
-        init.redirect === 'error' &&
+        init.redirect === 'manual' &&
         init.headers.Authorization === 'Bearer read-only-test-token',
     ),
   );
@@ -328,5 +328,37 @@ test('Bitbucket file and JSON reads reject oversized responses before transport 
   await assert.rejects(
     partialFile.adapter.readFile(revision, 'assets/sample.bin'),
     errorCode('UNKNOWN'),
+  );
+});
+
+test('Bitbucket file redirects are unsupported without following or leaking the token', async () => {
+  const source = `${api}/src/${revision}/assets/sample.bin`;
+  const redirected = fixture({
+    [source]: new Response(null, {
+      status: 301,
+      headers: { location: 'https://media.example/file' },
+    }),
+  });
+  await assert.rejects(
+    redirected.adapter.readFile(revision, 'assets/sample.bin'),
+    errorCode('UNSUPPORTED'),
+  );
+  assert.equal(redirected.calls.filter(({ url }) => url === source).length, 1);
+  assert.ok(redirected.calls.every(({ url }) => url.startsWith(api)));
+
+  const endpoint = createBitbucketEndpoint(
+    'https://bitbucket.org/acme/widgets',
+    () => 'token',
+    async () => {
+      throw new TypeError('network failure');
+    },
+  );
+  assert.ok(endpoint);
+  await assert.rejects(
+    endpoint.handle(
+      { version: 1, operation: 'getRepository', payload: {} },
+      new AbortController().signal,
+    ),
+    errorCode('OFFLINE'),
   );
 });
