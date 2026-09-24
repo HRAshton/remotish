@@ -5,6 +5,8 @@ import {
   RemotishError,
 } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
+import { BrowserRpcBootstrapFileSystem, restoreBrowserRpcWorkspace } from './bootstrap.js';
+import { BROWSER_RPC_BOOTSTRAP_SCHEME } from './bootstrap-uri.js';
 import { BrowserRpcEndpointBroker } from './broker.js';
 import { decodeBrowserRpcRepository } from './target.js';
 import { BrowserRpcHostTransport } from './transport/host.js';
@@ -64,6 +66,22 @@ function capabilitySignature(session: unknown): string {
 /** Activation does not pair or connect; a repository request starts the transport on demand. */
 export function activate(context: vscode.ExtensionContext): RemotishAdapterProviderV1 {
   const broker = new BrowserRpcEndpointBroker();
+  const bootstrap = new BrowserRpcBootstrapFileSystem(context);
+  context.subscriptions.push(
+    bootstrap,
+    vscode.workspace.registerFileSystemProvider(BROWSER_RPC_BOOTSTRAP_SCHEME, bootstrap, {
+      isReadonly: true,
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      if (
+        !vscode.workspace.workspaceFolders?.some(
+          (folder) => folder.uri.scheme === BROWSER_RPC_BOOTSTRAP_SCHEME,
+        )
+      ) {
+        bootstrap.cancel();
+      }
+    }),
+  );
   let transport: BrowserRpcHostTransport | undefined;
   let connecting: Promise<void> | undefined;
   let pairingGeneration = 0;
@@ -120,6 +138,7 @@ export function activate(context: vscode.ExtensionContext): RemotishAdapterProvi
       pairingGeneration += 1;
       transport?.dispose();
       transport = undefined;
+      bootstrap.cancel();
     },
   );
   context.subscriptions.push(configure, {
@@ -128,5 +147,10 @@ export function activate(context: vscode.ExtensionContext): RemotishAdapterProvi
       broker.dispose();
     },
   });
-  return createBrowserRpcProvider(broker, connect);
+  return {
+    ...createBrowserRpcProvider(broker, connect),
+    async restoreWorkspace(workspaceId) {
+      return restoreBrowserRpcWorkspace(context, workspaceId);
+    },
+  };
 }

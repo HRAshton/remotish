@@ -15,7 +15,8 @@
   },
   "browser": "./dist/extension.js",
   "activationEvents": [
-    "onCommand:remotish.browserRpc.configureBridge"
+    "onCommand:remotish.browserRpc.configureBridge",
+    "onFileSystem:remotish-rpc"
   ],
   "capabilities": {
     "virtualWorkspaces": true,
