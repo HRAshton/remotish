@@ -101,9 +101,13 @@ the normalized target and trusted transport origin to agree. Duplicate matching 
 ambiguous rather than selecting one by registration order. The broker waits at most 30 seconds for
 an endpoint; cancellation is available to broker callers. The V1 provider factory has no
 `AbortSignal` parameter, so a host repository command cannot yet cancel that wait directly.
-The browser transport and real endpoints are not yet implemented. Browser RPC currently has no
-provider-owned reconstruction record or `restoreWorkspace()` implementation, so it supports only
-session-local `remotish.ensureRepository` preparation, not canonical navigation/reload.
+The browser transport uses a customer-scoped Tampermonkey userscript installed on explicitly
+configured host and endpoint origins. The userscript binds endpoint origin to its execution
+context, and a customer-generated pairing key authenticates encrypted cross-tab messages. See the
+[Browser RPC provider setup and trust model](../extensions/browser-rpc-provider/README.md) for
+composition details. Browser RPC currently has no provider-owned reconstruction record or
+`restoreWorkspace()` implementation, so it supports only session-local
+`remotish.ensureRepository` preparation, not canonical navigation/reload.
 
 ## Lazy activation
 

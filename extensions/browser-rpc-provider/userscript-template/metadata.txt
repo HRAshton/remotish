@@ -1,0 +1,14 @@
+// ==UserScript==
+// @name         Customer Remotish Browser RPC Bridge
+// @namespace    https://example.invalid/remotish
+// @version      1
+// @description  Customer-scoped Remotish bridge; replace all example origins before installing.
+// @match        https://code.example.invalid/*
+// @match        https://scm.example.invalid/*
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_deleteValue
+// @grant        GM_listValues
+// @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
+// ==/UserScript==

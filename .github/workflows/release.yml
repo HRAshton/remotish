@@ -34,10 +34,12 @@ jobs:
           sdk_version="$(node --print "require('./packages/adapter-sdk/package.json').version")"
           host_version="$(node --print "require('./apps/demo-web/package.json').version")"
           fixture_provider_version="$(node --print "require('./extensions/fixture-provider/package.json').version")"
+          browser_rpc_provider_version="$(node --print "require('./extensions/browser-rpc-provider/package.json').version")"
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
           test "$host_version" = "$version"
           test "$fixture_provider_version" = "$version"
+          test "$browser_rpc_provider_version" = "$version"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run ci
       - run: pnpm test:vscode-web:vsix
@@ -49,6 +51,7 @@ jobs:
           sha256sum \
             remotish.vsix \
             remotish-fixture-provider.vsix \
+            remotish-browser-rpc-provider.vsix \
             remotish-framework.tar.gz \
             remotish.cdx.json \
             THIRD_PARTY_NOTICES.md > SHA256SUMS
@@ -58,6 +61,7 @@ jobs:
           subject-path: |
             artifacts/remotish.vsix
             artifacts/remotish-fixture-provider.vsix
+            artifacts/remotish-browser-rpc-provider.vsix
             artifacts/remotish-framework.tar.gz
             artifacts/remotish.cdx.json
             artifacts/THIRD_PARTY_NOTICES.md
@@ -140,6 +144,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             artifacts/remotish.vsix \
             artifacts/remotish-fixture-provider.vsix \
+            artifacts/remotish-browser-rpc-provider.vsix \
             artifacts/remotish-framework.tar.gz \
             artifacts/remotish.cdx.json \
             artifacts/THIRD_PARTY_NOTICES.md \

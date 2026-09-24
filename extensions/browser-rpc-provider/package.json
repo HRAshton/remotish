@@ -14,8 +14,23 @@
     "vscode": "^1.138.0"
   },
   "browser": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:remotish.browserRpc.configureBridge"
+  ],
   "capabilities": {
-    "virtualWorkspaces": true
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Browser RPC can connect to authenticated remote endpoints selected by a repository request."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "remotish.browserRpc.configureBridge",
+        "title": "Remotish Browser RPC: Configure Bridge Pairing Key"
+      }
+    ]
   },
   "remotish": {
     "provider": true,
