@@ -7,7 +7,9 @@ import {
   RpcAdapter,
 } from '@remotish/adapter-rpc';
 import { RemotishError } from '@remotish/adapter-sdk';
+import { MemoryWorkspaceStorage, RemotishWorkspace } from '@remotish/core';
 import { createBitbucketEndpoint } from '../../examples/browser-rpc-bitbucket/build/endpoint.js';
+import { createGmSourcePublisher } from '../../examples/browser-rpc-bitbucket/build/gm-publisher.js';
 import { BrowserRpcEndpointBroker } from '../../extensions/browser-rpc-provider/build/broker.js';
 
 const revision = 'a'.repeat(40);
@@ -64,28 +66,46 @@ function fixture(routes = {}) {
     },
     ...routes,
   };
-  const fetcher = async (input, init) => {
-    const url = String(input);
-    calls.push({ url, init });
-    const value = responses[url];
+  const responseFor = async (url, init) => {
+    let value = responses[url];
+    if (typeof value === 'function') {
+      value = await value(init);
+    }
     if (value === undefined) {
       return new Response('', { status: 404 });
     }
     if (value instanceof Response) {
       return value;
     }
-    if (typeof value === 'function') {
-      return value(init);
-    }
     if (value instanceof Uint8Array) {
       return new Response(value);
     }
     return Response.json(value);
   };
+  const fetcher = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, init });
+    return responseFor(url, init);
+  };
+  const sourcePublisher = async ({ url, authorization, form, signal }) => {
+    const init = {
+      method: 'POST',
+      headers: { Authorization: authorization, Accept: 'application/json' },
+      body: form,
+      credentials: 'omit',
+      redirect: 'manual',
+      signal,
+    };
+    calls.push({ url: url.href, init });
+    const response = await responseFor(url.href, init);
+    const location = response.headers.get('location');
+    return { status: response.status, ...(location === null ? {} : { location }) };
+  };
   const endpoint = createBitbucketEndpoint(
     'https://bitbucket.org/acme/widgets/src/main/README.md',
     () => 'read-only-test-token',
     fetcher,
+    sourcePublisher,
   );
   assert.ok(endpoint);
   const adapter = new RpcAdapter(
@@ -124,6 +144,36 @@ function errorCode(code) {
   return (error) => error instanceof RemotishError && error.code === code;
 }
 
+test('GM source publisher exposes the raw Location header without page cookies', async () => {
+  let details;
+  const publisher = createGmSourcePublisher((value) => {
+    details = value;
+    queueMicrotask(() =>
+      value.onload({
+        status: 201,
+        responseHeaders: `Location: ${api}/commit/${second}\r\nContent-Length: 0\r\n`,
+      }),
+    );
+    return { abort() {} };
+  });
+  const form = new FormData();
+  form.set('branch', 'main');
+  const result = await publisher({
+    url: new URL(`${api}/src`),
+    authorization: 'Bearer test-token',
+    form,
+    signal: new AbortController().signal,
+  });
+  assert.deepEqual(result, { status: 201, location: `${api}/commit/${second}` });
+  assert.equal(details.url, `${api}/src`);
+  assert.equal(details.method, 'POST');
+  assert.equal(details.headers.Authorization, 'Bearer test-token');
+  assert.equal(details.data, form);
+  assert.equal(details.anonymous, true);
+  assert.equal(details.redirect, 'manual');
+  assert.equal(details.responseType, 'arraybuffer');
+});
+
 test('Bitbucket endpoint derives exact target from repository tab only', () => {
   const token = () => 'test';
   const fetcher = async () => new Response('', { status: 404 });
@@ -146,7 +196,7 @@ test('Bitbucket endpoint derives exact target from repository tab only', () => {
   assert.notEqual(first?.target, secondTab?.target);
   assert.deepEqual(first?.session, {
     version: 1,
-    capabilities: { commits: true, createBranch: true, deleteBranch: true },
+    capabilities: { commits: false, createBranch: true, deleteBranch: true },
   });
 });
 
@@ -407,9 +457,7 @@ test('Bitbucket normal commit publishes binary additions, modifications and dele
   });
   assert.equal(calls[0].url, `${api}/src/${revision}/assets/old.bin?format=meta`);
   assert.equal(calls[0].init.method, 'GET');
-  const publication = calls.find(
-    ({ url, init }) => url === `${api}/src` && init.method === 'POST',
-  );
+  const publication = calls.find(({ url, init }) => url === `${api}/src` && init.method === 'POST');
   assert.ok(publication);
   const { url, init } = publication;
   assert.equal(url, `${api}/src`);
@@ -481,6 +529,50 @@ test('Bitbucket rejects attributed modifications before publication', async () =
   assert.equal((await binaryOnly.adapter.commit(request)).status, 'success');
 });
 
+test('Bitbucket pre-dispatch probe failure settles the workspace publication journal', async () => {
+  let failMetadata = false;
+  const metadataUrl = `${api}/src/${revision}/assets/sample.bin?format=meta`;
+  const { adapter, calls } = fixture({
+    [metadataUrl]: () => {
+      if (failMetadata) {
+        throw new TypeError('preflight network failure');
+      }
+      return {
+        type: 'commit_file',
+        path: 'assets/sample.bin',
+        attributes: [],
+      };
+    },
+  });
+  const storage = new MemoryWorkspaceStorage();
+  const workspace = await RemotishWorkspace.open(adapter, storage);
+  await workspace.writeFile('assets/sample.bin', new Uint8Array([9, 8, 7]), {
+    create: false,
+    overwrite: true,
+  });
+
+  failMetadata = true;
+  const result = await workspace.commitAndPush('Probe fails before publish');
+  assert.deepEqual(result, {
+    status: 'rejected',
+    reason: 'UNSUPPORTED',
+    message:
+      'Bitbucket commit preflight failed before publication (OFFLINE). No write was attempted.',
+  });
+  assert.equal(workspace.pendingPublication, undefined);
+  assert.equal(workspace.hasChanges, true);
+  assert.equal(
+    calls.some(({ url, init }) => url === `${api}/src` && init.method === 'POST'),
+    false,
+  );
+
+  failMetadata = false;
+  await workspace.writeFile('assets/sample.bin', new Uint8Array([6, 5, 4]), {
+    create: false,
+    overwrite: true,
+  });
+});
+
 test('Bitbucket multipart commits allow root filenames that match metadata fields', async () => {
   const { adapter, calls } = fixture({
     [`${api}/src`]: new Response(null, {
@@ -502,14 +594,10 @@ test('Bitbucket multipart commits allow root filenames that match metadata field
     push: { mode: 'normal' },
   });
   assert.equal(result.status, 'success');
-  const publication = calls.find(
-    ({ url, init }) => url === `${api}/src` && init.method === 'POST',
-  );
+  const publication = calls.find(({ url, init }) => url === `${api}/src` && init.method === 'POST');
   assert.ok(publication);
   for (const [index, name] of names.entries()) {
-    const fileParts = publication.init.body
-      .getAll(name)
-      .filter((value) => value instanceof Blob);
+    const fileParts = publication.init.body.getAll(name).filter((value) => value instanceof Blob);
     assert.equal(fileParts.length, 1, name);
     assert.equal(fileParts[0].name, name);
     assert.deepEqual(new Uint8Array(await fileParts[0].arrayBuffer()), new Uint8Array([index + 1]));
@@ -536,9 +624,10 @@ test('Bitbucket stale-head conflict is settled, but dispatched failures remain a
   const endpoint = createBitbucketEndpoint(
     'https://bitbucket.org/acme/widgets',
     () => 'token',
+    async () => new Response('', { status: 404 }),
     async () => {
       dispatches += 1;
-      throw new TypeError('connection failed after dispatch');
+      throw new RemotishError('OFFLINE', 'connection failed after dispatch');
     },
   );
   assert.ok(endpoint);

@@ -29,6 +29,11 @@ mapping stays here; the RPC adapter, Browser RPC provider, host, and core remain
    or a URL. Protect your browser profile and revoke the token when no longer needed. The Bitbucket website login
    alone is not used as REST API authentication.
 
+   Keep the template's exact `@connect api.bitbucket.org` line and `GM_xmlhttpRequest` grant.
+   Ordinary API reads use the isolated world's `fetch`, while the non-idempotent source publication
+   uses Tampermonkey's background request with cookies disabled so its raw `Location` response
+   header is available without relying on page CORS exposure.
+
    Keep the template's `@sandbox DOM` line and enable Tampermonkey's `ISOLATED_WORLD` on Chromium.
    Tampermonkey documents fallback to another enabled world if isolation is disabled; do not use
    a page-world fallback for this token-holding script. The build checks metadata, and startup
@@ -72,7 +77,8 @@ Normal commits send binary additions/modifications and deletions to Bitbucket's 
 `branch` and `parents=baseRevision`. Bitbucket atomically rejects a moved branch head with HTTP 409,
 which Remotish reports as `REMOTE_CHANGED`. A successful result is already published at the returned
 revision. Bitbucket's successful source-upload response has an empty body; the endpoint validates
-the created commit SHA from the response `Location` header before reporting success. A network
+the created commit SHA from the raw `Location` header exposed to the privileged userscript request
+before reporting success. This avoids depending on browser CORS exposure of `Location`. A network
 failure, missing/malformed `Location`, or other malformed response after sending a write is
 ambiguous; Remotish does not retry it and retains its publication-recovery protection.
 
@@ -85,8 +91,11 @@ Paths with control characters or invalid Unicode are rejected. Before dispatchin
 the endpoint reads that file's metadata at `baseRevision`.
 Ordinary files, including files Bitbucket labels `binary`, can be modified. Existing files marked
 `link`, `executable`, `subrepository`, or with an unknown future attribute are rejected as
-`UNSUPPORTED` rather than silently changing their repository semantics. Additions create ordinary
-files and deletions remain supported. This example deliberately fails closed instead of growing a
+`UNSUPPORTED` rather than silently changing their repository semantics. Attribute probes and token
+lookup are pre-dispatch checks: if either fails, the endpoint returns a settled rejection and no
+`/src` publication is attempted, so Remotish does not enter uncertain-publication recovery. Failures
+after the privileged `/src` request starts remain ambiguous. Additions create ordinary files and
+deletions remain supported. This example deliberately fails closed instead of growing a
 Bitbucket-specific file-mode concept into the Remotish adapter SDK.
 Files above 16 MiB and oversized/overlong listings fail explicitly; they are never truncated.
 Bitbucket LFS media redirects are not followed and fail as

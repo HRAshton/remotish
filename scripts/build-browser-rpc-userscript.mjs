@@ -16,7 +16,11 @@ const matches = [...header.matchAll(/^\/\/ @match\s+(\S+)\s*$/gmu)].map((match) 
 const grants = new Set(
   [...header.matchAll(/^\/\/ @grant\s+(\S+)\s*$/gmu)].map((match) => match[1]),
 );
+const connects = new Set(
+  [...header.matchAll(/^\/\/ @connect\s+(\S+)\s*$/gmu)].map((match) => match[1]),
+);
 const sandboxes = header.match(/^\/\/\s*@sandbox\b.*$/gmu) ?? [];
+const usesGmXmlHttpRequest = /\bGM_xmlhttpRequest\b/u.test(entry);
 const scopedMatch = (match) => {
   const origin = /^https:\/\/[^/*@?#]+\/\*$/u.test(match)
     ? match.slice(0, -2)
@@ -48,6 +52,8 @@ if (
     'GM_addValueChangeListener',
     'GM_removeValueChangeListener',
   ].some((grant) => !grants.has(grant)) ||
+  (usesGmXmlHttpRequest &&
+    (!grants.has('GM_xmlhttpRequest') || !connects.has('api.bitbucket.org'))) ||
   entry.includes('REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY') ||
   entry.includes('.invalid')
 ) {

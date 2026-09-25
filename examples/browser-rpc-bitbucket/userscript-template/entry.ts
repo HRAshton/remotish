@@ -5,6 +5,7 @@ import {
 } from '../../../extensions/browser-rpc-provider/src/transport/userscript.js';
 import { importBridgeKey } from '../../../extensions/browser-rpc-provider/src/transport/wire.js';
 import { createBitbucketEndpoint } from '../src/endpoint.js';
+import { createGmSourcePublisher, type GmXmlHttpRequest } from '../src/gm-publisher.js';
 
 // Copy this file and metadata.txt to ../local/, then configure your exact Code-OSS origin
 // and the same customer-generated key set in the Browser RPC provider extension.
@@ -19,6 +20,7 @@ declare const GM_deleteValue: GmStorage['deleteValue'];
 declare const GM_listValues: GmStorage['listValues'];
 declare const GM_addValueChangeListener: GmStorage['addValueChangeListener'];
 declare const GM_removeValueChangeListener: GmStorage['removeValueChangeListener'];
+declare const GM_xmlhttpRequest: GmXmlHttpRequest;
 declare function GM_registerMenuCommand(label: string, callback: () => void): void;
 
 const storage: GmStorage = {
@@ -47,10 +49,15 @@ async function main(): Promise<void> {
   }
 
   let target = '';
-  const handler = createBitbucketEndpoint(globalThis.location.href, async () => {
-    const value = await GM_getValue(`${tokenPrefix}${target}`);
-    return typeof value === 'string' ? value : undefined;
-  });
+  const handler = createBitbucketEndpoint(
+    globalThis.location.href,
+    async () => {
+      const value = await GM_getValue(`${tokenPrefix}${target}`);
+      return typeof value === 'string' ? value : undefined;
+    },
+    fetch.bind(globalThis),
+    createGmSourcePublisher(GM_xmlhttpRequest),
+  );
   if (!handler) {
     return;
   }

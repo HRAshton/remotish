@@ -27,6 +27,22 @@ const SLUG = /^[a-z0-9][a-z0-9._-]*$/iu;
 
 export type BitbucketTokenSource = () => string | undefined | Promise<string | undefined>;
 
+export interface BitbucketSourcePublishRequest {
+  readonly url: URL;
+  readonly authorization: string;
+  readonly form: FormData;
+  readonly signal: AbortSignal;
+}
+
+export interface BitbucketSourcePublishResponse {
+  readonly status: number;
+  readonly location?: string;
+}
+
+export type BitbucketSourcePublisher = (
+  request: BitbucketSourcePublishRequest,
+) => Promise<BitbucketSourcePublishResponse>;
+
 interface PreparedCommit {
   readonly form: FormData;
   readonly baseRevision: string;
@@ -40,6 +56,7 @@ export function createBitbucketEndpoint(
   token: BitbucketTokenSource,
   // Keep the isolated world's native receiver when the endpoint calls this as a member.
   fetcher: typeof fetch = fetch.bind(globalThis),
+  sourcePublisher?: BitbucketSourcePublisher,
 ): BitbucketEndpoint | undefined {
   let page: URL;
   try {
@@ -64,16 +81,13 @@ export function createBitbucketEndpoint(
   ) {
     return undefined;
   }
-  return new BitbucketEndpoint(workspace, slug, token, fetcher);
+  return new BitbucketEndpoint(workspace, slug, token, fetcher, sourcePublisher);
 }
 
 /** Bitbucket Cloud repository semantics over official REST API V2 endpoints. */
 export class BitbucketEndpoint {
   readonly target: string;
-  readonly session = {
-    version: 1,
-    capabilities: { commits: true, createBranch: true, deleteBranch: true },
-  } as const;
+  readonly session;
   private readonly basePath: string;
 
   constructor(
@@ -81,9 +95,18 @@ export class BitbucketEndpoint {
     slug: string,
     private readonly token: BitbucketTokenSource,
     private readonly fetcher: typeof fetch,
+    private readonly sourcePublisher?: BitbucketSourcePublisher,
   ) {
     this.target = `${BITBUCKET_ORIGIN}/${workspace}/${slug}`;
     this.basePath = `/2.0/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(slug)}`;
+    this.session = {
+      version: 1 as const,
+      capabilities: {
+        commits: sourcePublisher !== undefined,
+        createBranch: true,
+        deleteBranch: true,
+      },
+    };
   }
 
   async handle(request: RpcRequest, signal: AbortSignal): Promise<unknown> {
@@ -284,22 +307,45 @@ export class BitbucketEndpoint {
     if ('status' in prepared) {
       return prepared;
     }
-    const attributeRejection = await this.checkModificationAttributes(
-      prepared.baseRevision,
-      prepared.modifiedPaths,
-      signal,
-    );
-    if (attributeRejection) {
-      return attributeRejection;
+    if (!this.sourcePublisher) {
+      return {
+        status: 'rejected',
+        reason: 'UNSUPPORTED',
+        message: 'Bitbucket commit publication requires the privileged userscript request.',
+      };
+    }
+    let credential: string;
+    try {
+      const attributeRejection = await this.checkModificationAttributes(
+        prepared.baseRevision,
+        prepared.modifiedPaths,
+        signal,
+      );
+      if (attributeRejection) {
+        return attributeRejection;
+      }
+      credential = await this.credential();
+      if (signal.aborted) {
+        throw new RemotishError('CANCELLED', 'Bitbucket commit was cancelled before publication.');
+      }
+    } catch (error) {
+      // These checks happen before the source publication request is invoked. Settling the result
+      // here lets core clear its prepared journal because no remote write could have happened.
+      return prePublicationRejection(error);
     }
     // Bitbucket atomically asserts that parents is the current head of branch, returning 409
     // when it moved. Never retry this non-idempotent publication after an ambiguous failure.
-    const response = await this.request(`${this.basePath}/src`, 'POST', signal, prepared.form);
-    if (response.status === 409) {
+    const publication = await this.sourcePublisher({
+      url: new URL(`${this.basePath}/src`, API_ORIGIN),
+      authorization: `Bearer ${credential}`,
+      form: prepared.form,
+      signal,
+    });
+    if (publication.status === 409) {
       return { status: 'rejected', reason: 'REMOTE_CHANGED' };
     }
-    this.requireStatus(response, 201);
-    const publishedRevision = createdCommitRevision(response, this.basePath);
+    this.requireStatusCode(publication.status, 201);
+    const publishedRevision = createdCommitRevision(publication.location, this.basePath);
     return {
       status: 'success',
       revision: publishedRevision,
@@ -584,17 +630,21 @@ export class BitbucketEndpoint {
   }
 
   private requireStatus(response: Response, expected: number): void {
-    if (response.status !== expected) {
+    this.requireStatusCode(response.status, expected);
+  }
+
+  private requireStatusCode(status: number, expected: number): void {
+    if (status !== expected) {
       const code =
-        response.status === 401
+        status === 401
           ? 'UNAUTHORIZED'
-          : response.status === 403
+          : status === 403
             ? 'FORBIDDEN'
-            : response.status === 404
+            : status === 404
               ? 'NOT_FOUND'
-              : response.status === 429
+              : status === 429
                 ? 'RATE_LIMITED'
-                : response.status >= 500
+                : status >= 500
                   ? 'OFFLINE'
                   : 'UNKNOWN';
       throw new RemotishError(code, `Bitbucket API request failed (${code}).`);
@@ -681,8 +731,7 @@ function remoteRevision(value: unknown, label: string): string {
   return value.toLowerCase();
 }
 
-function createdCommitRevision(response: Response, basePath: string): string {
-  const location = response.headers.get('location');
+function createdCommitRevision(location: string | undefined, basePath: string): string {
   if (!location || location.length > 2048) {
     throw malformed('published commit location');
   }
@@ -708,6 +757,22 @@ function createdCommitRevision(response: Response, basePath: string): string {
     throw malformed('published commit location');
   }
   return value.toLowerCase();
+}
+
+function prePublicationRejection(error: unknown): CommitRejected {
+  const code = error instanceof RemotishError ? error.code : 'UNKNOWN';
+  if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') {
+    return {
+      status: 'rejected',
+      reason: 'FORBIDDEN',
+      message: 'Bitbucket commit authorization failed before publication.',
+    };
+  }
+  return {
+    status: 'rejected',
+    reason: 'UNSUPPORTED',
+    message: `Bitbucket commit preflight failed before publication (${code}). No write was attempted.`,
+  };
 }
 
 function branchName(value: unknown): string {
