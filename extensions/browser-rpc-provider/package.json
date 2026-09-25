@@ -2,7 +2,7 @@
   "name": "remotish-browser-rpc-provider",
   "displayName": "Remotish Browser RPC Provider",
   "description": "SCM-agnostic browser RPC provider for Remotish.",
-  "version": "0.1.0-beta.12",
+  "version": "0.1.0-beta.13",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
