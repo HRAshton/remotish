@@ -67,6 +67,7 @@ extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
 apps/demo-web               browser-safe Remotish host extension
 examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
+examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript example
 ```
 
 Adapters depend on `@remotish/adapter-sdk`, not on VS Code or core internals.

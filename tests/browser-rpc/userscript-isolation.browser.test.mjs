@@ -11,9 +11,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const metadataPaths = [
   'extensions/browser-rpc-provider/userscript-template/metadata.txt',
   'examples/browser-rpc-bitbucket/userscript-template/metadata.txt',
+  'examples/browser-rpc-bitbucket-datacenter/userscript-template/metadata.txt',
 ];
 
-test('both userscript templates request only the isolated DOM sandbox', async () => {
+test('all userscript templates request only the isolated DOM sandbox', async () => {
   for (const path of metadataPaths) {
     const metadata = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
     assert.deepEqual(
@@ -24,10 +25,14 @@ test('both userscript templates request only the isolated DOM sandbox', async ()
   }
 });
 
-test('both bundled userscripts refuse raw, js, and missing sandbox modes before key import', async () => {
+test('all bundled userscripts refuse raw, js, and missing sandbox modes before key import', async () => {
   for (const [path, origin] of [
     ['extensions/browser-rpc-provider/userscript-template/entry.ts', 'https://code.example.test'],
     ['examples/browser-rpc-bitbucket/userscript-template/entry.ts', 'https://bitbucket.org'],
+    [
+      'examples/browser-rpc-bitbucket-datacenter/userscript-template/entry.ts',
+      'https://bitbucket.example.test',
+    ],
   ]) {
     const entry = fileURLToPath(new URL(`../../${path}`, import.meta.url));
     const contents = (await readFile(entry, 'utf8'))

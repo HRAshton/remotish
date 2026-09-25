@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "userscript-template",
+    "outDir": "build/userscript",
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["userscript-template/entry.ts"],
+  "references": [{ "path": "./tsconfig.json" }, { "path": "../../extensions/browser-rpc-provider" }]
+}
