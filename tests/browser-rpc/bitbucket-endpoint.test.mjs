@@ -513,7 +513,16 @@ test('Bitbucket rejects attributed modifications before publication', async () =
       attributes: 'executable',
     },
   });
-  await assert.rejects(malformed.adapter.commit(request), errorCode('UNKNOWN'));
+  assert.deepEqual(await malformed.adapter.commit(request), {
+    status: 'rejected',
+    reason: 'UNSUPPORTED',
+    message:
+      'Bitbucket commit preflight failed before publication (UNKNOWN). No write was attempted.',
+  });
+  assert.equal(
+    malformed.calls.some(({ url, init }) => url === `${api}/src` && init.method === 'POST'),
+    false,
+  );
 
   const binaryOnly = fixture({
     [`${api}/src/${revision}/bin/tool?format=meta`]: {
@@ -530,11 +539,11 @@ test('Bitbucket rejects attributed modifications before publication', async () =
 });
 
 test('Bitbucket pre-dispatch probe failure settles the workspace publication journal', async () => {
-  let failMetadata = false;
+  const failingRoutes = new Set();
   const metadataUrl = `${api}/src/${revision}/assets/sample.bin?format=meta`;
   const { adapter, calls } = fixture({
     [metadataUrl]: () => {
-      if (failMetadata) {
+      if (failingRoutes.has(metadataUrl)) {
         throw new TypeError('preflight network failure');
       }
       return {
@@ -551,7 +560,7 @@ test('Bitbucket pre-dispatch probe failure settles the workspace publication jou
     overwrite: true,
   });
 
-  failMetadata = true;
+  failingRoutes.add(metadataUrl);
   const result = await workspace.commitAndPush('Probe fails before publish');
   assert.deepEqual(result, {
     status: 'rejected',
@@ -566,7 +575,7 @@ test('Bitbucket pre-dispatch probe failure settles the workspace publication jou
     false,
   );
 
-  failMetadata = false;
+  failingRoutes.delete(metadataUrl);
   await workspace.writeFile('assets/sample.bin', new Uint8Array([6, 5, 4]), {
     create: false,
     overwrite: true,
