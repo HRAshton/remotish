@@ -273,7 +273,11 @@ export class BitbucketDataCenterEndpoint {
     );
     // Bitbucket documents a server-side hard cap for this endpoint and no way to fetch beyond it.
     // Never return a knowingly partial change list.
-    if (data.nextPageStart !== undefined || data.values.length >= MAX_LIST_ITEMS) {
+    if (
+      data.nextPageStart !== undefined ||
+      data.values.length >= MAX_LIST_ITEMS ||
+      (data.limit < MAX_LIST_ITEMS && data.values.length >= data.limit)
+    ) {
       throw new RemotishError(
         'UNSUPPORTED',
         'Bitbucket commit change list exceeds the supported limit.',
@@ -788,17 +792,22 @@ function changePath(value: unknown, label: string): string {
   return remotePath(data.toString, `${label}.toString`);
 }
 
-function page(value: unknown): { values: readonly unknown[]; nextPageStart?: number } {
+function page(value: unknown): {
+  values: readonly unknown[];
+  limit: number;
+  nextPageStart?: number;
+} {
   const data = object(value, 'page');
   const values = list(data.values, 'page.values');
+  const limit = integer(data.limit, 'page.limit');
   if (typeof data.isLastPage !== 'boolean') {
     throw malformed('page.isLastPage');
   }
   if (data.isLastPage) {
-    return { values };
+    return { values, limit };
   }
   const nextPageStart = integer(data.nextPageStart, 'page.nextPageStart');
-  return { values, nextPageStart };
+  return { values, limit, nextPageStart };
 }
 
 function object(value: unknown, label: string): Record<string, unknown> {

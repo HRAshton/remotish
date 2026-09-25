@@ -39,4 +39,5 @@ For a transport-neutral, versioned repository protocol, inspect [`@remotish/adap
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
 | [`@remotish/adapter-rpc`](../adapters/rpc/README.md) | Transport-neutral, versioned repository RPC adapter |
 | [Bitbucket Browser RPC example](../examples/browser-rpc-bitbucket/README.md) | Tampermonkey read/write endpoint for Bitbucket Cloud |
+| [Bitbucket Data Center Browser RPC example](../examples/browser-rpc-bitbucket-datacenter/README.md) | Tampermonkey read and branch management endpoint for Bitbucket Data Center 9.4 |
 | [`apps/demo-web`](../apps/demo-web/README.md) | Complete VS Code Web composition |

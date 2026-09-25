@@ -475,4 +475,15 @@ test('Bitbucket Data Center rejects knowingly partial commit-change pages', asyn
     },
   });
   await assert.rejects(partial.adapter.getCommitChanges(second), errorCode('UNSUPPORTED'));
+
+  const hardCapped = fixture({
+    [`${api}/commits/${second}/changes?limit=10000`]: {
+      size: 1000,
+      limit: 1000,
+      isLastPage: true,
+      start: 0,
+      values: Array.from({ length: 1000 }, (_, index) => change('MODIFY', `file-${index}.txt`)),
+    },
+  });
+  await assert.rejects(hardCapped.adapter.getCommitChanges(second), errorCode('UNSUPPORTED'));
 });
