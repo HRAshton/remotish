@@ -183,11 +183,8 @@ export class RepositoryReader {
   }
 }
 
-function validateDirectoryEntries(
-  parent: RepoPath,
-  entries: readonly DirectoryEntry[],
-): readonly DirectoryEntry[] {
-  if (!Array.isArray(entries)) {
+function validateDirectoryEntries(parent: RepoPath, entries: unknown): readonly DirectoryEntry[] {
+  if (!isUnknownArray(entries)) {
     throw invalidAdapterDirectory(parent, 'directory response must be an array');
   }
   if (entries.length > MAX_DIRECTORY_ENTRIES) {
@@ -203,8 +200,7 @@ function validateDirectoryEntries(
       throw invalidAdapterDirectory(parent, `entry ${index} must be an object`);
     }
 
-    const candidate = entry as unknown as Record<string, unknown>;
-    const name = candidate.name;
+    const name = Reflect.get(entry, 'name');
     if (typeof name !== 'string' || !name) {
       throw invalidAdapterDirectory(parent, `entry ${index} name must be a non-empty string`);
     }
@@ -232,12 +228,12 @@ function validateDirectoryEntries(
     }
     names.add(name);
 
-    const type = candidate.type;
+    const type = Reflect.get(entry, 'type');
     if (type !== 'file' && type !== 'directory') {
       throw invalidAdapterDirectory(parent, `entry ${index} type must be file or directory`);
     }
 
-    const size = candidate.size;
+    const size = Reflect.get(entry, 'size');
     if (
       size !== undefined &&
       (typeof size !== 'number' || !Number.isSafeInteger(size) || size < 0)
@@ -262,6 +258,10 @@ function validateDirectoryEntries(
       ? { name, path: canonicalPath, type }
       : { name, path: canonicalPath, type, size };
   });
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
 }
 
 function invalidAdapterDirectory(parent: RepoPath, detail: string, cause?: unknown): RemotishError {

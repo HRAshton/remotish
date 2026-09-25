@@ -122,19 +122,18 @@ export class WorkingTreeMutations {
   private async renameDirectory(from: RepoPath, to: RepoPath): Promise<void> {
     const files = await listVisibleFiles(this.view, from);
     const directories = await listVisibleDirectories(this.view, from);
-    const contents = new Map<string, Uint8Array>();
-    for (const file of files) {
-      contents.set(file, await this.view.readFile(file));
-    }
+    const contents = await Promise.all(
+      files.map(async (path) => ({ path, content: await this.view.readFile(path) })),
+    );
 
     for (const directory of directories) {
       const suffix = directory.slice(from.length);
       this.overlay.setDirectory(`${to}${suffix}`);
     }
     this.overlay.setDirectory(to);
-    for (const file of files) {
-      const suffix = file.slice(from.length);
-      this.overlay.setFile(`${to}${suffix}`, contents.get(file) ?? new Uint8Array());
+    for (const { path, content } of contents) {
+      const suffix = path.slice(from.length);
+      this.overlay.setFile(`${to}${suffix}`, content);
     }
 
     await this.deleteInternal(from, true);
