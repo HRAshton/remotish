@@ -10,10 +10,17 @@ if (!entryArg || !metadataArg || !outputArg) {
 }
 const metadata = await readFile(resolve(metadataArg), 'utf8');
 const entry = await readFile(resolve(entryArg), 'utf8');
-const matches = [...metadata.matchAll(/^\/\/ @match\s+(\S+)\s*$/gmu)].map((match) => match[1]);
+const headerEnd = metadata.indexOf('// ==/UserScript==');
+const header = headerEnd < 0 ? '' : metadata.slice(0, headerEnd);
+const matches = [...header.matchAll(/^\/\/ @match\s+(\S+)\s*$/gmu)].map((match) => match[1]);
 const grants = new Set(
-  [...metadata.matchAll(/^\/\/ @grant\s+(\S+)\s*$/gmu)].map((match) => match[1]),
+  [...header.matchAll(/^\/\/ @grant\s+(\S+)\s*$/gmu)].map((match) => match[1]),
 );
+const connects = new Set(
+  [...header.matchAll(/^\/\/ @connect\s+(\S+)\s*$/gmu)].map((match) => match[1]),
+);
+const sandboxes = header.match(/^\/\/\s*@sandbox\b.*$/gmu) ?? [];
+const usesGmXmlHttpRequest = /\bGM_xmlhttpRequest\b/u.test(entry);
 const scopedMatch = (match) => {
   const origin = /^https:\/\/[^/*@?#]+\/\*$/u.test(match)
     ? match.slice(0, -2)
@@ -31,10 +38,13 @@ const scopedMatch = (match) => {
 };
 if (
   !/^\/\/ ==UserScript==\r?\n/u.test(metadata) ||
-  !metadata.includes('// ==/UserScript==') ||
+  headerEnd < 0 ||
   matches.length < 2 ||
   matches.some((match) => !scopedMatch(match)) ||
+  sandboxes.length !== 1 ||
+  !/^\/\/ @sandbox\s+DOM\s*$/u.test(sandboxes[0]) ||
   [
+    'GM_info',
     'GM_getValue',
     'GM_setValue',
     'GM_deleteValue',
@@ -42,10 +52,14 @@ if (
     'GM_addValueChangeListener',
     'GM_removeValueChangeListener',
   ].some((grant) => !grants.has(grant)) ||
+  (usesGmXmlHttpRequest &&
+    (!grants.has('GM_xmlhttpRequest') || !connects.has('api.bitbucket.org'))) ||
   entry.includes('REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY') ||
   entry.includes('.invalid')
 ) {
-  throw new Error('Configure exact origins, pairing key, and all GM grants before building.');
+  throw new Error(
+    'Configure exact origins, @sandbox DOM, pairing key, and all GM grants before building.',
+  );
 }
 await build({
   entryPoints: [resolve(entryArg)],

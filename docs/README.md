@@ -38,4 +38,5 @@ For a transport-neutral, versioned repository protocol, inspect [`@remotish/adap
 | [`@remotish/adapter-http`](../adapters/http-example/README.md) | Minimal browser-first HTTP mapping |
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
 | [`@remotish/adapter-rpc`](../adapters/rpc/README.md) | Transport-neutral, versioned repository RPC adapter |
+| [Bitbucket Browser RPC example](../examples/browser-rpc-bitbucket/README.md) | Tampermonkey read/write endpoint for Bitbucket Cloud |
 | [`apps/demo-web`](../apps/demo-web/README.md) | Complete VS Code Web composition |

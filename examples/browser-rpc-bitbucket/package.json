@@ -1,0 +1,5 @@
+{
+  "name": "@remotish/example-browser-rpc-bitbucket",
+  "private": true,
+  "type": "module"
+}

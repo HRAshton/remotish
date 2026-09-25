@@ -33,6 +33,12 @@
     },
     {
       "path": "./extensions/browser-rpc-provider"
+    },
+    {
+      "path": "./examples/browser-rpc-bitbucket"
+    },
+    {
+      "path": "./examples/browser-rpc-bitbucket/tsconfig.userscript.json"
     }
   ]
 }

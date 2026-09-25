@@ -8,6 +8,7 @@ build/
 .pnpm-store/
 .vscode-test-web/
 extensions/browser-rpc-provider/local/
+examples/browser-rpc-bitbucket/local/
 
 /*.md
 !README.md

@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Customer Remotish Browser RPC Bridge
+// @name         Remotish Bitbucket Browser RPC (customer configured)
 // @namespace    https://example.invalid/remotish
 // @version      1
-// @description  Customer-scoped Remotish bridge; replace all example origins before installing.
+// @description  Bitbucket Cloud read/write endpoint; configure local bridge and repository token.
 // @sandbox      DOM
 // @match        https://code.example.invalid/*
-// @match        https://scm.example.invalid/*
+// @match        https://bitbucket.org/*
 // @grant        GM_getValue
 // @grant        GM_info
 // @grant        GM_setValue
@@ -13,4 +13,7 @@
 // @grant        GM_listValues
 // @grant        GM_addValueChangeListener
 // @grant        GM_removeValueChangeListener
+// @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
+// @connect      api.bitbucket.org
 // ==/UserScript==
