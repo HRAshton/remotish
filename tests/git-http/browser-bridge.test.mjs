@@ -158,6 +158,83 @@ async function bundle(t, pairing) {
   return readFile(outputFile, 'utf8');
 }
 
+test('userscript builder rejects configuration and privilege mismatches', async (t) => {
+  await mkdir(join(root, 'extensions/git-http-provider/local'), { recursive: true });
+  const directory = await mkdtemp(join(root, 'extensions/git-http-provider/local/test-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const entryTemplate = (
+    await readFile(
+      new URL('../../extensions/git-http-provider/userscript-template/entry.ts', import.meta.url),
+      'utf8',
+    )
+  )
+    .replaceAll('https://code.example.invalid', 'https://code.example.com')
+    .replaceAll('https://git.example.invalid', 'https://git.example.com')
+    .replace(
+      'REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY',
+      randomBytes(32).toString('base64url'),
+    );
+  const metadataTemplate = (
+    await readFile(
+      new URL(
+        '../../extensions/git-http-provider/userscript-template/metadata.txt',
+        import.meta.url,
+      ),
+      'utf8',
+    )
+  )
+    .replaceAll('code.example.invalid', 'code.example.com')
+    .replaceAll('git.example.invalid', 'git.example.com')
+    .replaceAll('https://example.invalid', 'https://code.example.com');
+  const cases = [
+    [
+      'unrelated Git privilege',
+      entryTemplate,
+      metadataTemplate.replace('git.example.com', 'other.example.com'),
+    ],
+    [
+      'wrong Code-OSS match',
+      entryTemplate,
+      metadataTemplate.replace(
+        '@match        https://code.example.com/*',
+        '@match        https://other.example.com/*',
+      ),
+    ],
+    [
+      'wrong Git URL',
+      entryTemplate.replace('https://git.example.com', 'http://git.example.com'),
+      metadataTemplate,
+    ],
+    [
+      'wrong probe origin',
+      entryTemplate.replace(
+        'https://code.example.com/remotish-git-redirect-probe',
+        'https://other.example.com/remotish-git-redirect-probe',
+      ),
+      metadataTemplate,
+    ],
+    [
+      'invalid pairing key',
+      entryTemplate.replace(/const pairingKey = '[^']*';/u, "const pairingKey = 'short';"),
+      metadataTemplate,
+    ],
+  ];
+  const entryFile = join(directory, 'entry.ts');
+  const metadataFile = join(directory, 'metadata.txt');
+  const outputFile = join(directory, 'git-http.user.js');
+  for (const [name, entry, metadata] of cases) {
+    await writeFile(entryFile, entry);
+    await writeFile(metadataFile, metadata);
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/build-git-http-userscript.mjs'), entryFile, metadataFile, outputFile],
+      { cwd: root, encoding: 'utf8' },
+    );
+    assert.notEqual(result.status, 0, `${name}: builder accepted inconsistent configuration`);
+    assert.match(result.stderr, /Configure (?:exact origins|pairingKey)/u, name);
+  }
+});
+
 function runUserscript(script, xhr) {
   const errors = [];
   vm.runInNewContext(script, {

@@ -10,6 +10,20 @@ if (!entryArg || !metadataArg || !outputArg) {
 }
 const metadata = await readFile(resolve(metadataArg), 'utf8');
 const entry = await readFile(resolve(entryArg), 'utf8');
+const literal = (name) => {
+  const values = [...entry.matchAll(new RegExp(`^const ${name} = '([^'\r\n]*)';$`, 'gmu'))];
+  if (values.length !== 1 || !values[0][1]) {
+    throw new Error(`Configure ${name} as one string literal.`);
+  }
+  return values[0][1];
+};
+const codeOrigin = literal('codeOrigin');
+const gitUrl = literal('gitUrl');
+const redirectProbeUrl = literal('redirectProbeUrl');
+const pairingKey = literal('pairingKey');
+const code = new URL(codeOrigin);
+const git = new URL(gitUrl);
+const probe = new URL(redirectProbeUrl);
 const headerEnd = metadata.indexOf('// ==/UserScript==');
 const header = headerEnd < 0 ? '' : metadata.slice(0, headerEnd);
 const matches = [...header.matchAll(/^\/\/ @match\s+(\S+)\s*$/gmu)].map((match) => match[1]);
@@ -37,6 +51,21 @@ if (
   headerEnd < 0 ||
   matches.length !== 1 ||
   !exactHttpsOrigin(matches[0]) ||
+  code.protocol !== 'https:' ||
+  code.href !== `${code.origin}/` ||
+  git.protocol !== 'https:' ||
+  git.username ||
+  git.password ||
+  git.search ||
+  git.hash ||
+  !git.pathname.endsWith('.git') ||
+  probe.origin !== code.origin ||
+  probe.href === code.href ||
+  probe.username ||
+  probe.password ||
+  probe.hash ||
+  !/^[A-Za-z0-9_-]{43}$/u.test(pairingKey) ||
+  matches[0] !== `${code.origin}/*` ||
   sandboxes.length !== 1 ||
   !/^\/\/ @sandbox\s+DOM\s*$/u.test(sandboxes[0]) ||
   ['GM_info', 'GM_getValue', 'GM_setValue', 'GM_registerMenuCommand', 'GM_xmlhttpRequest'].some(
@@ -45,7 +74,8 @@ if (
   connects.length !== 2 ||
   new Set(connects).size !== 2 ||
   connects.some((host) => !/^[a-z0-9.-]+$/u.test(host) || host.includes('.invalid')) ||
-  !connects.includes(new URL(matches[0].slice(0, -2)).hostname) ||
+  !connects.includes(code.hostname) ||
+  !connects.includes(git.hostname) ||
   entry.includes('REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY') ||
   entry.includes('.invalid')
 ) {
