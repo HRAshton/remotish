@@ -188,7 +188,7 @@ test('production dependencies are reviewed and notices are tracked', async () =>
     })),
   );
   const workspaceNames = new Set(manifests.map(({ manifest }) => manifest.name));
-  const gitPilotDependencies = {
+  const gitHttpDependencies = {
     '@isomorphic-git/lightning-fs': '4.10.3',
     'isomorphic-git': '1.42.2',
     memfs: '4.50.0',
@@ -199,9 +199,9 @@ test('production dependencies are reviewed and notices are tracked', async () =>
       if (
         (path === '../../adapters/git-http/package.json' ||
           path === '../../extensions/git-http-provider/package.json') &&
-        name in gitPilotDependencies
+        name in gitHttpDependencies
       ) {
-        assert.equal(specifier, gitPilotDependencies[name]);
+        assert.equal(specifier, gitHttpDependencies[name]);
         continue;
       }
       assert.equal(
@@ -227,7 +227,7 @@ test('production dependencies are reviewed and notices are tracked', async () =>
   assert.match(notices, /\| @isomorphic-git\/lightning-fs \| 4\.10\.3 \|/u);
   assert.match(notices, /\| memfs \| 4\.50\.0 \|/u);
   assert.match(
-    rootManifest.scripts?.['package:git-http-provider:vsix'] ?? '',
+    rootManifest.scripts?.['release:git-http-provider:vsix'] ?? '',
     /shx cp THIRD_PARTY_NOTICES\.md extensions\/git-http-provider\/dist\/THIRD_PARTY_NOTICES\.md/u,
   );
 });

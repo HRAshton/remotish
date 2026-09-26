@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-/** Verify provider discovery and Web activation from source or an unpacked pilot VSIX. */
+/** Verify provider discovery and Web activation from source or an unpacked VSIX. */
 export async function run(): Promise<void> {
   const extension = vscode.extensions.getExtension('hrashton.remotish-git-http-provider');
   if (!extension) {

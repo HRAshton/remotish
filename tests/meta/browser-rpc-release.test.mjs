@@ -39,7 +39,7 @@ test('Browser RPC provider is a licensed, browser-only packaged extension', () =
 test('Browser RPC VSIX participates in packaged smoke and release controls', () => {
   assert.match(
     root.scripts['release:browser-rpc-provider:vsix'],
-    /remotish-browser-rpc-provider\.vsix$/u,
+    /remotish-browser-rpc-provider\.vsix(?: |$)/u,
   );
   assert.match(root.scripts['test:vscode-web:vsix'], /release:browser-rpc-provider:vsix/u);
   assert.match(

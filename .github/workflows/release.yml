@@ -20,13 +20,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 12.5.1
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
+
       - name: Verify tag and release component versions
         shell: bash
         run: |
@@ -35,41 +38,69 @@ jobs:
           host_version="$(node --print "require('./apps/demo-web/package.json').version")"
           fixture_provider_version="$(node --print "require('./extensions/fixture-provider/package.json').version")"
           browser_rpc_provider_version="$(node --print "require('./extensions/browser-rpc-provider/package.json').version")"
+          git_http_provider_version="$(node --print "require('./extensions/git-http-provider/package.json').version")"
+
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
           test "$host_version" = "$version"
           test "$fixture_provider_version" = "$version"
           test "$browser_rpc_provider_version" = "$version"
+          test "$git_http_provider_version" = "$version"
+
       - run: pnpm install --frozen-lockfile
+
       - run: pnpm run ci
+
       - run: pnpm test:vscode-web:vsix
+
       - run: pnpm release:source
+
       - run: cp THIRD_PARTY_NOTICES.md artifacts/THIRD_PARTY_NOTICES.md
-      - name: Create checksums
+
+      - name: Create initial checksums
         working-directory: artifacts
         run: |
           sha256sum \
             remotish.vsix \
             remotish-fixture-provider.vsix \
             remotish-browser-rpc-provider.vsix \
+            remotish-git-http-provider.vsix \
             remotish-framework.tar.gz \
             remotish.cdx.json \
             THIRD_PARTY_NOTICES.md > SHA256SUMS
+
       - name: Attest build provenance
+        id: attest-provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
             artifacts/remotish.vsix
             artifacts/remotish-fixture-provider.vsix
             artifacts/remotish-browser-rpc-provider.vsix
+            artifacts/remotish-git-http-provider.vsix
             artifacts/remotish-framework.tar.gz
             artifacts/remotish.cdx.json
             artifacts/THIRD_PARTY_NOTICES.md
+
+      - name: Export provenance bundle
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.attest-provenance.outputs.bundle-path }}
+        shell: bash
+        run: |
+          test -f "$PROVENANCE_BUNDLE"
+          cp "$PROVENANCE_BUNDLE" artifacts/remotish-release-provenance.sigstore.json
+
+          (
+            cd artifacts
+            sha256sum remotish-release-provenance.sigstore.json >> SHA256SUMS
+          )
+
       - name: Attest SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: artifacts/remotish.vsix
           sbom-path: artifacts/remotish.cdx.json
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release
@@ -87,34 +118,44 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 12.5.1
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: pnpm
+
       - name: Verify tag and adapter SDK version
         shell: bash
         run: |
           version="$(node --print "require('./package.json').version")"
           sdk_version="$(node --print "require('./packages/adapter-sdk/package.json').version")"
+
           test "$GITHUB_REF_NAME" = "v$version"
           test "$sdk_version" = "$version"
+
       - run: pnpm install --frozen-lockfile
+
       - run: pnpm --filter @remotish/adapter-sdk build
+
       - name: Verify npm package contents
         working-directory: packages/adapter-sdk
         run: npm pack --dry-run
+
       - name: Publish adapter SDK to npm
         working-directory: packages/adapter-sdk
         shell: bash
         run: |
           publish_args=(--access public)
+
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             publish_args+=(--tag beta)
           fi
+
           npm publish "${publish_args[@]}"
 
   release:
@@ -128,9 +169,11 @@ jobs:
         with:
           name: release
           path: artifacts
+
       - name: Verify checksums
         working-directory: artifacts
         run: sha256sum -c SHA256SUMS
+
       - name: Create GitHub release
         env:
           GH_REPO: ${{ github.repository }}
@@ -138,16 +181,20 @@ jobs:
         shell: bash
         run: |
           release_flags=()
+
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             release_flags+=(--prerelease)
           fi
+
           gh release create "$GITHUB_REF_NAME" \
             artifacts/remotish.vsix \
             artifacts/remotish-fixture-provider.vsix \
             artifacts/remotish-browser-rpc-provider.vsix \
+            artifacts/remotish-git-http-provider.vsix \
             artifacts/remotish-framework.tar.gz \
             artifacts/remotish.cdx.json \
             artifacts/THIRD_PARTY_NOTICES.md \
+            artifacts/remotish-release-provenance.sigstore.json \
             artifacts/SHA256SUMS \
             --generate-notes \
             --title "$GITHUB_REF_NAME" \
