@@ -30,7 +30,8 @@ export class RemotishHistoryProvider
   constructor(
     private readonly workspaceId: string,
     private readonly workspace: RemotishWorkspace,
-    private readonly reportBackgroundError: (error: unknown) => void,
+    private readonly reportBackgroundError: (error: unknown) => void = (error) =>
+      console.error(error),
   ) {
     this.queries = new HistoryQueryService(workspace);
     this._currentHistoryItemRef = toRef(workspaceRef(workspace.branch, workspace.baseRevision));
