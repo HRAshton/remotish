@@ -14,7 +14,8 @@ desktop VS Code. It is a pilot package and is not part of the release workflow.
 
 The desktop transport sends `Authorization: Bearer` only to the exact configured Git origin and
 repository path. Redirects are disabled. Token rotation uses the configure command again.
-Desktop uses a heap-only `memfs` object store; Web uses a heap-only LightningFS store.
+Already-open desktop workspaces use the new token on their next request. Desktop uses a heap-only
+`memfs` object store; Web uses a heap-only LightningFS store.
 
 ## Code-OSS Web setup
 
@@ -36,6 +37,10 @@ Desktop uses a heap-only `memfs` object store; Web uses a heap-only LightningFS 
 
 4. Install the script on the Code-OSS origin. Use its **Set Git HTTP pilot bearer token** menu to
    store the token in Tampermonkey storage. Open the repository with the provider command.
+
+When rotating the Web pairing key, update the userscript and configure the provider with the same
+new key. Already-open workspaces reconnect on their next request. Changing the configured clone
+URL requires opening a new workspace for that repository.
 
 The script makes bounded Git smart HTTP requests from the Code-OSS tab. It has no Bitbucket tab and
 no repository-semantic RPC endpoint. The paired BroadcastChannel frames are AES-GCM authenticated

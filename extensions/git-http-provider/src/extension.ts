@@ -1,6 +1,7 @@
 import {
   GitHttpAdapter,
   type GitHttpAdapterOptions,
+  GitHttpNotDispatchedError,
   type GitHttpRequest,
   type GitHttpResponse,
 } from '@remotish/adapter-git-http';
@@ -115,6 +116,59 @@ export function activateProvider(
   },
 ): RemotishAdapterProviderV1 {
   let bridge: GitHttpWebBridge | undefined;
+  let bridgePairing: string | undefined;
+  let bridgeUrl: string | undefined;
+  let connecting: Promise<GitHttpWebBridge> | undefined;
+  let generation = 0;
+
+  const ensureBridge = async (url: string): Promise<GitHttpWebBridge> => {
+    if (settings().url !== url) {
+      throw new GitHttpNotDispatchedError('FORBIDDEN', 'Git repository configuration changed.');
+    }
+    const startingGeneration = generation;
+    const pairing = await context.secrets.get(PAIRING_SECRET);
+    if (!pairing) {
+      throw new GitHttpNotDispatchedError(
+        'UNAUTHORIZED',
+        'Configure the Git HTTP bridge pairing key.',
+      );
+    }
+    if (generation !== startingGeneration || settings().url !== url) {
+      throw new GitHttpNotDispatchedError('FORBIDDEN', 'Git repository configuration changed.');
+    }
+    if (bridge && (bridgePairing !== pairing || bridgeUrl !== url)) {
+      bridge.dispose();
+      bridge = undefined;
+      generation += 1;
+    }
+    if (bridge) {
+      return bridge;
+    }
+    const currentGeneration = generation;
+    const pending = connecting ?? GitHttpWebBridge.connect(pairing, url);
+    connecting = pending;
+    let candidate: GitHttpWebBridge;
+    try {
+      candidate = await pending;
+    } catch (error) {
+      throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP userscript is unavailable.', {
+        cause: error,
+      });
+    } finally {
+      if (connecting === pending) {
+        connecting = undefined;
+      }
+    }
+    if (generation !== currentGeneration || settings().url !== url) {
+      candidate.dispose();
+      throw new GitHttpNotDispatchedError('FORBIDDEN', 'Git repository configuration changed.');
+    }
+    bridge = candidate;
+    bridgePairing = pairing;
+    bridgeUrl = url;
+    return candidate;
+  };
+
   const provider: RemotishAdapterProviderV1 = {
     apiVersion: REMOTISH_ADAPTER_PROVIDER_API_VERSION,
     id: PROVIDER_ID,
@@ -130,13 +184,8 @@ export function activateProvider(
       }
       let request: (value: GitHttpRequest) => Promise<GitHttpResponse>;
       if (vscode.env.uiKind === vscode.UIKind.Web) {
-        const pairing = await context.secrets.get(PAIRING_SECRET);
-        if (!pairing) {
-          throw new RemotishError('UNAUTHORIZED', 'Configure the Git HTTP bridge pairing key.');
-        }
-        const webBridge = bridge ?? (await GitHttpWebBridge.connect(pairing, url));
-        bridge = webBridge;
-        request = (value) => webBridge.request(value);
+        await ensureBridge(url);
+        request = async (value) => (await ensureBridge(url)).request(value);
       } else {
         if (!desktop) {
           throw new RemotishError('UNSUPPORTED', 'Git HTTP desktop entry point is unavailable.');
@@ -145,7 +194,28 @@ export function activateProvider(
         if (!token) {
           throw new RemotishError('UNAUTHORIZED', 'Configure the Git HTTP bearer token.');
         }
-        request = (value) => desktop.request(url, token, value);
+        request = async (value) => {
+          if (settings().url !== url) {
+            throw new GitHttpNotDispatchedError(
+              'FORBIDDEN',
+              'Git repository configuration changed.',
+            );
+          }
+          const currentToken = await context.secrets.get(TOKEN_SECRET);
+          if (!currentToken) {
+            throw new GitHttpNotDispatchedError(
+              'UNAUTHORIZED',
+              'Configure the Git HTTP bearer token.',
+            );
+          }
+          if (settings().url !== url) {
+            throw new GitHttpNotDispatchedError(
+              'FORBIDDEN',
+              'Git repository configuration changed.',
+            );
+          }
+          return desktop.request(url, currentToken, value);
+        };
       }
       return new GitHttpAdapter({
         url,
@@ -209,6 +279,8 @@ export function activateProvider(
     );
     bridge?.dispose();
     bridge = undefined;
+    connecting = undefined;
+    generation += 1;
   });
   const open = vscode.commands.registerCommand('remotish.gitHttp.open', async () => {
     const { url } = settings();

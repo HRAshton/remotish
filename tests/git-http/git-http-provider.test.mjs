@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { test } from 'node:test';
 import * as vscode from 'vscode';
+import {
+  CHANNEL,
+  decrypt,
+  encrypt,
+  importKey,
+} from '../../extensions/git-http-provider/build/bridge-wire.js';
 import { desktopGitRequest } from '../../extensions/git-http-provider/build/desktop-http.js';
 import {
   activate,
@@ -103,6 +109,109 @@ test('Web provider stores only a pairing key and does not ask VS Code for a toke
   assert.deepEqual([...state.secretsState.keys()], ['remotish.gitHttp.pairingKey.v1']);
   await assert.rejects(provider.createAdapter({ url: URL }), (error) => error.code === 'OFFLINE');
   assert.deepEqual([...state.secretsState.keys()], ['remotish.gitHttp.pairingKey.v1']);
+});
+
+test('an open desktop adapter uses the rotated bearer token', async (t) => {
+  vscode.__test.reset();
+  const state = context();
+  const provider = activateDesktop(state);
+  t.after(() =>
+    state.subscriptions.forEach((item) => {
+      item.dispose();
+    }),
+  );
+  vscode.__test.inputBoxResponses.push(URL, 'Pilot Author', 'pilot@example.invalid', 'first-token');
+  await vscode.commands.executeCommand('remotish.gitHttp.configure');
+  const adapter = await provider.createAdapter({ url: URL });
+  const originalFetch = globalThis.fetch;
+  const tokens = [];
+  globalThis.fetch = async (url, init) => {
+    tokens.push(init.headers.Authorization);
+    const response = new Response('', { status: 401 });
+    Object.defineProperty(response, 'url', { value: url });
+    return response;
+  };
+  try {
+    await assert.rejects(adapter.getRepository(), (error) => error.code === 'UNAUTHORIZED');
+    vscode.__test.inputBoxResponses.push(
+      URL,
+      'Pilot Author',
+      'pilot@example.invalid',
+      'second-token',
+    );
+    await vscode.commands.executeCommand('remotish.gitHttp.configure');
+    await assert.rejects(adapter.getRepository(), (error) => error.code === 'UNAUTHORIZED');
+    assert.deepEqual(tokens, ['Bearer first-token', 'Bearer second-token']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('an open Web adapter reconnects with the rotated pairing key', async (t) => {
+  vscode.__test.reset();
+  vscode.env.uiKind = vscode.UIKind.Web;
+  const state = context();
+  const provider = activate(state);
+  const channel = new BroadcastChannel(CHANNEL);
+  t.after(() => {
+    channel.close();
+    state.subscriptions.forEach((item) => {
+      item.dispose();
+    });
+  });
+  const firstPairing = randomBytes(32).toString('base64url');
+  const secondPairing = randomBytes(32).toString('base64url');
+  let key = await importKey(firstPairing);
+  let generation = 'first';
+  const requests = [];
+  const errors = [];
+  channel.onmessage = (event) => {
+    const handle = async () => {
+      let frame;
+      try {
+        frame = await decrypt(key, event.data);
+      } catch {
+        return;
+      }
+      if (frame.kind === 'hello-request') {
+        channel.postMessage(
+          await encrypt(key, {
+            version: 1,
+            kind: 'hello',
+            hostId: frame.hostId,
+            id: frame.id,
+            sessionId: 'a'.repeat(32),
+          }),
+        );
+      } else if (frame.kind === 'request') {
+        requests.push(generation);
+        channel.postMessage(
+          await encrypt(key, {
+            version: 1,
+            kind: 'failure',
+            hostId: frame.hostId,
+            id: frame.id,
+            sessionId: frame.sessionId,
+            code: 'UNAUTHORIZED',
+          }),
+        );
+      }
+    };
+    handle().catch((error) => {
+      errors.push(error);
+    });
+  };
+  vscode.__test.inputBoxResponses.push(URL, 'Pilot Author', 'pilot@example.invalid', firstPairing);
+  await vscode.commands.executeCommand('remotish.gitHttp.configure');
+  const adapter = await provider.createAdapter({ url: URL });
+  await assert.rejects(adapter.getRepository(), (error) => error.code === 'UNAUTHORIZED');
+  vscode.__test.inputBoxResponses.push(URL, 'Pilot Author', 'pilot@example.invalid', secondPairing);
+  await vscode.commands.executeCommand('remotish.gitHttp.configure');
+  key = await importKey(secondPairing);
+  generation = 'second';
+  await assert.rejects(adapter.getRepository(), (error) => error.code === 'UNAUTHORIZED');
+  assert.deepEqual(requests, ['first', 'second']);
+  assert.deepEqual(errors, []);
 });
 
 test('desktop transport confines bearer authorization and rejects redirects', async () => {
