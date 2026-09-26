@@ -22,6 +22,7 @@ import {
   createGitHttpClient,
   type GitHttpAdapterOptions,
   GitHttpNotDispatchedError,
+  normalizeGitHttpError,
   validateGitUrl,
 } from './transport.js';
 
@@ -152,16 +153,20 @@ export class GitHttpAdapter implements RemotishAdapter {
     if (!this.refreshing) {
       this.refreshing = (async () => {
         this.check(signal);
-        const result = await git.fetch({
-          fs: this.fs,
-          http: this.http(signal),
-          dir: DIR,
-          url: this.url,
-          remote: 'origin',
-          singleBranch: false,
-          tags: false,
-          prune: true,
-        });
+        const result = await git
+          .fetch({
+            fs: this.fs,
+            http: this.http(signal),
+            dir: DIR,
+            url: this.url,
+            remote: 'origin',
+            singleBranch: false,
+            tags: false,
+            prune: true,
+          })
+          .catch((error: unknown) => {
+            throw normalizeGitHttpError(error);
+          });
         if (!result.defaultBranch) {
           throw new RemotishError('UNSUPPORTED', 'Git remote has no default branch.');
         }
@@ -266,8 +271,9 @@ export class GitHttpAdapter implements RemotishAdapter {
   }
 
   async getCommits(request: CommitQuery, options?: RemoteRequestOptions): Promise<CommitPage> {
-    await this.ready(options?.signal);
-    this.check(options?.signal);
+    const signal = options?.signal;
+    await this.ready(signal);
+    this.check(signal);
     const limit = Math.max(1, Math.min(100, request.limit ?? 50));
     let head: string;
     let offset = 0;
@@ -452,12 +458,12 @@ export class GitHttpAdapter implements RemotishAdapter {
       }
       if (!requestAttempted && !(error instanceof GitHttpNotDispatchedError)) {
         throw new GitHttpNotDispatchedError(
-          error instanceof RemotishError ? error.code : 'UNKNOWN',
+          normalizeGitHttpError(error).code,
           'Git publication failed before receive-pack dispatch.',
           { cause: error },
         );
       }
-      throw error;
+      throw normalizeGitHttpError(error);
     } finally {
       if (localRefWritten) {
         await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
@@ -466,11 +472,15 @@ export class GitHttpAdapter implements RemotishAdapter {
   }
 
   private async remoteHead(ref: string, signal?: AbortSignal): Promise<string | undefined> {
-    const remote = await git.getRemoteInfo2({
-      http: this.http(signal),
-      url: this.url,
-      forPush: true,
-    });
+    const remote = await git
+      .getRemoteInfo2({
+        http: this.http(signal),
+        url: this.url,
+        forPush: true,
+      })
+      .catch((error: unknown) => {
+        throw normalizeGitHttpError(error);
+      });
     return remote.refs?.find((entry) => entry.ref === ref)?.oid;
   }
 

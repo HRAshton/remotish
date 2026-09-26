@@ -15,6 +15,38 @@ export class GitHttpNotDispatchedError extends RemotishError {
   }
 }
 
+/** Translate untrusted Git/HTTP failures without exposing server response bodies. */
+export function normalizeGitHttpError(error: unknown): RemotishError {
+  if (error instanceof RemotishError) {
+    return error;
+  }
+  let code: RemotishErrorCode = 'UNKNOWN';
+  if (error && typeof error === 'object') {
+    const rawCode = 'code' in error ? error.code : undefined;
+    const data = 'data' in error ? error.data : undefined;
+    const status =
+      rawCode === 'HttpError' && data && typeof data === 'object' && 'statusCode' in data
+        ? data.statusCode
+        : undefined;
+    if (status === 401) {
+      code = 'UNAUTHORIZED';
+    } else if (status === 403) {
+      code = 'FORBIDDEN';
+    } else if (status === 404) {
+      code = 'NOT_FOUND';
+    } else if (status === 429) {
+      code = 'RATE_LIMITED';
+    } else if (typeof status === 'number' && status >= 500 && status <= 599) {
+      code = 'OFFLINE';
+    } else if ('name' in error && error.name === 'AbortError') {
+      code = 'CANCELLED';
+    } else if (error instanceof TypeError || rawCode === 'NetworkError') {
+      code = 'OFFLINE';
+    }
+  }
+  return new RemotishError(code, `Git HTTP operation failed (${code}).`, { cause: error });
+}
+
 export interface GitHttpRequest {
   readonly url: string;
   readonly method: string;

@@ -137,6 +137,40 @@ test('desktop heap filesystem supports Git fetch and immutable reads', async (t)
   );
 });
 
+test('Git HTTP fetch maps remote failures to stable error codes', async (t) => {
+  const { request } = await startRepository(t);
+  for (const [status, code] of [
+    [401, 'UNAUTHORIZED'],
+    [403, 'FORBIDDEN'],
+    [429, 'RATE_LIMITED'],
+    [503, 'OFFLINE'],
+  ]) {
+    const adapter = new GitHttpAdapter({
+      url: GIT_URL,
+      author,
+      request: async (input) =>
+        input.url.includes('service=git-upload-pack')
+          ? { status, headers: {}, body: new Uint8Array() }
+          : request(input),
+    });
+    await assert.rejects(adapter.getRepository(), (error) => error.code === code);
+  }
+  const offline = new GitHttpAdapter({
+    url: GIT_URL,
+    author,
+    request: async () => {
+      throw new TypeError('network failed');
+    },
+  });
+  await assert.rejects(offline.getRepository(), (error) => error.code === 'OFFLINE');
+  const malformed = new GitHttpAdapter({
+    url: GIT_URL,
+    author,
+    request: async () => ({ status: 200, headers: {}, body: new Uint8Array() }),
+  });
+  await assert.rejects(malformed.getRepository(), (error) => error.code === 'UNKNOWN');
+});
+
 test('Git HTTP reads immutable binary content and publishes a multi-file change', async (t) => {
   const { adapter, bare, root } = await startRepository(t);
   const repository = await adapter.getRepository();
@@ -314,7 +348,7 @@ test('ambiguous receive-pack failure never reports publication success', async (
       const response = await request(input);
       if (!failed && input.url.endsWith('/git-receive-pack')) {
         failed = true;
-        throw new Error('Connection lost after server ref update.');
+        throw new TypeError('Connection lost after server ref update.');
       }
       return response;
     },
@@ -332,6 +366,7 @@ test('ambiguous receive-pack failure never reports publication success', async (
       ],
       push: { mode: 'normal' },
     }),
+    (error) => error.code === 'OFFLINE',
   );
   assert.equal(failed, true);
   assert.notEqual(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), original.revision);
