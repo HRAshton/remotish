@@ -379,7 +379,7 @@ test('pre-dispatch refusal settles workspace journal and preserves overlay', asy
 
 test('server ref rejection settles publication even when follow-up lookup fails', async (t) => {
   const { request, bare, root } = await startRepository(t);
-  await writeFile(join(bare, 'hooks', 'pre-receive'), '#!/bin/sh\nexit 1\n');
+  await writeFile(join(bare, 'hooks', 'pre-receive'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
   let rejected = false;
   const adapter = new GitHttpAdapter({
     url: GIT_URL,
