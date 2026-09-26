@@ -2,6 +2,16 @@
 
 Contributions are welcome when they preserve the project's central boundary: adapters describe repository semantics; Remotish owns workspace/editor semantics.
 
+## Contribution process
+
+1. Create a branch for the change.
+2. Make the change together with appropriate tests and documentation.
+3. Run `pnpm run ci` locally.
+4. Open a pull request against `master`.
+5. Address CI failures and review feedback before merging.
+
+Changes to `master` are made through pull requests and must satisfy the repository's required checks and review rules.
+
 ## Development setup
 
 Requirements: Node.js 22.x or 24.x and Corepack.

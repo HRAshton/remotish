@@ -6,10 +6,13 @@ Use GitHub's private vulnerability reporting:
 
 https://github.com/HRAshton/remotish/security/advisories/new
 
-Please do not report suspected vulnerabilities through public issues, discussions, or pull requests.
+Do not disclose a suspected vulnerability in a public issue, discussion, pull request, or other public channel.
 
-We aim to acknowledge vulnerability reports within 3 business days, provide an initial assessment within 7 days, and coordinate remediation
-and disclosure with the reporter. Unless circumstances require otherwise, coordinated public disclosure should normally occur within 90 days.
+We aim to acknowledge vulnerability reports within 3 business days and provide an initial assessment within 7 days. Critical vulnerabilities are
+prioritized for expedited remediation.
+
+Disclosure timing is coordinated with the reporter. Unless circumstances require otherwise, coordinated public disclosure should normally occur
+within 90 days.
 
 ## Scope
 
