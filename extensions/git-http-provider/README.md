@@ -38,11 +38,15 @@ Desktop uses a heap-only `memfs` object store; Web uses a heap-only LightningFS 
    store the token in Tampermonkey storage. Open the repository with the provider command.
 
 The script makes bounded Git smart HTTP requests from the Code-OSS tab. It has no Bitbucket tab and
-no repository-semantic RPC endpoint. The paired BroadcastChannel frames are AES-GCM authenticated;
+no repository-semantic RPC endpoint. The paired BroadcastChannel frames are AES-GCM authenticated
+and requests are bound to the current userscript session;
 the userscript validates the exact Git URL, method and headers before attaching the token. It uses
-`redirect: 'manual'` on every authenticated request and rejects redirect responses or a changed
+`redirect: 'manual'` and `anonymous: true` on every authenticated request and rejects redirect responses or a changed
 final URL. Requests and responses are each limited to 4 MiB in Web. Cancellation aborts the
 Tampermonkey request; a cancellation or timeout during publication remains uncertain to Remotish.
+The script accepts at most 4,096 distinct request IDs per page lifetime. Reload Code-OSS to start
+a new script session after that limit. This fixed bound retains every seen ID for the session so
+an old authenticated write cannot become replayable through cache eviction.
 
 ## Bitbucket Data Center 9.4 pilot
 
