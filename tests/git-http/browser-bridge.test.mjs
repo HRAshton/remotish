@@ -211,6 +211,7 @@ test('Web bridge proves redirect control before use and confines bearer requests
   assert.deepEqual(response.body, Uint8Array.of(0, 255));
   assert.equal(requests.at(-1).headers.Authorization, 'Bearer pilot-token');
   assert.equal(requests.at(-1).redirect, 'manual');
+  assert.equal(requests.at(-1).anonymous, true);
   assert.equal(requests.at(-1).url, input.url);
 
   await assert.rejects(

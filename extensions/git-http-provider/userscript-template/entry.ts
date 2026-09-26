@@ -246,6 +246,7 @@ async function main(): Promise<void> {
         ...(frame.method === 'POST' ? { data: payload } : {}),
         responseType: 'arraybuffer',
         redirect: 'manual',
+        anonymous: true,
         timeout: REQUEST_TIMEOUT_MS,
         onprogress: (progress) => {
           if (progress.loaded > MAX_BODY_BYTES) {
