@@ -428,7 +428,11 @@ export class GitHttpAdapter implements RemotishAdapter {
     force: boolean,
     signal?: AbortSignal,
     deleting = false,
-  ): Promise<{ readonly stale: boolean; readonly remoteRevision?: string }> {
+  ): Promise<{
+    readonly stale: boolean;
+    readonly rejected?: boolean;
+    readonly remoteRevision?: string;
+  }> {
     const localRef = `refs/remotish/publish/${crypto.randomUUID().replaceAll('-', '')}`;
     let observed: string | undefined;
     let requestAttempted = false;
@@ -459,13 +463,11 @@ export class GitHttpAdapter implements RemotishAdapter {
           return observed === expected;
         },
       });
+      if (result.refs[target]?.ok === false) {
+        return this.rejectedRefUpdate(target, expected, signal);
+      }
       if (!result.ok || result.refs[target]?.ok !== true) {
-        // The server replied with a definite ref rejection. A different head is a stale lease;
-        // other server failures are operational and may need independent recovery evidence.
-        const current = await this.remoteHead(target, signal);
-        if (current !== expected) {
-          return { stale: true, ...(current ? { remoteRevision: current } : {}) };
-        }
+        // A missing ref status does not prove whether the update happened.
         throw new RemotishError('UNKNOWN', 'Git server rejected the ref update.');
       }
       return { stale: false };
@@ -474,10 +476,7 @@ export class GitHttpAdapter implements RemotishAdapter {
         return { stale: true, ...(observed !== ZERO_OID ? { remoteRevision: observed } : {}) };
       }
       if (isDefiniteRefRejection(error, target)) {
-        const current = await this.remoteHead(target, signal);
-        if (current !== expected) {
-          return { stale: true, ...(current ? { remoteRevision: current } : {}) };
-        }
+        return this.rejectedRefUpdate(target, expected, signal);
       }
       if (!requestAttempted && !(error instanceof GitHttpNotDispatchedError)) {
         throw new GitHttpNotDispatchedError(
@@ -492,6 +491,26 @@ export class GitHttpAdapter implements RemotishAdapter {
         await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
       }
     }
+  }
+
+  private async rejectedRefUpdate(
+    target: string,
+    expected: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly stale: boolean;
+    readonly rejected?: boolean;
+    readonly remoteRevision?: string;
+  }> {
+    try {
+      const current = await this.remoteHead(target, signal);
+      if (current !== expected) {
+        return { stale: true, ...(current ? { remoteRevision: current } : {}) };
+      }
+    } catch {
+      // The server's explicit ref rejection remains definitive if this optional lookup fails.
+    }
+    return { stale: false, rejected: true };
   }
 
   private async remoteHead(ref: string, signal?: AbortSignal): Promise<string | undefined> {
@@ -566,6 +585,13 @@ export class GitHttpAdapter implements RemotishAdapter {
           ...(outcome.remoteRevision ? { remoteRevision: outcome.remoteRevision } : {}),
         };
       }
+      if (outcome.rejected) {
+        return {
+          status: 'rejected',
+          reason: 'UNSUPPORTED',
+          message: 'Git server rejected the ref update.',
+        };
+      }
       return { status: 'success', revision: oid, commit: info(oid, commit) };
     } catch (error) {
       if (!pushStarted || error instanceof GitHttpNotDispatchedError) {
@@ -592,6 +618,9 @@ export class GitHttpAdapter implements RemotishAdapter {
     if (outcome.stale) {
       throw new RemotishError('INVALID_REQUEST', 'Git branch already exists.');
     }
+    if (outcome.rejected) {
+      throw new RemotishError('UNKNOWN', 'Git server rejected the branch update.');
+    }
     return { name, revision: oid };
   }
 
@@ -608,6 +637,9 @@ export class GitHttpAdapter implements RemotishAdapter {
     const outcome = await this.push(ZERO_OID, target, expected, false, options?.signal, true);
     if (outcome.stale) {
       throw new RemotishError('INVALID_REQUEST', 'Git branch moved before deletion.');
+    }
+    if (outcome.rejected) {
+      throw new RemotishError('UNKNOWN', 'Git server rejected the branch deletion.');
     }
   }
 }

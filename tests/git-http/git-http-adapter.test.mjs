@@ -377,6 +377,42 @@ test('pre-dispatch refusal settles workspace journal and preserves overlay', asy
   assert.equal(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), original);
 });
 
+test('server ref rejection settles publication even when follow-up lookup fails', async (t) => {
+  const { request, bare, root } = await startRepository(t);
+  await writeFile(join(bare, 'hooks', 'pre-receive'), '#!/bin/sh\nexit 1\n');
+  let rejected = false;
+  const adapter = new GitHttpAdapter({
+    url: GIT_URL,
+    author,
+    request: async (input) => {
+      if (rejected && input.url.includes('service=git-receive-pack')) {
+        throw new TypeError('Follow-up lookup failed.');
+      }
+      const response = await request(input);
+      if (input.url.endsWith('/git-receive-pack')) {
+        rejected = true;
+      }
+      return response;
+    },
+  });
+  const workspace = await RemotishWorkspace.open(adapter, new MemoryWorkspaceStorage());
+  const original = workspace.baseRevision;
+  await workspace.writeFile('hello.txt', new TextEncoder().encode('local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  const result = await workspace.commitAndPush('Rejected by hook');
+  assert.equal(rejected, true);
+  assert.deepEqual(result, {
+    status: 'rejected',
+    reason: 'UNSUPPORTED',
+    message: 'Git server rejected the ref update.',
+  });
+  assert.equal(workspace.pendingPublication, undefined);
+  assert.equal(workspace.hasChanges, true);
+  assert.equal(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), original);
+});
+
 test('ambiguous receive-pack failure never reports publication success', async (t) => {
   const { request, bare, root } = await startRepository(t);
   let failed = false;
