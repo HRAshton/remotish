@@ -101,6 +101,13 @@ Remotish is prepared for a public beta release. The repository is currently pre-
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development commands and [SECURITY.md](SECURITY.md) for vulnerability reporting. Release artifacts are built with pinned dependencies, checksums, SBOM generation and provenance attestations; details are in [Release security](docs/release-security.md).
 
+## Get involved
+
+- [Releases](https://github.com/HRAshton/remotish/releases) - download published releases.
+- [Issues](https://github.com/HRAshton/remotish/issues) - report bugs or propose enhancements.
+- [Contributing](CONTRIBUTING.md) - development setup and contribution requirements.
+- [Security](SECURITY.md) - report suspected vulnerabilities privately.
+
 ## License
 
 Remotish is licensed under the [Zero-Clause BSD (`0BSD`) license](LICENSE).
