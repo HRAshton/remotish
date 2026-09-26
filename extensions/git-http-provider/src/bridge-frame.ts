@@ -1,5 +1,8 @@
 import { RemotishError } from '@remotish/adapter-sdk';
 
+/* BroadcastChannel input is untrusted. The wire layer authenticates packets; this decoder
+ * validates decrypted JSON, bounds IDs, headers, and statuses, then builds canonical frames. */
+
 type BridgeFailureCode =
   | 'OFFLINE'
   | 'UNAUTHORIZED'

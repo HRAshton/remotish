@@ -27,7 +27,8 @@ export interface GitFileEntry {
   readonly mode: string;
 }
 
-/** Read-only repository operations over a GitSession. */
+/** Remote refresh moves refs but leaves content-addressed objects in the session store;
+ * reads pinned to an object ID remain stable across later refreshes. */
 export class GitReader {
   constructor(private readonly session: GitSession) {}
 

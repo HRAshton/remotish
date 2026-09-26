@@ -1,5 +1,8 @@
 import type { WorkspaceSnapshot } from '@remotish/core';
 
+/* Both persistence formats pass through this boundary: validate stored data, then rebuild
+ * branch and overlay records before they enter the live workspace. */
+
 interface StoredRenameSnapshot {
   readonly from: string;
   readonly to: string;
@@ -52,6 +55,7 @@ export function parseStoredWorkspace<TFile extends { readonly path: string }>(
 
   const selectedBranch = requireString(root.selectedBranch, 'selectedBranch', validation);
   const rawBranches = requireRecord(root.branches, 'branches', validation);
+  // Branch names such as "__proto__" must remain ordinary keys.
   const branches = Object.create(null) as Record<string, StoredBranchWorkspaceSnapshot<TFile>>;
   const pendingCommitPublication =
     root.pendingCommitPublication === undefined
@@ -93,9 +97,11 @@ export function parseStoredWorkspace<TFile extends { readonly path: string }>(
     };
   }
 
+  // Restoration needs a pinned base and overlay for the selected branch.
   if (!Object.hasOwn(branches, selectedBranch)) {
     throw validation.invalid(`selected branch ${selectedBranch} is not present in branches`);
   }
+  // Publication recovery must never be applied to a different branch.
   if (pendingCommitPublication && pendingCommitPublication.branch !== selectedBranch) {
     throw validation.invalid('pending publication branch must be the selected branch');
   }

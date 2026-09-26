@@ -76,7 +76,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     return [...this.currentSelection()].sort();
   }
 
-  /** Add paths to the current branch's commit selection. */
   async stage(paths: readonly RepoPath[]): Promise<void> {
     const selection = this.currentSelection();
     for (const path of paths) {
@@ -85,7 +84,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     await this.refresh();
   }
 
-  /** Remove paths from the current branch's commit selection. */
   async unstage(paths: readonly RepoPath[]): Promise<void> {
     const selection = this.currentSelection();
     for (const path of paths) {
@@ -94,7 +92,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     await this.refresh();
   }
 
-  /** Select every current working-tree change for the next commit. */
   async stageAll(): Promise<void> {
     const selection = this.currentSelection();
     for (const change of await this.workspace.getChanges()) {
@@ -103,7 +100,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     await this.refresh();
   }
 
-  /** Clear the current branch's commit selection. */
   async unstageAll(): Promise<void> {
     this.currentSelection().clear();
     await this.refresh();

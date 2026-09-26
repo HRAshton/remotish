@@ -9,25 +9,19 @@ import { baseName, normalizePath, parentPath } from '../util/path.js';
 import { TraversalBudget } from '../util/traversal-budget.js';
 import { RevisionCache } from './revision-cache.js';
 
-/** Default deadline for one immutable adapter read at the core boundary. */
 const DEFAULT_REPOSITORY_REQUEST_TIMEOUT_MS = 30_000;
 
-/** Maximum children accepted from one adapter directory response. */
 const MAX_DIRECTORY_ENTRIES = 50_000;
 
-/** Maximum length of one repository path segment accepted from adapter metadata. */
 const MAX_REPO_PATH_SEGMENT_LENGTH = 1_024;
 
-/** Maximum canonical repository path length accepted from adapter metadata. */
 const MAX_REPO_PATH_LENGTH = 8_192;
 
-/** Resource limits applied by the core repository-reader trust boundary. */
 export interface RepositoryReaderOptions {
   /** Deadline for one adapter file/directory read, in milliseconds. */
   readonly requestTimeoutMs?: number;
 }
 
-/** Framework file metadata derived from immutable adapter directory/file reads. */
 export interface FileStat {
   readonly type: 'file' | 'directory';
   readonly size: number;
