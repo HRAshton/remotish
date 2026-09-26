@@ -22,7 +22,7 @@ export class GitSession {
   constructor(readonly options: GitHttpAdapterOptions) {
     this.fs = options.fs ?? new LightningFS(crypto.randomUUID(), { db: new MemoryBackend() });
     this.url = validateGitUrl(options.url);
-    if (!options.author.name.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/u.test(options.author.email)) {
+    if (!options.author.name.trim() || !isValidAuthorEmail(options.author.email)) {
       throw new RemotishError('INVALID_REQUEST', 'Configure a Git author name and email.');
     }
   }
@@ -91,4 +91,17 @@ export class GitSession {
     }
     this.remoteDefaultBranch = requireBranch(result.defaultBranch.replace(/^refs\/heads\//u, ''));
   }
+}
+
+function isValidAuthorEmail(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const at = value.indexOf('@');
+  return (
+    at > 0 &&
+    at === value.lastIndexOf('@') &&
+    !/\s/u.test(value) &&
+    value.slice(at + 2, -1).includes('.')
+  );
 }
