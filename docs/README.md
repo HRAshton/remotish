@@ -30,7 +30,6 @@ and [provider](../extensions/git-http-provider/README.md).
 
 - [Development](maintainers/development.md) - local setup, checks and repository conventions.
 - [Documentation maintenance](maintainers/documentation.md) - canonical-source and link rules.
-- [Pre-1.0 refactor report](maintainers/pre-v1-refactor-report.md) - decisions, structural changes, and verification limits from the beta cleanup.
 - [Release security](release-security.md) - release gates, checksums, SBOM and attestations.
 
 ## Reference implementations
