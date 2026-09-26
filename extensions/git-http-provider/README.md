@@ -18,6 +18,10 @@ workspaces use the new token on their next request. Desktop uses an in-memory `m
 
 ## Code-OSS Web setup
 
+If you installed the release VSIXes, obtain the matching release source archive or checkout before
+building the userscript. The VSIX does not contain `userscript-template/`, `src/`, or the
+repository-level builder script. Run the commands below from the root of that source tree.
+
 1. Install the Remotish host and Git HTTP provider VSIXes in a trusted Code-OSS Web window. Generate
    one 256-bit base64url pairing key locally. Run the configure command with the Git URL, author
    identity and pairing key. The Web extension stores only the pairing key in SecretStorage; it does
