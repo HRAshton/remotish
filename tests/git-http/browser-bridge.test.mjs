@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { GitHttpNotDispatchedError } from '../../adapters/git-http/dist/index.js';
 import {
+  CHANNEL,
   decodeBytes,
   decrypt,
   encodeBytes,
@@ -30,6 +31,7 @@ test('Web bridge carries the full documented body limit', async () => {
     kind: 'response',
     hostId: 'a'.repeat(32),
     id: 'b'.repeat(32),
+    sessionId: 'c'.repeat(32),
     status: 200,
     headers: {},
     body: encodeBytes(body),
@@ -37,6 +39,64 @@ test('Web bridge carries the full documented body limit', async () => {
   const frame = await decrypt(key, packet);
   assert.equal(frame.kind, 'response');
   assert.deepEqual(decodeBytes(frame.body), body);
+});
+
+test('Web userscript rejects authenticated packets from an earlier session', async (t) => {
+  const pairing = randomBytes(32).toString('base64url');
+  const script = await bundle(t, pairing);
+  const key = await importKey(pairing);
+  t.after(() => {
+    for (const peer of Channel.peers) {
+      peer.close();
+    }
+  });
+  const requests = [];
+  const xhr = (details) => {
+    if (details.url.endsWith('remotish-git-redirect-probe')) {
+      queueMicrotask(() => details.onload({ status: 302, finalUrl: details.url }));
+    } else {
+      requests.push(details);
+    }
+    return { abort() {} };
+  };
+  runUserscript(script, xhr);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const first = [...Channel.peers][0];
+  const observer = new Channel(CHANNEL);
+  const hello = async (id) => {
+    const answer = new Promise((resolve) => {
+      observer.onmessage = async (event) => {
+        const frame = await decrypt(key, event.data);
+        if (frame.kind === 'hello' && frame.id === id) {
+          resolve(frame);
+        }
+      };
+    });
+    observer.postMessage(
+      await encrypt(key, { version: 1, kind: 'hello-request', hostId: 'a'.repeat(32), id }),
+    );
+    return answer;
+  };
+  const previous = await hello('b'.repeat(32));
+  const replay = await encrypt(key, {
+    version: 1,
+    kind: 'request',
+    hostId: 'a'.repeat(32),
+    id: 'd'.repeat(32),
+    sessionId: previous.sessionId,
+    url: `${gitUrl}/git-receive-pack`,
+    method: 'POST',
+    headers: {},
+    body: '',
+  });
+  first.close();
+  runUserscript(script, xhr);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const current = await hello('e'.repeat(32));
+  assert.notEqual(current.sessionId, previous.sessionId);
+  observer.postMessage(replay);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(requests.length, 0);
 });
 
 class Channel {

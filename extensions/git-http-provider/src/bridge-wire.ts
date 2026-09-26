@@ -7,9 +7,23 @@ const MAX_PACKET_CHARS = 24 * 1024 * 1024;
 export type BridgeFrame =
   | {
       readonly version: 1;
+      readonly kind: 'hello-request';
+      readonly hostId: string;
+      readonly id: string;
+    }
+  | {
+      readonly version: 1;
+      readonly kind: 'hello';
+      readonly hostId: string;
+      readonly id: string;
+      readonly sessionId: string;
+    }
+  | {
+      readonly version: 1;
       readonly kind: 'request';
       readonly hostId: string;
       readonly id: string;
+      readonly sessionId: string;
       readonly url: string;
       readonly method: string;
       readonly headers: Record<string, string>;
@@ -20,6 +34,7 @@ export type BridgeFrame =
       readonly kind: 'response';
       readonly hostId: string;
       readonly id: string;
+      readonly sessionId: string;
       readonly status: number;
       readonly headers: Record<string, string>;
       readonly body: string;
@@ -29,6 +44,7 @@ export type BridgeFrame =
       readonly kind: 'failure';
       readonly hostId: string;
       readonly id: string;
+      readonly sessionId: string;
       readonly code:
         | 'OFFLINE'
         | 'UNAUTHORIZED'
@@ -37,7 +53,13 @@ export type BridgeFrame =
         | 'INVALID_REQUEST'
         | 'UNKNOWN';
     }
-  | { readonly version: 1; readonly kind: 'cancel'; readonly hostId: string; readonly id: string };
+  | {
+      readonly version: 1;
+      readonly kind: 'cancel';
+      readonly hostId: string;
+      readonly id: string;
+      readonly sessionId: string;
+    };
 
 export function encodeBytes(bytes: Uint8Array, limit = MAX_BODY_BYTES): string {
   if (bytes.byteLength > limit) {
@@ -163,11 +185,39 @@ export async function decrypt(key: CryptoKey, raw: unknown): Promise<BridgeFrame
   ) {
     throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge frame.');
   }
+  if (fields.kind === 'hello-request') {
+    return { version: 1, kind: 'hello-request', hostId: fields.hostId, id: fields.id };
+  }
+  if (typeof fields.sessionId !== 'string' || !/^[0-9a-f]{32}$/u.test(fields.sessionId)) {
+    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge session.');
+  }
+  if (fields.kind === 'hello') {
+    return {
+      version: 1,
+      kind: 'hello',
+      hostId: fields.hostId,
+      id: fields.id,
+      sessionId: fields.sessionId,
+    };
+  }
   if (fields.kind === 'cancel') {
-    return { version: 1, kind: 'cancel', hostId: fields.hostId, id: fields.id };
+    return {
+      version: 1,
+      kind: 'cancel',
+      hostId: fields.hostId,
+      id: fields.id,
+      sessionId: fields.sessionId,
+    };
   }
   if (fields.kind === 'failure' && isErrorCode(fields.code)) {
-    return { version: 1, kind: 'failure', hostId: fields.hostId, id: fields.id, code: fields.code };
+    return {
+      version: 1,
+      kind: 'failure',
+      hostId: fields.hostId,
+      id: fields.id,
+      sessionId: fields.sessionId,
+      code: fields.code,
+    };
   }
   if (
     fields.kind === 'request' &&
@@ -181,6 +231,7 @@ export async function decrypt(key: CryptoKey, raw: unknown): Promise<BridgeFrame
       kind: 'request',
       hostId: fields.hostId,
       id: fields.id,
+      sessionId: fields.sessionId,
       url: fields.url,
       method: fields.method,
       headers: fields.headers,
@@ -201,6 +252,7 @@ export async function decrypt(key: CryptoKey, raw: unknown): Promise<BridgeFrame
       kind: 'response',
       hostId: fields.hostId,
       id: fields.id,
+      sessionId: fields.sessionId,
       status: fields.status,
       headers: fields.headers,
       body: fields.body,

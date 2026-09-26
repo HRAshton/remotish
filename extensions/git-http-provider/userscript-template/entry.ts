@@ -7,6 +7,7 @@ import {
   encrypt,
   importKey,
   MAX_BODY_BYTES,
+  randomId,
 } from '../src/bridge-wire.js';
 
 // Copy this file and metadata.txt into ignored local/ before configuring customer values.
@@ -151,6 +152,7 @@ async function main(): Promise<void> {
   }
   await verifyRedirectControl();
   const key = await importKey(pairingKey);
+  const sessionId = randomId();
   const channel = new BroadcastChannel(CHANNEL);
   const seen = new Set<string>();
   const active = new Map<string, GmHandle>();
@@ -170,6 +172,13 @@ async function main(): Promise<void> {
   channel.onmessage = (event) => {
     const handle = async () => {
       const frame = await decrypt(key, event.data);
+      if (frame.kind === 'hello-request') {
+        await send({ version: 1, kind: 'hello', hostId: frame.hostId, id: frame.id, sessionId });
+        return;
+      }
+      if (frame.sessionId !== sessionId) {
+        return;
+      }
       const requestKey = `${frame.hostId}:${frame.id}`;
       if (frame.kind === 'cancel') {
         if (seen.size < MAX_SEEN) {
@@ -187,6 +196,7 @@ async function main(): Promise<void> {
           kind: 'failure',
           hostId: frame.hostId,
           id: frame.id,
+          sessionId,
           code: 'UNSUPPORTED',
         });
         return;
@@ -198,6 +208,7 @@ async function main(): Promise<void> {
           kind: 'failure',
           hostId: frame.hostId,
           id: frame.id,
+          sessionId,
           code: 'INVALID_REQUEST',
         });
         return;
@@ -213,6 +224,7 @@ async function main(): Promise<void> {
           kind: 'failure',
           hostId: frame.hostId,
           id: frame.id,
+          sessionId,
           code: 'INVALID_REQUEST',
         });
         return;
@@ -224,6 +236,7 @@ async function main(): Promise<void> {
           kind: 'failure',
           hostId: frame.hostId,
           id: frame.id,
+          sessionId,
           code: 'UNAUTHORIZED',
         });
         return;
@@ -237,7 +250,14 @@ async function main(): Promise<void> {
         }
         settled = true;
         active.delete(requestKey);
-        await send({ version: 1, kind: 'failure', hostId: frame.hostId, id: frame.id, code });
+        await send({
+          version: 1,
+          kind: 'failure',
+          hostId: frame.hostId,
+          id: frame.id,
+          sessionId,
+          code,
+        });
       };
       const handle = GM_xmlhttpRequest({
         method: frame.method,
@@ -281,6 +301,7 @@ async function main(): Promise<void> {
             kind: 'response',
             hostId: frame.hostId,
             id: frame.id,
+            sessionId,
             status: response.status,
             headers: parseHeaders(response.responseHeaders),
             body: encodeBytes(new Uint8Array(response.response)),

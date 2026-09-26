@@ -26,7 +26,10 @@ interface Pending {
 export class GitHttpWebBridge {
   private readonly channel = new BroadcastChannel(CHANNEL);
   private readonly hostId = randomId();
+  private readonly helloId = randomId();
   private readonly pending = new Map<string, Pending>();
+  private sessionId?: string;
+  private helloResolve: ((sessionId: string) => void) | undefined;
   private disposed: boolean = false;
 
   private constructor(
@@ -40,12 +43,45 @@ export class GitHttpWebBridge {
   }
 
   static async connect(pairing: string, url: string): Promise<GitHttpWebBridge> {
-    return new GitHttpWebBridge(await importKey(pairing), url);
+    const bridge = new GitHttpWebBridge(await importKey(pairing), url);
+    try {
+      await bridge.handshake();
+      return bridge;
+    } catch (error) {
+      bridge.dispose();
+      throw error;
+    }
+  }
+
+  private handshake(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.helloResolve = undefined;
+        reject(new RemotishError('OFFLINE', 'Git HTTP userscript did not answer.'));
+      }, 5_000);
+      this.helloResolve = (sessionId) => {
+        clearTimeout(timer);
+        this.helloResolve = undefined;
+        this.sessionId = sessionId;
+        resolve();
+      };
+      this.send({ version: 1, kind: 'hello-request', hostId: this.hostId, id: this.helloId }).catch(
+        (error: unknown) => {
+          clearTimeout(timer);
+          this.helloResolve = undefined;
+          reject(error);
+        },
+      );
+    });
   }
 
   async request(request: GitHttpRequest): Promise<GitHttpResponse> {
     if (this.disposed) {
       throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge is closed.');
+    }
+    const sessionId = this.sessionId;
+    if (!sessionId) {
+      throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP userscript session is unavailable.');
     }
     if (this.pending.size >= MAX_PENDING) {
       throw new GitHttpNotDispatchedError('RATE_LIMITED', 'Too many Git HTTP bridge requests.');
@@ -72,6 +108,7 @@ export class GitHttpWebBridge {
         kind: 'request',
         hostId: this.hostId,
         id,
+        sessionId,
         url: request.url,
         method: request.method,
         headers: { ...request.headers },
@@ -102,7 +139,9 @@ export class GitHttpWebBridge {
         }
       };
       const cancel = () => {
-        this.send({ version: 1, kind: 'cancel', hostId: this.hostId, id }).catch(() => {});
+        this.send({ version: 1, kind: 'cancel', hostId: this.hostId, id, sessionId }).catch(
+          () => {},
+        );
         finish(new RemotishError('CANCELLED', 'Git HTTP request cancelled.'));
       };
       const timer = setTimeout(
@@ -135,6 +174,13 @@ export class GitHttpWebBridge {
   private async receive(raw: unknown): Promise<void> {
     const frame = await decrypt(this.key, raw);
     if (frame.hostId !== this.hostId || this.disposed) {
+      return;
+    }
+    if (frame.kind === 'hello' && frame.id === this.helloId) {
+      this.helloResolve?.(frame.sessionId);
+      return;
+    }
+    if (frame.kind === 'hello-request' || frame.sessionId !== this.sessionId) {
       return;
     }
     const pending = this.pending.get(frame.id);
