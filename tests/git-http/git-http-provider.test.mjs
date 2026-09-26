@@ -101,8 +101,8 @@ test('Web provider stores only a pairing key and does not ask VS Code for a toke
   vscode.__test.inputBoxResponses.push(URL, 'Pilot Author', 'pilot@example.invalid', pairing);
   await vscode.commands.executeCommand('remotish.gitHttp.configure');
   assert.deepEqual([...state.secretsState.keys()], ['remotish.gitHttp.pairingKey.v1']);
-  const adapter = await provider.createAdapter({ url: URL });
-  assert.equal(adapter.capabilities.commits, true);
+  await assert.rejects(provider.createAdapter({ url: URL }), (error) => error.code === 'OFFLINE');
+  assert.deepEqual([...state.secretsState.keys()], ['remotish.gitHttp.pairingKey.v1']);
 });
 
 test('desktop transport confines bearer authorization and rejects redirects', async () => {
