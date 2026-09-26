@@ -9,23 +9,23 @@ A release build is expected to satisfy all of these controls:
 - GitHub Actions are pinned to immutable commit SHAs.
 - checkout uses `persist-credentials: false`.
 - jobs use least-privilege permissions.
-- the release tag must match the root package version, and the host, fixture-provider extension, Browser RPC provider extension, and public adapter SDK versions must match that release version.
+- the release tag must match the root package version, and the host, fixture-provider extension, Browser RPC provider extension, Git HTTP provider extension, and public adapter SDK versions must match that release version.
 - Node.js 22 and 24 are covered by CI; release/Web smoke jobs use the minimum supported Node 22 runtime.
 - project dependencies install from the frozen pnpm lockfile.
 - build/release CLIs never use ephemeral package execution: the required tools are exact-version root `devDependencies`, and the committed pnpm lockfile freezes their resolved dependency graphs.
 - release-contract tests reject reintroduction of ephemeral package execution in package scripts and workflows.
 - the canonical `pnpm run ci` gate runs declaration-contract, lint, build/test, production-dependency policy and native pnpm SBOM checks before packaging.
-- the browser host, deterministic fixture-provider, and Browser RPC provider extensions are bundled and packaged with exact-version development dependencies declared in the root `package.json`; VS Code proposal declarations are committed under `types/vscode-proposed`, and release-contract tests keep their set aligned with the pinned 1.138.0 host and enabled proposals.
+- the browser host, deterministic fixture-provider, Browser RPC provider, and Git HTTP provider extensions are bundled and packaged with exact-version development dependencies declared in the root `package.json`; VS Code proposal declarations are committed under `types/vscode-proposed`, and release-contract tests keep their set aligned with the pinned 1.138.0 host and enabled proposals.
 - VSIX contents are governed by each extension's `.vscodeignore`; the exact locally produced host and provider packages are unpacked and smoke-tested together under Code-OSS Web.
-- the packaged smoke verifies manifest-only provider discovery, lazy provider activation, Browser RPC handshake and repository preparation, a real `?folder=remotish-rpc://...` bootstrap launch, and host virtual-filesystem behavior.
-- SHA-256 checksums cover all three VSIXes, the source archive, SBOM, and tracked third-party notices.
-- provenance attestations use GitHub OIDC via `actions/attest` and cover all three VSIXes plus the other release artifacts.
+- the packaged smoke verifies manifest-only provider discovery, lazy provider activation, Browser RPC handshake and repository preparation, Git HTTP provider activation/descriptor validation, a real `?folder=remotish-rpc://...` bootstrap launch, and host virtual-filesystem behavior.
+- SHA-256 checksums cover all four VSIXes, the source archive, SBOM, and tracked third-party notices.
+- provenance attestations use GitHub OIDC via `actions/attest` and cover all four VSIXes plus the other release artifacts.
 - a validated CycloneDX JSON SBOM is generated and associated with the Remotish host VSIX.
 - publishing uses the protected `release` environment.
 
 A failure in a release gate blocks artifact creation/publishing.
 
-The generic Remotish host is released as `remotish.vsix`. The released `remotish-fixture-provider.vsix` is a deterministic demo/reference provider. It is not a production repository backend. The released `remotish-browser-rpc-provider.vsix` supplies the transport, not a site-specific endpoint; customer-developers install their own scoped userscript and endpoint code. Neither provider is published to the VS Code Marketplace.
+The generic Remotish host is released as `remotish.vsix`. The released `remotish-fixture-provider.vsix` is a deterministic demo/reference provider and is not a production repository backend. The released `remotish-browser-rpc-provider.vsix` supplies the transport, not a site-specific endpoint; customer-developers install their own scoped userscript and endpoint code. The released `remotish-git-http-provider.vsix` is the supported one-repository Git smart-HTTP provider for Web and desktop. These provider VSIXes are release artifacts but are not published to the VS Code Marketplace.
 
 ## Consumer verification
 
@@ -36,6 +36,7 @@ sha256sum -c SHA256SUMS
 gh attestation verify remotish.vsix -R HRAshton/remotish
 gh attestation verify remotish-fixture-provider.vsix -R HRAshton/remotish
 gh attestation verify remotish-browser-rpc-provider.vsix -R HRAshton/remotish
+gh attestation verify remotish-git-http-provider.vsix -R HRAshton/remotish
 ```
 
 Use the repository/release coordinates that correspond to the artifact you downloaded if the project is mirrored or renamed.
@@ -44,13 +45,13 @@ Use the repository/release coordinates that correspond to the artifact you downl
 
 `pnpm test:vscode-web:vsix` performs the important packaging-path check:
 
-1. builds the framework, host browser bundle, and both provider browser bundles;
-2. packages `remotish.vsix`, `remotish-fixture-provider.vsix`, and `remotish-browser-rpc-provider.vsix` independently;
+1. builds the framework, host browser bundle, and all provider browser bundles;
+2. packages `remotish.vsix`, `remotish-fixture-provider.vsix`, `remotish-browser-rpc-provider.vsix`, and `remotish-git-http-provider.vsix` independently;
 3. unpacks those exact locally produced VSIXes into the smoke-test layout;
 4. injects the test bundle only into the unpacked host smoke-test copy;
-5. runs provider discovery/lazy activation, Browser RPC handshake and binary filesystem read, a separate Browser RPC bootstrap-folder URL launch, plus host command and virtual-filesystem behavior under Code-OSS Web.
+5. runs provider discovery/lazy activation, Browser RPC handshake and binary filesystem read, Git HTTP provider smoke validation, a separate Browser RPC bootstrap-folder URL launch, plus host command and virtual-filesystem behavior under Code-OSS Web.
 
-The packaged file sets are controlled by each extension's `.vscodeignore`; `vsce ls --no-dependencies` is the standard way to inspect them when changing packaging rules. Release-contract tests pin the host ignore rules and verify both provider manifests/package paths.
+The packaged file sets are controlled by each extension's `.vscodeignore`; `vsce ls --no-dependencies` is the standard way to inspect them when changing packaging rules. Release-contract tests pin the host ignore rules and verify all provider manifests/package paths.
 
 Tests are injected only into the unpacked smoke-test copy, not into the release VSIXes. Canonical cold restoration through the discovered-provider mechanism is covered separately by the deterministic runtime-stub tests.
 
@@ -70,7 +71,7 @@ Before CI or release, regenerate and commit `pnpm-lock.yaml` with the pinned pnp
 
 ## Licensing and notices
 
-Remotish source uses the `0BSD` license. The current workspace has no third-party production npm dependencies: production edges are only internal `@remotish/*` workspace packages. Release-contract tests enforce that invariant, and the tracked `THIRD_PARTY_NOTICES.md` is copied into release artifacts. Both provider VSIXes include the project `0BSD` license. If an external runtime dependency is introduced, the contract test fails until dependency licensing/notices handling is made explicit and the notice is updated.
+Remotish source uses the `0BSD` license. Most production dependency edges are internal `@remotish/*` workspace packages. Git HTTP deliberately adds the reviewed, exact-version runtime dependencies `isomorphic-git`, `@isomorphic-git/lightning-fs`, and `memfs`; the release-contract test restricts that exception to the Git HTTP adapter/provider and verifies the tracked `THIRD_PARTY_NOTICES.md`. The Git HTTP provider packaging step copies those notices into its VSIX. Provider VSIXes include the project `0BSD` license. Any additional external runtime dependency requires an explicit dependency-policy and notices update.
 
 ## Vulnerability reporting
 

@@ -2,21 +2,14 @@
 
 ## Reporting a vulnerability
 
-Please do **not** disclose a suspected vulnerability in a public issue, discussion, pull request, or other public channel.
+Use GitHub's private vulnerability reporting:
 
-Use GitHub's private vulnerability reporting / security-advisory flow for this repository when it is available (**Security → Report a vulnerability**). If that UI is not enabled, contact the repository maintainers through a private channel listed on the maintainer's GitHub profile and include the repository name in the subject/context.
+https://github.com/HRAshton/remotish/security/advisories/new
 
-Include enough information to reproduce and assess the issue:
+Please do not report suspected vulnerabilities through public issues, discussions, or pull requests.
 
-- affected version/commit;
-- affected package or extension component;
-- prerequisites and environment;
-- reproduction steps or a minimal proof of concept;
-- expected vs actual security boundary;
-- impact you believe is possible;
-- any suggested mitigation, if known.
-
-Do not include real credentials, tokens, private repositories, or unrelated user data in a report.
+We aim to acknowledge vulnerability reports within 3 business days, provide an initial assessment within 7 days, and coordinate remediation
+and disclosure with the reporter. Unless circumstances require otherwise, coordinated public disclosure should normally occur within 90 days.
 
 ## Scope
 
