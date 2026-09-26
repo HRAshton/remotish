@@ -18,19 +18,20 @@ export class RemotishVsCodeHost implements vscode.Disposable {
   readonly registry: WorkspaceRegistry;
   readonly scm: ScmManager;
   readonly branches: BranchUiManager;
+  readonly logger: vscode.LogOutputChannel;
   private readonly disposables: vscode.Disposable[];
 
   constructor(options: RemotishVsCodeHostOptions = {}) {
     this.registry = new WorkspaceRegistry(options);
-    const logger = vscode.window.createOutputChannel('Remotish', { log: true });
+    this.logger = vscode.window.createOutputChannel('Remotish', { log: true });
     const fileSystem = new RepositoryFileSystem(this.registry);
     const workingProvider = new RemotishFileSystemProvider(this.registry, fileSystem, 'working');
     const revisionProvider = new RemotishFileSystemProvider(this.registry, fileSystem, 'revision');
-    this.scm = new ScmManager(this.registry);
+    this.scm = new ScmManager(this.registry, this.logger);
     this.branches = new BranchUiManager(this.registry);
 
     this.disposables = [
-      logger,
+      this.logger,
       workingProvider,
       revisionProvider,
       this.scm,
@@ -42,8 +43,8 @@ export class RemotishVsCodeHost implements vscode.Disposable {
         isCaseSensitive: true,
         isReadonly: true,
       }),
-      registerScmCommands(this.registry, this.scm, logger),
-      registerBranchCommands(this.registry, logger),
+      registerScmCommands(this.registry, this.scm, this.logger),
+      registerBranchCommands(this.registry, this.logger),
     ];
   }
 

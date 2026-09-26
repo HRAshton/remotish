@@ -10,7 +10,10 @@ export class ScmManager implements vscode.Disposable {
   private readonly entries = new Map<string, RemotishSourceControl>();
   private readonly registrySubscription: vscode.Disposable;
 
-  constructor(private readonly registry: WorkspaceRegistry) {
+  constructor(
+    private readonly registry: WorkspaceRegistry,
+    private readonly logger: vscode.LogOutputChannel,
+  ) {
     for (const registration of registry.list()) {
       this.add(registration.id);
     }
@@ -45,7 +48,12 @@ export class ScmManager implements vscode.Disposable {
     if (!registration.workspace.capabilities.commits) {
       return;
     }
-    this.entries.set(workspaceId, new RemotishSourceControl(workspaceId, registration.workspace));
+    this.entries.set(
+      workspaceId,
+      new RemotishSourceControl(workspaceId, registration.workspace, (error) =>
+        this.logger.error(`SCM refresh failed for workspace ${workspaceId}.`, error),
+      ),
+    );
   }
 
   private remove(workspaceId: string): void {

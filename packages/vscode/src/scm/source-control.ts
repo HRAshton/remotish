@@ -43,6 +43,8 @@ export class RemotishSourceControl implements vscode.Disposable {
   constructor(
     readonly workspaceId: string,
     readonly workspace: RemotishWorkspace,
+    private readonly reportBackgroundError: (error: unknown) => void = (error) =>
+      console.error(error),
   ) {
     this.sourceControl = vscode.scm.createSourceControl(
       'remotish',
@@ -64,9 +66,9 @@ export class RemotishSourceControl implements vscode.Disposable {
     this.changes = this.sourceControl.createResourceGroup('changes', 'Changes');
     this.changes.hideWhenEmpty = false;
 
-    this.workspaceSubscription = workspace.onDidChange(() => void this.refresh());
+    this.workspaceSubscription = workspace.onDidChange(() => this.refreshInBackground());
     this.refreshActionButton();
-    void this.refresh();
+    this.refreshInBackground();
   }
 
   /** Paths selected for the next commit on the current branch. */
@@ -131,6 +133,18 @@ export class RemotishSourceControl implements vscode.Disposable {
     this.stagedChanges.dispose();
     this.changes.dispose();
     this.sourceControl.dispose();
+  }
+
+  private refreshInBackground(): void {
+    void this.refresh().catch((error) => this.reportRefreshFailure(error));
+  }
+
+  private reportRefreshFailure(error: unknown): void {
+    try {
+      this.reportBackgroundError(error);
+    } catch (reportingError) {
+      console.error('Failed to report a Remotish SCM background refresh error.', reportingError);
+    }
   }
 
   private async runRefreshLoop(): Promise<void> {

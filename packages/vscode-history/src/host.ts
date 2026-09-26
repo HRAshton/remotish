@@ -10,7 +10,7 @@ export class RemotishHistoryHost implements vscode.Disposable {
   private readonly timelineRegistration: vscode.Disposable;
 
   constructor(host: RemotishVsCodeHost) {
-    this.manager = new HistoryManager(host.registry, host.scm);
+    this.manager = new HistoryManager(host.registry, host.scm, host.logger);
     this.timelineProvider = new RemotishTimelineProvider(host.registry);
     this.timelineRegistration = vscode.workspace.registerTimelineProvider(
       WORKING_SCHEME,
