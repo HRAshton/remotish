@@ -18,7 +18,12 @@ import {
   type RevisionId,
 } from '@remotish/adapter-sdk';
 import * as git from 'isomorphic-git';
-import { createGitHttpClient, type GitHttpAdapterOptions, validateGitUrl } from './transport.js';
+import {
+  createGitHttpClient,
+  type GitHttpAdapterOptions,
+  GitHttpNotDispatchedError,
+  validateGitUrl,
+} from './transport.js';
 
 const DIR = '/repository';
 const ZERO_OID = '0'.repeat(40);
@@ -125,8 +130,8 @@ export class GitHttpAdapter implements RemotishAdapter {
     }
   }
 
-  private http(signal?: AbortSignal): git.HttpClient {
-    return createGitHttpClient(this.options, signal);
+  private http(signal?: AbortSignal, onReceivePackRequest?: () => void): git.HttpClient {
+    return createGitHttpClient(this.options, signal, onReceivePackRequest);
   }
 
   private async ready(signal?: AbortSignal): Promise<void> {
@@ -396,17 +401,22 @@ export class GitHttpAdapter implements RemotishAdapter {
     deleting = false,
   ): Promise<{ readonly stale: boolean; readonly remoteRevision?: string }> {
     const localRef = `refs/remotish/publish/${crypto.randomUUID().replaceAll('-', '')}`;
-    await git.writeRef({
-      fs: this.fs,
-      dir: DIR,
-      ref: localRef,
-      value: deleting ? expected : localOid,
-    });
     let observed: string | undefined;
+    let requestAttempted = false;
+    let localRefWritten = false;
     try {
+      await git.writeRef({
+        fs: this.fs,
+        dir: DIR,
+        ref: localRef,
+        value: deleting ? expected : localOid,
+      });
+      localRefWritten = true;
       const result = await git.push({
         fs: this.fs,
-        http: this.http(signal),
+        http: this.http(signal, () => {
+          requestAttempted = true;
+        }),
         dir: DIR,
         url: this.url,
         remote: 'origin',
@@ -440,9 +450,18 @@ export class GitHttpAdapter implements RemotishAdapter {
           return { stale: true, ...(current ? { remoteRevision: current } : {}) };
         }
       }
+      if (!requestAttempted && !(error instanceof GitHttpNotDispatchedError)) {
+        throw new GitHttpNotDispatchedError(
+          error instanceof RemotishError ? error.code : 'UNKNOWN',
+          'Git publication failed before receive-pack dispatch.',
+          { cause: error },
+        );
+      }
       throw error;
     } finally {
-      await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
+      if (localRefWritten) {
+        await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
+      }
     }
   }
 
@@ -456,62 +475,76 @@ export class GitHttpAdapter implements RemotishAdapter {
   }
 
   async commit(request: CommitRequest, options?: RemoteRequestOptions): Promise<CommitResult> {
-    await this.ready(options?.signal);
-    this.check(options?.signal);
-    const name = branch(request.branch);
-    const baseOid = revision(request.baseRevision);
-    const expected = revision(
-      request.push.mode === 'normal' ? baseOid : request.push.expectedRevision,
-    );
-    const original = await this.commitObject(baseOid);
-    const files = await this.files(baseOid);
-    for (const change of request.changes) {
-      const path = safePath(change.path);
-      if (change.type === 'delete') {
-        files.delete(path);
-      } else {
-        if (change.content.byteLength > 16 * 1024 * 1024) {
-          throw new RemotishError('UNSUPPORTED', 'Git file exceeds the pilot size limit.');
+    let pushStarted = false;
+    try {
+      await this.ready(options?.signal);
+      this.check(options?.signal);
+      const name = branch(request.branch);
+      const baseOid = revision(request.baseRevision);
+      const expected = revision(
+        request.push.mode === 'normal' ? baseOid : request.push.expectedRevision,
+      );
+      const original = await this.commitObject(baseOid);
+      const files = await this.files(baseOid);
+      for (const change of request.changes) {
+        const path = safePath(change.path);
+        if (change.type === 'delete') {
+          files.delete(path);
+        } else {
+          if (change.content.byteLength > 16 * 1024 * 1024) {
+            throw new RemotishError('UNSUPPORTED', 'Git file exceeds the pilot size limit.');
+          }
+          const oid = await git.writeBlob({ fs: this.fs, dir: DIR, blob: change.content });
+          files.set(path, { oid, mode: files.get(path)?.mode ?? '100644' });
         }
-        const oid = await git.writeBlob({ fs: this.fs, dir: DIR, blob: change.content });
-        files.set(path, { oid, mode: files.get(path)?.mode ?? '100644' });
       }
-    }
-    if (!request.message.trim()) {
-      throw new RemotishError('INVALID_REQUEST', 'Git commit message is empty.');
-    }
-    const tree = await this.writeTree(files);
-    const now = Math.floor(Date.now() / 1000);
-    const identity = {
-      ...this.options.author,
-      timestamp: now,
-      timezoneOffset: new Date().getTimezoneOffset(),
-    };
-    const parent = request.type === 'amend' ? original.commit.parent : [baseOid];
-    const commit: git.CommitObject = {
-      tree,
-      parent,
-      message: request.message,
-      author: request.type === 'amend' ? original.commit.author : identity,
-      committer: identity,
-    };
-    const oid = await git.writeCommit({ fs: this.fs, dir: DIR, commit });
-    const target = `refs/heads/${name}`;
-    const outcome = await this.push(
-      oid,
-      target,
-      expected,
-      request.push.mode === 'force-with-lease',
-      options?.signal,
-    );
-    if (outcome.stale) {
-      return {
-        status: 'rejected',
-        reason: 'REMOTE_CHANGED',
-        ...(outcome.remoteRevision ? { remoteRevision: outcome.remoteRevision } : {}),
+      if (!request.message.trim()) {
+        throw new RemotishError('INVALID_REQUEST', 'Git commit message is empty.');
+      }
+      const tree = await this.writeTree(files);
+      const now = Math.floor(Date.now() / 1000);
+      const identity = {
+        ...this.options.author,
+        timestamp: now,
+        timezoneOffset: new Date().getTimezoneOffset(),
       };
+      const parent = request.type === 'amend' ? original.commit.parent : [baseOid];
+      const commit: git.CommitObject = {
+        tree,
+        parent,
+        message: request.message,
+        author: request.type === 'amend' ? original.commit.author : identity,
+        committer: identity,
+      };
+      const oid = await git.writeCommit({ fs: this.fs, dir: DIR, commit });
+      const target = `refs/heads/${name}`;
+      pushStarted = true;
+      const outcome = await this.push(
+        oid,
+        target,
+        expected,
+        request.push.mode === 'force-with-lease',
+        options?.signal,
+      );
+      if (outcome.stale) {
+        return {
+          status: 'rejected',
+          reason: 'REMOTE_CHANGED',
+          ...(outcome.remoteRevision ? { remoteRevision: outcome.remoteRevision } : {}),
+        };
+      }
+      return { status: 'success', revision: oid, commit: info(oid, commit) };
+    } catch (error) {
+      if (!pushStarted || error instanceof GitHttpNotDispatchedError) {
+        const code = error instanceof RemotishError ? error.code : 'UNKNOWN';
+        return {
+          status: 'rejected',
+          reason: code === 'UNAUTHORIZED' || code === 'FORBIDDEN' ? 'FORBIDDEN' : 'UNSUPPORTED',
+          message: `Git publication stopped before receive-pack (${code}). No write was attempted.`,
+        };
+      }
+      throw error;
     }
-    return { status: 'success', revision: oid, commit: info(oid, commit) };
   }
 
   async createBranch(

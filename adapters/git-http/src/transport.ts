@@ -1,4 +1,4 @@
-import { RemotishError } from '@remotish/adapter-sdk';
+import { RemotishError, type RemotishErrorCode } from '@remotish/adapter-sdk';
 import type {
   HttpClient,
   GitHttpRequest as IsomorphicRequest,
@@ -7,6 +7,13 @@ import type {
 
 const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+
+/** Only transport code with positive proof of no write may throw this error. */
+export class GitHttpNotDispatchedError extends RemotishError {
+  constructor(code: RemotishErrorCode, message: string, options?: { cause?: unknown }) {
+    super(code, message, options);
+  }
+}
 
 export interface GitHttpRequest {
   readonly url: string;
@@ -82,6 +89,7 @@ async function collect(
 export function createGitHttpClient(
   options: GitHttpAdapterOptions,
   operationSignal?: AbortSignal,
+  onReceivePackRequest?: () => void,
 ): HttpClient {
   const configured = new URL(validateGitUrl(options.url));
   return {
@@ -98,6 +106,9 @@ export function createGitHttpClient(
       }
       const signal = request.signal ?? operationSignal;
       const body = await collect(request.body, MAX_REQUEST_BYTES, signal);
+      if (url.pathname === `${configured.pathname}/git-receive-pack` && request.method === 'POST') {
+        onReceivePackRequest?.();
+      }
       const response = await options.request({
         url: url.href,
         method: request.method ?? 'GET',

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { GitHttpNotDispatchedError } from '../../adapters/git-http/dist/index.js';
 import {
   decodeBytes,
   decrypt,
@@ -218,7 +219,7 @@ test('Web bridge proves redirect control before use and confines bearer requests
   );
   await assert.rejects(
     bridge.request({ ...input, body: new Uint8Array(4 * 1024 * 1024 + 1) }),
-    /too large/,
+    (error) => error instanceof GitHttpNotDispatchedError && error.code === 'UNSUPPORTED',
   );
   assert.equal(requests.length, 2);
 

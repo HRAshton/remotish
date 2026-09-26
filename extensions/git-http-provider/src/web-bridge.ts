@@ -1,4 +1,8 @@
-import type { GitHttpRequest, GitHttpResponse } from '@remotish/adapter-git-http';
+import {
+  GitHttpNotDispatchedError,
+  type GitHttpRequest,
+  type GitHttpResponse,
+} from '@remotish/adapter-git-http';
 import { RemotishError } from '@remotish/adapter-sdk';
 import {
   CHANNEL,
@@ -41,10 +45,10 @@ export class GitHttpWebBridge {
 
   async request(request: GitHttpRequest): Promise<GitHttpResponse> {
     if (this.disposed) {
-      throw new RemotishError('OFFLINE', 'Git HTTP bridge is closed.');
+      throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge is closed.');
     }
     if (this.pending.size >= MAX_PENDING) {
-      throw new RemotishError('RATE_LIMITED', 'Too many Git HTTP bridge requests.');
+      throw new GitHttpNotDispatchedError('RATE_LIMITED', 'Too many Git HTTP bridge requests.');
     }
     const target = new URL(request.url);
     const configured = new URL(this.url);
@@ -52,27 +56,39 @@ export class GitHttpWebBridge {
       target.origin !== configured.origin ||
       !target.pathname.startsWith(`${configured.pathname}/`)
     ) {
-      throw new RemotishError('INVALID_REQUEST', 'Git HTTP request left the configured origin.');
+      throw new GitHttpNotDispatchedError(
+        'INVALID_REQUEST',
+        'Git HTTP request left the configured origin.',
+      );
     }
     if (request.signal?.aborted) {
-      throw new RemotishError('CANCELLED', 'Git HTTP request cancelled.');
+      throw new GitHttpNotDispatchedError('CANCELLED', 'Git HTTP request cancelled.');
     }
     const id = randomId();
-    const packet = await encrypt(this.key, {
-      version: 1,
-      kind: 'request',
-      hostId: this.hostId,
-      id,
-      url: request.url,
-      method: request.method,
-      headers: { ...request.headers },
-      body: encodeBytes(request.body),
-    });
+    let packet: string;
+    try {
+      packet = await encrypt(this.key, {
+        version: 1,
+        kind: 'request',
+        hostId: this.hostId,
+        id,
+        url: request.url,
+        method: request.method,
+        headers: { ...request.headers },
+        body: encodeBytes(request.body),
+      });
+    } catch (error) {
+      throw new GitHttpNotDispatchedError(
+        error instanceof RemotishError ? error.code : 'UNKNOWN',
+        'Git HTTP bridge request was not sent.',
+        { cause: error },
+      );
+    }
     if (request.signal?.aborted) {
-      throw new RemotishError('CANCELLED', 'Git HTTP request cancelled.');
+      throw new GitHttpNotDispatchedError('CANCELLED', 'Git HTTP request cancelled.');
     }
     if (this.disposed) {
-      throw new RemotishError('OFFLINE', 'Git HTTP bridge is closed.');
+      throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge is closed.');
     }
     return new Promise<GitHttpResponse>((resolve, reject) => {
       const finish = (error?: RemotishError, value?: GitHttpResponse) => {
@@ -98,7 +114,15 @@ export class GitHttpWebBridge {
         reject: (error) => finish(error),
       });
       request.signal?.addEventListener('abort', cancel, { once: true });
-      this.channel.postMessage(packet);
+      try {
+        this.channel.postMessage(packet);
+      } catch (error) {
+        finish(
+          new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge request was not sent.', {
+            cause: error,
+          }),
+        );
+      }
     });
   }
 

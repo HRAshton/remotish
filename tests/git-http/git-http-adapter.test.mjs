@@ -6,7 +6,8 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { GitHttpAdapter } from '../../adapters/git-http/dist/index.js';
+import { MemoryWorkspaceStorage, RemotishWorkspace } from '@remotish/core';
+import { GitHttpAdapter, GitHttpNotDispatchedError } from '../../adapters/git-http/dist/index.js';
 
 const GIT_URL = 'https://git.example.invalid/repo.git';
 const author = { name: 'Pilot Author', email: 'pilot@example.invalid' };
@@ -269,6 +270,38 @@ test('Git HTTP pages history and creates and deletes real remote branches', asyn
   assert.equal(secondPage.nextCursor, undefined);
   await adapter.deleteBranch('feature/test');
   assert.equal(run(root, '--git-dir', bare, 'branch', '--list', 'feature/test'), '');
+});
+
+test('pre-dispatch refusal settles workspace journal and preserves overlay', async (t) => {
+  const { request, bare, root } = await startRepository(t);
+  let refused = false;
+  const adapter = new GitHttpAdapter({
+    url: GIT_URL,
+    author,
+    request: async (input) => {
+      if (input.url.endsWith('/git-receive-pack')) {
+        refused = true;
+        throw new GitHttpNotDispatchedError(
+          'UNSUPPORTED',
+          'Bridge request exceeded its size limit.',
+        );
+      }
+      return request(input);
+    },
+  });
+  const workspace = await RemotishWorkspace.open(adapter, new MemoryWorkspaceStorage());
+  const original = workspace.baseRevision;
+  await workspace.writeFile('hello.txt', new TextEncoder().encode('local\n'), {
+    create: false,
+    overwrite: true,
+  });
+  const result = await workspace.commitAndPush('Pre-dispatch refusal');
+  assert.equal(refused, true);
+  assert.equal(result.status, 'rejected');
+  assert.equal(result.reason, 'UNSUPPORTED');
+  assert.equal(workspace.pendingPublication, undefined);
+  assert.equal(workspace.hasChanges, true);
+  assert.equal(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), original);
 });
 
 test('ambiguous receive-pack failure never reports publication success', async (t) => {
