@@ -19,7 +19,7 @@ deletion. It does not implement a Remotish index, local commit queue or merge en
 submodules and symbolic links, including directory listings and file reads, because Git link targets
 are not ordinary file contents. One Git HTTP request is limited to 32 MiB, one response to 64 MiB, one changed file to
 16 MiB, one tree to 100,000 files, branch listing to 10,000 and history pagination to 10,000 commits.
-These are pilot limits; a repository exceeding them fails closed.
+These are deliberate safety limits; a repository exceeding them fails closed.
 
 The disposable Git HTTP fixture in `tests/git-http/` exercises actual Git upload-pack and
 receive-pack behavior. Bitbucket Data Center 9.4 qualification needs a separate live test repository
