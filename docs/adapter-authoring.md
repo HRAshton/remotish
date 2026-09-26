@@ -263,5 +263,6 @@ Use the smallest reference that matches your problem:
 - [`@remotish/adapter-github`](../adapters/github/README.md) - production-style pagination, binary reads, authentication and lease-protected publication.
 - [`@remotish/adapter-fixture`](../packages/adapter-fixture/README.md) - deterministic in-memory behavior for tests.
 - [`@remotish/adapter-rpc`](../adapters/rpc/README.md) - versioned repository RPC over a caller-supplied transport.
+- [`@remotish/adapter-git-http`](../adapters/git-http/README.md) - browser-safe Git smart HTTP with conditional ref publication.
 
 For exact method/result semantics, continue with [Adapter contract](adapter-contract.md).

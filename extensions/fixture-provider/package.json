@@ -2,7 +2,7 @@
   "name": "remotish-fixture-provider",
   "displayName": "Remotish Fixture Provider",
   "description": "Deterministic demo/reference provider for Remotish.",
-  "version": "0.1.0-beta.13",
+  "version": "0.1.0-beta.14",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,

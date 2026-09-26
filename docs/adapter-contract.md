@@ -271,3 +271,6 @@ The project is pre-1.0 today. The intended post-1.0 compatibility policy is sema
 - internal helpers that are not exported from the package root carry no compatibility guarantee.
 
 For implementation guidance, see [Build an adapter](adapter-authoring.md). For verification, see [Testing adapters](testing-adapters.md).
+
+The [generic Git HTTP adapter](../adapters/git-http/README.md) implements this contract using
+Git receive-pack's old-object-ID compare-and-swap for normal, force-with-lease and amend publication.

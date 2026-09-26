@@ -11,11 +11,13 @@ const packagePaths = [
   '../../packages/vscode/package.json',
   '../../packages/vscode-history/package.json',
   '../../adapters/github/package.json',
+  '../../adapters/git-http/package.json',
   '../../adapters/http-example/package.json',
   '../../adapters/rpc/package.json',
   '../../apps/demo-web/package.json',
   '../../extensions/fixture-provider/package.json',
   '../../extensions/browser-rpc-provider/package.json',
+  '../../extensions/git-http-provider/package.json',
 ];
 
 async function exists(url) {
@@ -178,7 +180,7 @@ test('build and release tools are exact direct dependencies without ephemeral ex
   }
 });
 
-test('production dependencies stay internal and notices are tracked', async () => {
+test('production dependencies are reviewed and notices are tracked', async () => {
   const manifests = await Promise.all(
     packagePaths.map(async (path) => ({
       path,
@@ -186,9 +188,22 @@ test('production dependencies stay internal and notices are tracked', async () =
     })),
   );
   const workspaceNames = new Set(manifests.map(({ manifest }) => manifest.name));
+  const gitPilotDependencies = {
+    '@isomorphic-git/lightning-fs': '4.10.3',
+    'isomorphic-git': '1.42.2',
+    memfs: '4.50.0',
+  };
 
   for (const { path, manifest } of manifests) {
     for (const [name, specifier] of Object.entries(manifest.dependencies ?? {})) {
+      if (
+        (path === '../../adapters/git-http/package.json' ||
+          path === '../../extensions/git-http-provider/package.json') &&
+        name in gitPilotDependencies
+      ) {
+        assert.equal(specifier, gitPilotDependencies[name]);
+        continue;
+      }
       assert.equal(
         name.startsWith('@remotish/'),
         true,
@@ -208,7 +223,13 @@ test('production dependencies stay internal and notices are tracked', async () =
   }
 
   const notices = await readFile(new URL('../../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8');
-  assert.match(notices, /no third-party production npm dependencies/u);
+  assert.match(notices, /\| isomorphic-git \| 1\.42\.2 \|/u);
+  assert.match(notices, /\| @isomorphic-git\/lightning-fs \| 4\.10\.3 \|/u);
+  assert.match(notices, /\| memfs \| 4\.50\.0 \|/u);
+  assert.match(
+    rootManifest.scripts?.['package:git-http-provider:vsix'] ?? '',
+    /shx cp THIRD_PARTY_NOTICES\.md extensions\/git-http-provider\/dist\/THIRD_PARTY_NOTICES\.md/u,
+  );
 });
 
 test('adapter SDK is configured as the only public npm package', async () => {
@@ -278,7 +299,7 @@ test('CI push checks target the repository default branch', async () => {
 test('release scripts delegate generic infrastructure to standard tooling', async () => {
   assert.equal(
     rootManifest.scripts?.clean,
-    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist extensions/fixture-provider/dist extensions/browser-rpc-provider/dist',
+    'tsc -b --clean && shx rm -rf artifacts apps/demo-web/dist extensions/fixture-provider/dist extensions/browser-rpc-provider/dist extensions/git-http-provider/dist',
   );
   assert.equal(await exists(new URL('../../scripts/clean.mjs', import.meta.url)), false);
 

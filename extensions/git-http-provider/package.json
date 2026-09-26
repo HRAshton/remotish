@@ -1,0 +1,72 @@
+{
+  "name": "remotish-git-http-provider",
+  "displayName": "Remotish Git HTTP Provider",
+  "description": "One-repository HTTPS Git provider for Remotish.",
+  "version": "0.1.0-beta.14",
+  "publisher": "hrashton",
+  "license": "0BSD",
+  "private": true,
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "main": "./dist/extension-desktop.js",
+  "browser": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:remotish.gitHttp.configure",
+    "onCommand:remotish.gitHttp.open"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Git HTTP uses credentials and a configured remote origin."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "remotish.gitHttp.configure",
+        "title": "Remotish Git HTTP: Configure Repository"
+      },
+      {
+        "command": "remotish.gitHttp.open",
+        "title": "Remotish Git HTTP: Open Repository"
+      }
+    ],
+    "configuration": {
+      "title": "Remotish Git HTTP",
+      "properties": {
+        "remotish.gitHttp.url": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "One credential-free HTTPS Git clone URL."
+        },
+        "remotish.gitHttp.authorName": {
+          "type": "string",
+          "default": "",
+          "scope": "application"
+        },
+        "remotish.gitHttp.authorEmail": {
+          "type": "string",
+          "default": "",
+          "scope": "application"
+        }
+      }
+    }
+  },
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "git-http",
+    "displayName": "Git HTTP"
+  },
+  "dependencies": {
+    "@remotish/adapter-git-http": "workspace:*",
+    "@remotish/adapter-sdk": "workspace:*",
+    "memfs": "4.50.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty false"
+  }
+}

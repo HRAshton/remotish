@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "tsconfig.tsbuildinfo",
+    "esModuleInterop": true
+  },
+  "references": [{ "path": "../../packages/adapter-sdk" }],
+  "include": ["src/**/*.ts"]
+}

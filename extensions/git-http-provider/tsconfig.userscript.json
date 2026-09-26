@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "composite": false
+  },
+  "include": ["userscript-template/entry.ts", "src/bridge-wire.ts"],
+  "references": [{ "path": "../../packages/adapter-sdk" }]
+}
