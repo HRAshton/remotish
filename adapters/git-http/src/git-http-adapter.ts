@@ -488,7 +488,11 @@ export class GitHttpAdapter implements RemotishAdapter {
       throw normalizeGitHttpError(error);
     } finally {
       if (localRefWritten) {
-        await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
+        try {
+          await git.deleteRef({ fs: this.fs, dir: DIR, ref: localRef });
+        } catch {
+          // This ref is heap-only scratch state. Cleanup cannot change a known remote outcome.
+        }
       }
     }
   }

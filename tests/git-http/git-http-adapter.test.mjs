@@ -413,6 +413,33 @@ test('server ref rejection settles publication even when follow-up lookup fails'
   assert.equal(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), original);
 });
 
+test('local temporary-ref cleanup cannot overwrite remote publication success', async (t) => {
+  const fs = createFsFromVolume(new Volume());
+  const unlink = fs.promises.unlink.bind(fs.promises);
+  let cleanupFailed = false;
+  fs.promises.unlink = async (path, ...args) => {
+    if (String(path).includes('/refs/remotish/publish/')) {
+      cleanupFailed = true;
+      throw new Error('Local scratch cleanup failed.');
+    }
+    return unlink(path, ...args);
+  };
+  const { adapter, bare, root } = await startRepository(t, fs);
+  const original = (await adapter.getBranches()).find((item) => item.name === 'main');
+  assert.ok(original);
+  const result = await adapter.commit({
+    type: 'commit',
+    branch: 'main',
+    baseRevision: original.revision,
+    message: 'Published despite cleanup failure',
+    changes: [{ type: 'add', path: 'added.txt', content: new TextEncoder().encode('new') }],
+    push: { mode: 'normal' },
+  });
+  assert.equal(cleanupFailed, true);
+  assert.equal(result.status, 'success');
+  assert.equal(run(root, '--git-dir', bare, 'rev-parse', 'refs/heads/main'), result.revision);
+});
+
 test('ambiguous receive-pack failure never reports publication success', async (t) => {
   const { request, bare, root } = await startRepository(t);
   let failed = false;
