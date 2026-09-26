@@ -1,65 +1,10 @@
 import { RemotishError } from '@remotish/adapter-sdk';
+import { type BridgeFrame, decodeBridgeFrame } from './bridge-frame.js';
 
+export type { BridgeFrame } from './bridge-frame.js';
 export const CHANNEL = 'remotish-git-http-v1';
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PACKET_CHARS = 24 * 1024 * 1024;
-
-export type BridgeFrame =
-  | {
-      readonly version: 1;
-      readonly kind: 'hello-request';
-      readonly hostId: string;
-      readonly id: string;
-    }
-  | {
-      readonly version: 1;
-      readonly kind: 'hello';
-      readonly hostId: string;
-      readonly id: string;
-      readonly sessionId: string;
-    }
-  | {
-      readonly version: 1;
-      readonly kind: 'request';
-      readonly hostId: string;
-      readonly id: string;
-      readonly sessionId: string;
-      readonly url: string;
-      readonly method: string;
-      readonly headers: Record<string, string>;
-      readonly body: string;
-    }
-  | {
-      readonly version: 1;
-      readonly kind: 'response';
-      readonly hostId: string;
-      readonly id: string;
-      readonly sessionId: string;
-      readonly status: number;
-      readonly headers: Record<string, string>;
-      readonly body: string;
-    }
-  | {
-      readonly version: 1;
-      readonly kind: 'failure';
-      readonly hostId: string;
-      readonly id: string;
-      readonly sessionId: string;
-      readonly code:
-        | 'OFFLINE'
-        | 'UNAUTHORIZED'
-        | 'FORBIDDEN'
-        | 'UNSUPPORTED'
-        | 'INVALID_REQUEST'
-        | 'UNKNOWN';
-    }
-  | {
-      readonly version: 1;
-      readonly kind: 'cancel';
-      readonly hostId: string;
-      readonly id: string;
-      readonly sessionId: string;
-    };
 
 export function encodeBytes(bytes: Uint8Array, limit = MAX_BODY_BYTES): string {
   if (bytes.byteLength > limit) {
@@ -74,28 +19,20 @@ export function encodeBytes(bytes: Uint8Array, limit = MAX_BODY_BYTES): string {
 
 export function decodeBytes(value: string, limit = MAX_BODY_BYTES): Uint8Array {
   if (value.length > Math.ceil(limit / 3) * 4 + 4 || value.length % 4 !== 0) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge bytes.');
+    throw invalidBytes();
   }
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
   for (let i = 0; i < value.length - padding; i += 1) {
     const code = value.charCodeAt(i);
-    if (
-      !(
-        (code >= 65 && code <= 90) ||
-        (code >= 97 && code <= 122) ||
-        (code >= 48 && code <= 57) ||
-        code === 43 ||
-        code === 47
-      )
-    ) {
-      throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge bytes.');
+    if (!isBase64Code(code)) {
+      throw invalidBytes();
     }
   }
   let decoded: string;
   try {
     decoded = atob(value);
   } catch {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge bytes.');
+    throw invalidBytes();
   }
   if (decoded.length > limit) {
     throw new RemotishError('UNSUPPORTED', 'Git HTTP bridge body is too large.');
@@ -135,32 +72,13 @@ export async function encrypt(key: CryptoKey, frame: BridgeFrame): Promise<strin
 }
 
 export async function decrypt(key: CryptoKey, raw: unknown): Promise<BridgeFrame> {
-  if (typeof raw !== 'string' || raw.length > MAX_PACKET_CHARS) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
-  }
-  let packet: unknown;
-  try {
-    packet = JSON.parse(raw);
-  } catch {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
-  }
-  if (!packet || typeof packet !== 'object' || Array.isArray(packet)) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
-  }
-  const data = packet as Record<string, unknown>;
-  if (data.version !== 1 || typeof data.iv !== 'string' || typeof data.ciphertext !== 'string') {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
-  }
-  const iv = decodeBytes(data.iv);
-  if (iv.length !== 12) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
-  }
+  const { iv, ciphertext } = decodePacket(raw);
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       key,
-      decodeBytes(data.ciphertext, MAX_PACKET_CHARS / 2),
+      decodeBytes(ciphertext, MAX_PACKET_CHARS / 2),
     );
   } catch {
     throw new RemotishError('INVALID_REQUEST', 'Unauthenticated Git HTTP bridge packet.');
@@ -171,121 +89,53 @@ export async function decrypt(key: CryptoKey, raw: unknown): Promise<BridgeFrame
   } catch {
     throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge frame.');
   }
-  if (!frame || typeof frame !== 'object' || Array.isArray(frame)) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge frame.');
-  }
-  const fields = frame as Record<string, unknown>;
-  if (
-    fields.version !== 1 ||
-    typeof fields.kind !== 'string' ||
-    typeof fields.hostId !== 'string' ||
-    typeof fields.id !== 'string' ||
-    !/^[0-9a-f]{32}$/u.test(fields.hostId) ||
-    !/^[0-9a-f]{32}$/u.test(fields.id)
-  ) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge frame.');
-  }
-  if (fields.kind === 'hello-request') {
-    return { version: 1, kind: 'hello-request', hostId: fields.hostId, id: fields.id };
-  }
-  if (typeof fields.sessionId !== 'string' || !/^[0-9a-f]{32}$/u.test(fields.sessionId)) {
-    throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge session.');
-  }
-  if (fields.kind === 'hello') {
-    return {
-      version: 1,
-      kind: 'hello',
-      hostId: fields.hostId,
-      id: fields.id,
-      sessionId: fields.sessionId,
-    };
-  }
-  if (fields.kind === 'cancel') {
-    return {
-      version: 1,
-      kind: 'cancel',
-      hostId: fields.hostId,
-      id: fields.id,
-      sessionId: fields.sessionId,
-    };
-  }
-  if (fields.kind === 'failure' && isErrorCode(fields.code)) {
-    return {
-      version: 1,
-      kind: 'failure',
-      hostId: fields.hostId,
-      id: fields.id,
-      sessionId: fields.sessionId,
-      code: fields.code,
-    };
-  }
-  if (
-    fields.kind === 'request' &&
-    typeof fields.url === 'string' &&
-    typeof fields.method === 'string' &&
-    typeof fields.body === 'string' &&
-    isHeaders(fields.headers)
-  ) {
-    return {
-      version: 1,
-      kind: 'request',
-      hostId: fields.hostId,
-      id: fields.id,
-      sessionId: fields.sessionId,
-      url: fields.url,
-      method: fields.method,
-      headers: fields.headers,
-      body: fields.body,
-    };
-  }
-  if (
-    fields.kind === 'response' &&
-    typeof fields.status === 'number' &&
-    Number.isInteger(fields.status) &&
-    fields.status >= 100 &&
-    fields.status <= 599 &&
-    typeof fields.body === 'string' &&
-    isHeaders(fields.headers)
-  ) {
-    return {
-      version: 1,
-      kind: 'response',
-      hostId: fields.hostId,
-      id: fields.id,
-      sessionId: fields.sessionId,
-      status: fields.status,
-      headers: fields.headers,
-      body: fields.body,
-    };
-  }
-  throw new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge frame.');
-}
-
-function isHeaders(value: unknown): value is Record<string, string> {
-  return (
-    !!value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    Object.keys(value).length <= 32 &&
-    Object.entries(value).every(
-      ([key, entry]) => typeof entry === 'string' && key.length <= 64 && entry.length <= 4096,
-    )
-  );
-}
-
-function isErrorCode(value: unknown): value is Extract<BridgeFrame, { kind: 'failure' }>['code'] {
-  return (
-    value === 'OFFLINE' ||
-    value === 'UNAUTHORIZED' ||
-    value === 'FORBIDDEN' ||
-    value === 'UNSUPPORTED' ||
-    value === 'INVALID_REQUEST' ||
-    value === 'UNKNOWN'
-  );
+  return decodeBridgeFrame(frame);
 }
 
 export function randomId(): string {
   return [...crypto.getRandomValues(new Uint8Array(16))]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function decodePacket(raw: unknown): { readonly iv: Uint8Array; readonly ciphertext: string } {
+  if (typeof raw !== 'string' || raw.length > MAX_PACKET_CHARS) {
+    throw invalidPacket();
+  }
+  let packet: unknown;
+  try {
+    packet = JSON.parse(raw);
+  } catch {
+    throw invalidPacket();
+  }
+  if (!packet || typeof packet !== 'object' || Array.isArray(packet)) {
+    throw invalidPacket();
+  }
+  const data = packet as Record<string, unknown>;
+  if (data.version !== 1 || typeof data.iv !== 'string' || typeof data.ciphertext !== 'string') {
+    throw invalidPacket();
+  }
+  const iv = decodeBytes(data.iv);
+  if (iv.length !== 12) {
+    throw invalidPacket();
+  }
+  return { iv, ciphertext: data.ciphertext };
+}
+
+function isBase64Code(code: number): boolean {
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    code === 43 ||
+    code === 47
+  );
+}
+
+function invalidBytes(): RemotishError {
+  return new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge bytes.');
+}
+
+function invalidPacket(): RemotishError {
+  return new RemotishError('INVALID_REQUEST', 'Invalid Git HTTP bridge packet.');
 }

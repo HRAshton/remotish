@@ -133,11 +133,11 @@ async function bundle(t, pairing) {
   );
   const entryFile = join(directory, 'entry.ts');
   const metadataFile = join(directory, 'metadata.txt');
-  const outputFile = join(directory, 'pilot.user.js');
+  const outputFile = join(directory, 'git-http.user.js');
   await writeFile(
     entryFile,
     template
-      .replace('../src/bridge-wire.js', '../../src/bridge-wire.js')
+      .replace('../src/userscript-runtime.js', '../../src/userscript-runtime.js')
       .replaceAll('https://code.example.invalid', 'https://code.example.com')
       .replaceAll('https://git.example.invalid', 'https://git.example.com')
       .replace('REPLACE_WITH_YOUR_OWN_43_CHARACTER_BASE64URL_KEY', pairing),
