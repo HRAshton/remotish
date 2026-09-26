@@ -4,6 +4,7 @@ import type * as vscode from 'vscode';
 import { withCancellation } from './cancellation.js';
 
 const PAGE_SIZE = 25;
+// A file with sparse changes may require many commit reads; return a cursor after this bound.
 const MAX_SCANNED_COMMITS = 250;
 
 interface TimelineCursorState {
@@ -24,6 +25,7 @@ export interface FileTimelinePage {
   readonly nextCursor?: string;
 }
 
+/** Walks backward from a pinned revision, following previousPath across renames. */
 export class FileTimelineQueryService {
   constructor(private readonly workspace: RemotishWorkspace) {}
 
@@ -173,6 +175,7 @@ function decodeCursor(
   revision: string,
   path: RepoPath,
 ): TimelineCursorState {
+  // Cursors belong to one base revision; a refresh starts a new walk.
   if (!value) {
     return { revision, offset: 0, trackedPath: path };
   }

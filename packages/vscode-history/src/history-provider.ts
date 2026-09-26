@@ -30,15 +30,17 @@ export class RemotishHistoryProvider
   constructor(
     private readonly workspaceId: string,
     private readonly workspace: RemotishWorkspace,
+    private readonly reportBackgroundError: (error: unknown) => void = (error) =>
+      console.error(error),
   ) {
     this.queries = new HistoryQueryService(workspace);
     this._currentHistoryItemRef = toRef(workspaceRef(workspace.branch, workspace.baseRevision));
     this.workspaceSubscription = workspace.onDidChange(() => {
       this._currentHistoryItemRef = toRef(workspaceRef(workspace.branch, workspace.baseRevision));
       this.currentRefsChanged.fire();
-      void this.refreshRemoteRefs(false);
+      this.refreshRemoteRefsInBackground(false);
     });
-    void this.refreshRemoteRefs(true);
+    this.refreshRemoteRefsInBackground(true);
   }
 
   get currentHistoryItemRef(): vscode.SourceControlHistoryItemRef {
@@ -154,6 +156,21 @@ export class RemotishHistoryProvider
     this.workspaceSubscription.dispose();
     this.currentRefsChanged.dispose();
     this.refsChanged.dispose();
+  }
+
+  private refreshRemoteRefsInBackground(silent: boolean): void {
+    void this.refreshRemoteRefs(silent).catch((error) => this.reportRefreshFailure(error));
+  }
+
+  private reportRefreshFailure(error: unknown): void {
+    try {
+      this.reportBackgroundError(error);
+    } catch (reportingError) {
+      console.error(
+        'Failed to report a Remotish history background refresh error.',
+        reportingError,
+      );
+    }
   }
 
   private async refreshRemoteRefs(silent: boolean): Promise<void> {

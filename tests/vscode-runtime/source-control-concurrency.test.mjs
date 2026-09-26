@@ -131,3 +131,36 @@ test('disposing source control prevents an in-flight refresh from mutating UI st
   assert.equal(vscode.__test.sourceControls.length, 0);
   vscode.__test.reset();
 });
+
+test('source control reports detached refresh failures instead of leaking rejections', async (t) => {
+  vscode.__test.reset();
+  const listeners = new Set();
+  const failure = new Error('getChanges failed');
+  const reported = [];
+  const workspace = {
+    branch: 'main',
+    baseRevision: 'C1',
+    capabilities: { commits: true, forceWithLease: false, amend: false },
+    onDidChange(listener) {
+      listeners.add(listener);
+      return { dispose: () => listeners.delete(listener) };
+    },
+    async getChanges() {
+      throw failure;
+    },
+  };
+  const scm = new RemotishSourceControl('failing', workspace, (error) => reported.push(error));
+  t.after(() => {
+    scm.dispose();
+    vscode.__test.reset();
+  });
+
+  await settle();
+  assert.deepEqual(reported, [failure]);
+
+  for (const listener of listeners) {
+    listener({ branch: 'main', baseRevision: 'C1' });
+  }
+  await settle();
+  assert.deepEqual(reported, [failure, failure]);
+});

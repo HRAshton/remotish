@@ -6,6 +6,6 @@
     "noEmit": true,
     "composite": false
   },
-  "include": ["userscript-template/entry.ts", "src/bridge-wire.ts"],
+  "include": ["userscript-template/entry.ts"],
   "references": [{ "path": "../../packages/adapter-sdk" }]
 }

@@ -63,10 +63,10 @@ A successful commit is already published remotely. Remotish does not create loca
 @remotish/adapter-http      small HTTP protocol example
 @remotish/adapter-github    production-style GitHub reference adapter
 @remotish/adapter-rpc       transport-neutral, versioned RPC adapter
-@remotish/adapter-git-http  Git smart HTTP adapter pilot
+@remotish/adapter-git-http  Git smart HTTP adapter
 extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
-extensions/git-http-provider  HTTPS Git provider pilot for Web and desktop
+extensions/git-http-provider  HTTPS Git provider for Web and desktop
 apps/demo-web               browser-safe Remotish host extension
 examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
 examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript example
@@ -85,7 +85,7 @@ corepack pnpm vscode:web
 
 The launcher loads the Remotish host and fixture provider as separate extensions. Run **Remotish Demo: Open Fixture Repository** to open the deterministic fixture through the same provider discovery, canonical workspace, filesystem, SCM, branch and history paths used by real providers.
 
-For one HTTPS Git repository, see the [Git HTTP provider pilot](extensions/git-http-provider/README.md).
+For one HTTPS Git repository, see the [Git HTTP provider](extensions/git-http-provider/README.md).
 
 ## Suitable backends
 
@@ -100,6 +100,13 @@ Remotish is prepared for a public beta release. The repository is currently pre-
 ## Development and security
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development commands and [SECURITY.md](SECURITY.md) for vulnerability reporting. Release artifacts are built with pinned dependencies, checksums, SBOM generation and provenance attestations; details are in [Release security](docs/release-security.md).
+
+## Get involved
+
+- [Releases](https://github.com/HRAshton/remotish/releases) - download published releases.
+- [Issues](https://github.com/HRAshton/remotish/issues) - report bugs or propose enhancements.
+- [Contributing](CONTRIBUTING.md) - development setup and contribution requirements.
+- [Security](SECURITY.md) - report suspected vulnerabilities privately.
 
 ## License
 

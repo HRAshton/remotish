@@ -12,4 +12,4 @@ allowBuilds:
   '@vscode/vsce-sign': true
   esbuild: true
 
-minimumReleaseAge: 0 # TODO: Adjust this value once the initial release cycle stabilizes
+minimumReleaseAge: 1440 # Require external releases to age for 24 hours before normal installation.

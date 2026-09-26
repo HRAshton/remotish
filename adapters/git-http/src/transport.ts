@@ -69,7 +69,7 @@ export interface GitHttpAdapterOptions {
   readonly fs?: PromiseFsClient;
 }
 
-/** Restrict every Git request to one configured origin and repository path. */
+/** Canonical credential-free HTTPS clone URL accepted by the Git HTTP adapter and providers. */
 export function validateGitUrl(raw: string): string {
   let url: URL;
   try {
@@ -85,9 +85,13 @@ export function validateGitUrl(raw: string): string {
     url.hash ||
     !url.pathname.endsWith('.git') ||
     url.pathname.includes('//') ||
-    url.pathname.split('/').some((part) => part === '.' || part === '..')
+    url.pathname.split('/').some((part) => part === '.' || part === '..') ||
+    url.href !== raw
   ) {
-    throw new RemotishError('INVALID_REQUEST', 'Expected a credential-free HTTPS Git clone URL.');
+    throw new RemotishError(
+      'INVALID_REQUEST',
+      'Expected a canonical credential-free HTTPS Git clone URL.',
+    );
   }
   return url.href;
 }
@@ -105,7 +109,7 @@ async function collect(
     }
     length += part.byteLength;
     if (length > limit) {
-      throw new RemotishError('UNSUPPORTED', 'Git HTTP transfer exceeds the pilot size limit.');
+      throw new RemotishError('UNSUPPORTED', 'Git HTTP transfer exceeds the size limit.');
     }
     parts.push(part);
   }
@@ -134,7 +138,10 @@ export function createGitHttpClient(
           url.pathname !== `${configured.pathname}/git-upload-pack` &&
           url.pathname !== `${configured.pathname}/git-receive-pack`)
       ) {
-        throw new RemotishError('INVALID_REQUEST', 'Git HTTP request left the configured origin.');
+        throw new RemotishError(
+          'INVALID_REQUEST',
+          'Git HTTP request left the configured repository.',
+        );
       }
       const signal = request.signal ?? operationSignal;
       const body = await collect(request.body, MAX_REQUEST_BYTES, signal);
@@ -149,7 +156,7 @@ export function createGitHttpClient(
         ...(signal ? { signal } : {}),
       });
       if (response.body.byteLength > MAX_RESPONSE_BYTES) {
-        throw new RemotishError('UNSUPPORTED', 'Git HTTP response exceeds the pilot size limit.');
+        throw new RemotishError('UNSUPPORTED', 'Git HTTP response exceeds the size limit.');
       }
       return {
         url: url.href,

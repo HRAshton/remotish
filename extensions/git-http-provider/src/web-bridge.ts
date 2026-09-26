@@ -30,14 +30,14 @@ export class GitHttpWebBridge {
   private readonly pending = new Map<string, Pending>();
   private sessionId?: string;
   private helloResolve: ((sessionId: string) => void) | undefined;
-  private disposed: boolean = false;
+  private disposed = false;
 
   private constructor(
     private readonly key: CryptoKey,
     private readonly url: string,
   ) {
     this.channel.onmessage = (event) => {
-      // Page scripts may send arbitrary channel traffic; only authenticated frames are handled.
+      // Page scripts can send arbitrary channel traffic; only authenticated frames are handled.
       this.receive(event.data).catch(() => {});
     };
   }
@@ -51,6 +51,29 @@ export class GitHttpWebBridge {
       bridge.dispose();
       throw error;
     }
+  }
+
+  async request(request: GitHttpRequest): Promise<GitHttpResponse> {
+    const sessionId = this.requireSession();
+    this.validateRequest(request);
+    const id = randomId();
+    const packet = await this.encodeRequest(request, id, sessionId);
+    this.validateDispatchState(request);
+    return this.dispatch(request, id, sessionId, packet);
+  }
+
+  dispose(): void {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: dispose can be called more than once.
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.channel.onmessage = null;
+    this.channel.close();
+    for (const pending of this.pending.values()) {
+      pending.reject(new RemotishError('OFFLINE', 'Git HTTP bridge closed.'));
+    }
+    this.pending.clear();
   }
 
   private handshake(): Promise<void> {
@@ -75,17 +98,21 @@ export class GitHttpWebBridge {
     });
   }
 
-  async request(request: GitHttpRequest): Promise<GitHttpResponse> {
+  private requireSession(): string {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: disposal can happen after construction.
     if (this.disposed) {
       throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge is closed.');
     }
-    const sessionId = this.sessionId;
-    if (!sessionId) {
+    if (!this.sessionId) {
       throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP userscript session is unavailable.');
     }
     if (this.pending.size >= MAX_PENDING) {
       throw new GitHttpNotDispatchedError('RATE_LIMITED', 'Too many Git HTTP bridge requests.');
     }
+    return this.sessionId;
+  }
+
+  private validateRequest(request: GitHttpRequest): void {
     const target = new URL(request.url);
     const configured = new URL(this.url);
     if (
@@ -100,10 +127,15 @@ export class GitHttpWebBridge {
     if (request.signal?.aborted) {
       throw new GitHttpNotDispatchedError('CANCELLED', 'Git HTTP request cancelled.');
     }
-    const id = randomId();
-    let packet: string;
+  }
+
+  private async encodeRequest(
+    request: GitHttpRequest,
+    id: string,
+    sessionId: string,
+  ): Promise<string> {
     try {
-      packet = await encrypt(this.key, {
+      return await encrypt(this.key, {
         version: 1,
         kind: 'request',
         hostId: this.hostId,
@@ -121,13 +153,25 @@ export class GitHttpWebBridge {
         { cause: error },
       );
     }
+  }
+
+  private validateDispatchState(request: GitHttpRequest): void {
     if (request.signal?.aborted) {
       throw new GitHttpNotDispatchedError('CANCELLED', 'Git HTTP request cancelled.');
     }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: disposal can happen while a request is encoded.
     if (this.disposed) {
       throw new GitHttpNotDispatchedError('OFFLINE', 'Git HTTP bridge is closed.');
     }
-    return new Promise<GitHttpResponse>((resolve, reject) => {
+  }
+
+  private dispatch(
+    request: GitHttpRequest,
+    id: string,
+    sessionId: string,
+    packet: string,
+  ): Promise<GitHttpResponse> {
+    return new Promise((resolve, reject) => {
       const finish = (error?: RemotishError, value?: GitHttpResponse) => {
         clearTimeout(timer);
         request.signal?.removeEventListener('abort', cancel);
@@ -139,9 +183,9 @@ export class GitHttpWebBridge {
         }
       };
       const cancel = () => {
-        this.send({ version: 1, kind: 'cancel', hostId: this.hostId, id, sessionId }).catch(
-          () => {},
-        );
+        this.send({ version: 1, kind: 'cancel', hostId: this.hostId, id, sessionId }).catch(() => {
+          // The request is already cancelled locally; channel closure cannot change that outcome.
+        });
         finish(new RemotishError('CANCELLED', 'Git HTTP request cancelled.'));
       };
       const timer = setTimeout(
@@ -166,6 +210,7 @@ export class GitHttpWebBridge {
   }
 
   private async send(frame: Parameters<typeof encrypt>[1]): Promise<void> {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: disposal can happen while a frame is encrypted.
     if (!this.disposed) {
       this.channel.postMessage(await encrypt(this.key, frame));
     }
@@ -200,18 +245,5 @@ export class GitHttpWebBridge {
     } else if (frame.kind === 'failure') {
       pending.reject(new RemotishError(frame.code, 'Git HTTP bridge request failed.'));
     }
-  }
-
-  dispose(): void {
-    if (this.disposed) {
-      return;
-    }
-    this.disposed = true;
-    this.channel.onmessage = null;
-    this.channel.close();
-    for (const pending of this.pending.values()) {
-      pending.reject(new RemotishError('OFFLINE', 'Git HTTP bridge closed.'));
-    }
-    this.pending.clear();
   }
 }

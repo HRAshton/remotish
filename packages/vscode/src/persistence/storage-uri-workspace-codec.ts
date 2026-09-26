@@ -1,4 +1,13 @@
 import type { WorkspaceSnapshot } from '@remotish/core';
+import {
+  parseStoredWorkspace,
+  requireNonNegativeInteger,
+  requireRecord,
+  requireString,
+  type StoredBranchWorkspaceSnapshot,
+  type StoredPendingCommitPublication,
+  toWorkspaceSnapshot,
+} from './workspace-persistence-schema.js';
 
 /** Content-addressed file reference used by storageUri-backed workspace manifests. */
 export interface StoredBlobReference {
@@ -11,48 +20,28 @@ interface StoredOverlayFile {
   readonly blob: StoredBlobReference;
 }
 
-interface StoredRenameSnapshot {
-  readonly from: string;
-  readonly to: string;
-}
-
-type StoredPendingCommitPublication =
-  | {
-      readonly phase: 'prepared';
-      readonly branch: string;
-      readonly expectedRemoteRevision: string;
-    }
-  | {
-      readonly phase: 'published';
-      readonly branch: string;
-      readonly expectedRemoteRevision: string;
-      readonly publishedRevision: string;
-    };
-
-interface StoredBranchWorkspaceSnapshot {
-  readonly baseRevision: string;
-  readonly overlay: {
-    readonly files: readonly StoredOverlayFile[];
-    readonly directories: readonly string[];
-    readonly deletedPaths: readonly string[];
-    readonly renames: readonly StoredRenameSnapshot[];
-  };
-}
-
 /** Manifest persisted separately from raw content-addressed overlay blobs. */
 export interface StoredStorageUriWorkspaceManifest {
   readonly version: 2;
   readonly selectedBranch: string;
-  readonly branches: Readonly<Record<string, StoredBranchWorkspaceSnapshot>>;
+  readonly branches: Readonly<Record<string, StoredBranchWorkspaceSnapshot<StoredOverlayFile>>>;
   readonly pendingCommitPublication?: StoredPendingCommitPublication;
 }
+
+const validation = {
+  invalid: (detail: string) =>
+    new Error(`Invalid persisted Remotish workspace manifest: ${detail}.`),
+};
 
 /** Builds a manifest while handing raw overlay bytes to the storage implementation. */
 export async function encodeStorageUriWorkspaceManifest(
   snapshot: WorkspaceSnapshot,
   storeBlob: (content: Uint8Array) => Promise<StoredBlobReference>,
 ): Promise<StoredStorageUriWorkspaceManifest> {
-  const branches = Object.create(null) as Record<string, StoredBranchWorkspaceSnapshot>;
+  const branches = Object.create(null) as Record<
+    string,
+    StoredBranchWorkspaceSnapshot<StoredOverlayFile>
+  >;
   for (const [name, branch] of Object.entries(snapshot.branches)) {
     branches[name] = {
       baseRevision: branch.baseRevision,
@@ -85,181 +74,38 @@ export async function decodeStorageUriWorkspaceManifest(
   readBlob: (blob: StoredBlobReference) => Promise<Uint8Array>,
 ): Promise<WorkspaceSnapshot> {
   const stored = requireStorageUriWorkspaceManifest(value);
-  const branches = Object.create(null) as Record<string, WorkspaceSnapshot['branches'][string]>;
-
-  for (const [name, branch] of Object.entries(stored.branches)) {
-    branches[name] = {
-      baseRevision: branch.baseRevision,
-      overlay: {
-        files: await Promise.all(
-          branch.overlay.files.map(async (file) => ({
-            path: file.path,
-            content: await readBlob(file.blob),
-          })),
-        ),
-        directories: [...branch.overlay.directories],
-        deletedPaths: [...branch.overlay.deletedPaths],
-        renames: branch.overlay.renames.map((rename) => ({ ...rename })),
-      },
-    };
-  }
-
-  return {
-    version: 1,
-    selectedBranch: stored.selectedBranch,
-    branches,
-    ...(stored.pendingCommitPublication
-      ? { pendingCommitPublication: { ...stored.pendingCommitPublication } }
-      : {}),
-  };
+  return toWorkspaceSnapshot(stored, async (files) =>
+    Promise.all(
+      files.map(async (file) => ({ path: file.path, content: await readBlob(file.blob) })),
+    ),
+  );
 }
 
 /** Returns the blob hashes referenced by a validated persisted manifest. */
 export function referencedStorageBlobIds(value: unknown): ReadonlySet<string> {
   const stored = requireStorageUriWorkspaceManifest(value);
-  const result = new Set<string>();
-  for (const branch of Object.values(stored.branches)) {
-    for (const file of branch.overlay.files) {
-      result.add(file.blob.sha256);
-    }
-  }
-  return result;
+  return new Set(
+    Object.values(stored.branches).flatMap((branch) =>
+      branch.overlay.files.map((file) => file.blob.sha256),
+    ),
+  );
 }
 
 function requireStorageUriWorkspaceManifest(value: unknown): StoredStorageUriWorkspaceManifest {
-  const snapshot = requireRecord(value, 'workspace manifest');
-  if (snapshot.version !== 2) {
-    throw invalidManifest(`unsupported version ${String(snapshot.version)}`);
-  }
-
-  const selectedBranch = requireString(snapshot.selectedBranch, 'selectedBranch');
-  const storedBranches = requireRecord(snapshot.branches, 'branches');
-  const branches = Object.create(null) as Record<string, StoredBranchWorkspaceSnapshot>;
-  const pendingCommitPublication =
-    snapshot.pendingCommitPublication === undefined
-      ? undefined
-      : requirePendingCommitPublication(snapshot.pendingCommitPublication);
-
-  for (const [name, value] of Object.entries(storedBranches)) {
-    const branch = requireRecord(value, `branches.${name}`);
-    const overlay = requireRecord(branch.overlay, `branches.${name}.overlay`);
-    branches[name] = {
-      baseRevision: requireString(branch.baseRevision, `branches.${name}.baseRevision`),
-      overlay: {
-        files: requireArray(overlay.files, `branches.${name}.overlay.files`).map((file, index) => {
-          const item = requireRecord(file, `branches.${name}.overlay.files[${index}]`);
-          const blob = requireRecord(item.blob, `branches.${name}.overlay.files[${index}].blob`);
-          const sha256 = requireString(
-            blob.sha256,
-            `branches.${name}.overlay.files[${index}].blob.sha256`,
-          );
-          if (!/^[a-f0-9]{64}$/u.test(sha256)) {
-            throw invalidManifest(
-              `branches.${name}.overlay.files[${index}].blob.sha256 is invalid`,
-            );
-          }
-          return {
-            path: requireString(item.path, `branches.${name}.overlay.files[${index}].path`),
-            blob: {
-              sha256,
-              size: requireNonNegativeInteger(
-                blob.size,
-                `branches.${name}.overlay.files[${index}].blob.size`,
-              ),
-            },
-          };
-        }),
-        directories: requireStringArray(
-          overlay.directories,
-          `branches.${name}.overlay.directories`,
-        ),
-        deletedPaths: requireStringArray(
-          overlay.deletedPaths,
-          `branches.${name}.overlay.deletedPaths`,
-        ),
-        renames: requireArray(overlay.renames, `branches.${name}.overlay.renames`).map(
-          (rename, index) => {
-            const item = requireRecord(rename, `branches.${name}.overlay.renames[${index}]`);
-            return {
-              from: requireString(item.from, `branches.${name}.overlay.renames[${index}].from`),
-              to: requireString(item.to, `branches.${name}.overlay.renames[${index}].to`),
-            };
-          },
-        ),
+  const stored = parseStoredWorkspace(value, 2, 'workspace manifest', validation, (file, field) => {
+    const item = requireRecord(file, field, validation);
+    const blob = requireRecord(item.blob, `${field}.blob`, validation);
+    const sha256 = requireString(blob.sha256, `${field}.blob.sha256`, validation);
+    if (!/^[a-f0-9]{64}$/u.test(sha256)) {
+      throw validation.invalid(`${field}.blob.sha256 is invalid`);
+    }
+    return {
+      path: requireString(item.path, `${field}.path`, validation),
+      blob: {
+        sha256,
+        size: requireNonNegativeInteger(blob.size, `${field}.blob.size`, validation),
       },
     };
-  }
-
-  if (!Object.hasOwn(branches, selectedBranch)) {
-    throw invalidManifest(`selected branch ${selectedBranch} is not present in branches`);
-  }
-  if (pendingCommitPublication && pendingCommitPublication.branch !== selectedBranch) {
-    throw invalidManifest('pending publication branch must be the selected branch');
-  }
-  return {
-    version: 2,
-    selectedBranch,
-    branches,
-    ...(pendingCommitPublication ? { pendingCommitPublication } : {}),
-  };
-}
-
-function requirePendingCommitPublication(value: unknown): StoredPendingCommitPublication {
-  const pending = requireRecord(value, 'pendingCommitPublication');
-  const branch = requireString(pending.branch, 'pendingCommitPublication.branch');
-  const expectedRemoteRevision = requireString(
-    pending.expectedRemoteRevision,
-    'pendingCommitPublication.expectedRemoteRevision',
-  );
-  if (pending.phase === undefined || pending.phase === 'prepared') {
-    return { phase: 'prepared', branch, expectedRemoteRevision };
-  }
-  if (pending.phase === 'published') {
-    return {
-      phase: 'published',
-      branch,
-      expectedRemoteRevision,
-      publishedRevision: requireString(
-        pending.publishedRevision,
-        'pendingCommitPublication.publishedRevision',
-      ),
-    };
-  }
-  throw invalidManifest(`pendingCommitPublication.phase is unsupported: ${String(pending.phase)}`);
-}
-
-function requireRecord(value: unknown, field: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw invalidManifest(`${field} must be an object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function requireArray(value: unknown, field: string): readonly unknown[] {
-  if (!Array.isArray(value)) {
-    throw invalidManifest(`${field} must be an array`);
-  }
-  return value;
-}
-
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value) {
-    throw invalidManifest(`${field} must be a non-empty string`);
-  }
-  return value;
-}
-
-function requireStringArray(value: unknown, field: string): readonly string[] {
-  return requireArray(value, field).map((item, index) => requireString(item, `${field}[${index}]`));
-}
-
-function requireNonNegativeInteger(value: unknown, field: string): number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw invalidManifest(`${field} must be a non-negative safe integer`);
-  }
-  return value;
-}
-
-function invalidManifest(detail: string): Error {
-  return new Error(`Invalid persisted Remotish workspace manifest: ${detail}.`);
+  });
+  return { version: 2, ...stored };
 }

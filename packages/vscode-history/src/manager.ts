@@ -10,6 +10,7 @@ export class HistoryManager implements vscode.Disposable {
   constructor(
     private readonly registry: WorkspaceRegistry,
     private readonly scm: ScmManager,
+    private readonly logger?: vscode.LogOutputChannel,
   ) {
     for (const registration of registry.list()) {
       this.add(registration.id);
@@ -42,7 +43,13 @@ export class HistoryManager implements vscode.Disposable {
       return;
     }
     const workspace = this.registry.require(workspaceId).workspace;
-    const provider = new RemotishHistoryProvider(workspaceId, workspace);
+    const provider = new RemotishHistoryProvider(workspaceId, workspace, (error) => {
+      if (this.logger) {
+        this.logger.error(`History refresh failed for workspace ${workspaceId}.`, error);
+      } else {
+        console.error(`History refresh failed for workspace ${workspaceId}.`, error);
+      }
+    });
     sourceControl.historyProvider = provider;
     this.entries.set(workspaceId, provider);
   }

@@ -58,10 +58,10 @@ export class Uri {
 
   static joinPath(base, ...segments) {
     const suffix = segments
-      .map((segment) => String(segment).replace(/^\/+|\/+$/g, ''))
+      .map((segment) => stripSurroundingSlashes(String(segment)))
       .filter(Boolean)
       .join('/');
-    const root = base.path.replace(/\/+$/g, '');
+    const root = stripTrailingSlashes(base.path);
     return base.with({ path: suffix ? `${root}/${suffix}` : root || '/' });
   }
 
@@ -493,7 +493,23 @@ function stringify(value) {
 }
 
 function storageKey(uri) {
-  return uri.toString().replace(/\/+$/u, '');
+  return stripTrailingSlashes(uri.toString());
+}
+
+function stripSurroundingSlashes(value) {
+  let start = 0;
+  while (value[start] === '/') {
+    start += 1;
+  }
+  return stripTrailingSlashes(value.slice(start));
+}
+
+function stripTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 function hasStorageChild(key) {
