@@ -11,7 +11,7 @@ const providerVsixes = (
         'artifacts/remotish-browser-rpc-provider.vsix',
         'artifacts/remotish-git-http-provider.vsix',
       ]
-).map(resolve);
+).map((vsix) => resolve(vsix));
 const smokeRoot = resolve('artifacts/vsix-smoke');
 const extensionRoot = resolve(smokeRoot, 'extension');
 const providersRoot = resolve(smokeRoot, 'providers');
