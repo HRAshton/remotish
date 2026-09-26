@@ -214,6 +214,45 @@ test('Git HTTP reads immutable binary content and publishes a multi-file change'
   );
 });
 
+test('Git HTTP rejects gitlinks and symlinks as file entries', async (t) => {
+  const { adapter, working } = await startRepository(t);
+  const original = (await adapter.getBranches()).find((item) => item.name === 'main');
+  assert.ok(original);
+  await writeFile(join(working, 'link'), 'hello.txt');
+  const linkOid = run(working, 'hash-object', '-w', 'link');
+  run(working, 'update-index', '--add', '--cacheinfo', `120000,${linkOid},link`);
+  run(working, 'update-index', '--add', '--cacheinfo', `160000,${original.revision},submodule`);
+  run(
+    working,
+    '-c',
+    'user.name=External',
+    '-c',
+    'user.email=external@example.invalid',
+    'commit',
+    '-m',
+    'Special entries',
+  );
+  run(working, 'push', 'origin', 'HEAD:main');
+  const current = (await adapter.getBranches()).find((item) => item.name === 'main');
+  assert.ok(current);
+  await assert.rejects(
+    adapter.readDirectory(current.revision, ''),
+    (error) => error.code === 'UNSUPPORTED',
+  );
+  await assert.rejects(
+    adapter.readFile(current.revision, 'link'),
+    (error) => error.code === 'UNSUPPORTED',
+  );
+  await assert.rejects(
+    adapter.readFile(current.revision, 'submodule'),
+    (error) => error.code === 'UNSUPPORTED',
+  );
+  await assert.rejects(
+    adapter.getCommitChanges(current.revision),
+    (error) => error.code === 'UNSUPPORTED',
+  );
+});
+
 test('Git HTTP rejects stale normal publication and keeps amend parentage', async (t) => {
   const { adapter, bare, working, root } = await startRepository(t);
   const original = (await adapter.getBranches()).find((item) => item.name === 'main');

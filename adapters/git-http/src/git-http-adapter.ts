@@ -246,6 +246,9 @@ export class GitHttpAdapter implements RemotishAdapter {
     } catch {
       throw new RemotishError('NOT_FOUND', 'Git directory does not exist.');
     }
+    if (tree.tree.some((entry) => entry.type === 'commit' || entry.mode === '120000')) {
+      throw new RemotishError('UNSUPPORTED', 'Git submodules and symlinks are not supported.');
+    }
     return tree.tree.map((entry) => ({
       name: entry.path,
       path: normalized ? `${normalized}/${entry.path}` : entry.path,
@@ -262,6 +265,26 @@ export class GitHttpAdapter implements RemotishAdapter {
     this.check(options?.signal);
     await this.commitObject(oid);
     const normalized = safePath(path);
+    const parts = normalized.split('/');
+    const name = parts.pop();
+    let directory: git.ReadTreeResult;
+    try {
+      directory = await git.readTree({
+        fs: this.fs,
+        dir: DIR,
+        oid,
+        ...(parts.length ? { filepath: parts.join('/') } : {}),
+      });
+    } catch {
+      throw new RemotishError('NOT_FOUND', 'Git file does not exist.');
+    }
+    const entry = directory.tree.find((candidate) => candidate.path === name);
+    if (entry?.type === 'commit' || entry?.mode === '120000') {
+      throw new RemotishError('UNSUPPORTED', 'Git submodules and symlinks are not supported.');
+    }
+    if (entry?.type !== 'blob') {
+      throw new RemotishError('NOT_FOUND', 'Git file does not exist.');
+    }
     try {
       const result = await git.readBlob({ fs: this.fs, dir: DIR, oid, filepath: normalized });
       return new Uint8Array(result.blob);
@@ -317,10 +340,10 @@ export class GitHttpAdapter implements RemotishAdapter {
         const path = prefix ? `${prefix}/${entry.path}` : entry.path;
         if (entry.type === 'tree') {
           await visit(entry.oid, path);
-        } else if (entry.type === 'blob') {
+        } else if (entry.type === 'blob' && entry.mode !== '120000') {
           files.set(path, { oid: entry.oid, mode: entry.mode });
         } else {
-          throw new RemotishError('UNSUPPORTED', 'Git submodules are not supported.');
+          throw new RemotishError('UNSUPPORTED', 'Git submodules and symlinks are not supported.');
         }
         if (files.size > MAX_TREE_ENTRIES) {
           throw new RemotishError('UNSUPPORTED', 'Git tree exceeds the pilot entry limit.');
