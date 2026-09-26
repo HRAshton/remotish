@@ -1,0 +1,8 @@
+**/*.ts
+**/*.tsbuildinfo
+build/**
+src/**
+userscript-template/**
+local/**
+tsconfig.json
+tsconfig.userscript.json

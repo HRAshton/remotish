@@ -336,3 +336,8 @@ For an independently installable provider:
 7. Let Remotish own workspace construction, canonical identity, navigation, filesystem, SCM, branches, and history.
 
 The adapter package remains separately reusable without VS Code.
+
+The [Git HTTP pilot provider](../extensions/git-http-provider/README.md) is an independently
+installed example with one URL-only descriptor. Desktop bearer tokens stay in SecretStorage; Web
+tokens stay in a customer-scoped Tampermonkey script on the Code-OSS origin. It uses Git smart HTTP
+and does not need a Bitbucket tab or a repository-semantic endpoint.

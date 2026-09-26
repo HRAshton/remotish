@@ -19,7 +19,7 @@ test('host VSIX uses the Remotish product artifact name everywhere release tooli
   assert.match(releaseVsix, /--out \.\.\/\.\.\/artifacts\/remotish\.vsix$/u);
   assert.equal(
     prepareVsix,
-    'node scripts/prepare-vsix-smoke.mjs artifacts/remotish.vsix artifacts/remotish-fixture-provider.vsix artifacts/remotish-browser-rpc-provider.vsix',
+    'node scripts/prepare-vsix-smoke.mjs artifacts/remotish.vsix artifacts/remotish-fixture-provider.vsix artifacts/remotish-browser-rpc-provider.vsix artifacts/remotish-git-http-provider.vsix',
   );
   assert.match(prepareVsixSmoke, /process\.argv\[2\] \?\? 'artifacts\/remotish\.vsix'/u);
 

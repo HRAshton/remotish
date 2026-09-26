@@ -8,6 +8,7 @@ build/
 .pnpm-store/
 .vscode-test-web/
 extensions/browser-rpc-provider/local/
+extensions/git-http-provider/local/
 examples/browser-rpc-bitbucket/local/
 examples/browser-rpc-bitbucket-datacenter/local/
 

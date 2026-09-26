@@ -1,0 +1,15 @@
+// ==UserScript==
+// @name         Customer Remotish Git HTTP Bridge
+// @namespace    https://example.invalid/remotish-git-http
+// @version      1
+// @description  One-repository Git HTTP bridge for Code-OSS Web.
+// @sandbox      DOM
+// @match        https://code.example.invalid/*
+// @connect      code.example.invalid
+// @connect      git.example.invalid
+// @grant        GM_info
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
+// ==/UserScript==

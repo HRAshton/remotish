@@ -140,6 +140,7 @@ const inputBoxResponses = [];
 const warningResponses = [];
 const storageFiles = new Map();
 const storageDirectories = new Set();
+const configurationValues = new Map();
 const logOutputChannels = [];
 const installedExtensions = [];
 const extensionsChanged = new EventEmitter();
@@ -174,6 +175,16 @@ export const commands = {
 export const workspace = {
   workspaceFolders: undefined,
   onDidChangeWorkspaceFolders: workspaceFoldersChanged.event,
+  getConfiguration(section) {
+    return {
+      get(key, fallback) {
+        return configurationValues.get(`${section}.${key}`) ?? fallback;
+      },
+      async update(key, value) {
+        configurationValues.set(`${section}.${key}`, value);
+      },
+    };
+  },
   fs: {
     async createDirectory(uri) {
       storageDirectories.add(storageKey(uri));
@@ -389,6 +400,10 @@ export const window = {
   },
 };
 
+export const UIKind = Object.freeze({ Desktop: 1, Web: 2 });
+export const env = { uiKind: UIKind.Desktop };
+export const ConfigurationTarget = Object.freeze({ Global: 1 });
+
 export const __test = {
   commandHandlers,
   fileSystemProviders,
@@ -405,6 +420,7 @@ export const __test = {
   logOutputChannels,
   storageFiles,
   storageDirectories,
+  configurationValues,
   installedExtensions,
   setWorkspaceFolders(folders) {
     workspace.workspaceFolders = folders;
@@ -467,6 +483,8 @@ export const __test = {
     }
     logOutputChannels.splice(0);
     workspace.workspaceFolders = undefined;
+    configurationValues.clear();
+    env.uiKind = UIKind.Desktop;
   },
 };
 

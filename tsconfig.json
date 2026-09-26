@@ -26,6 +26,9 @@
       "path": "./adapters/rpc"
     },
     {
+      "path": "./adapters/git-http"
+    },
+    {
       "path": "./apps/demo-web"
     },
     {
@@ -33,6 +36,12 @@
     },
     {
       "path": "./extensions/browser-rpc-provider"
+    },
+    {
+      "path": "./extensions/git-http-provider"
+    },
+    {
+      "path": "./extensions/git-http-provider/tsconfig.userscript.json"
     },
     {
       "path": "./examples/browser-rpc-bitbucket"

@@ -1,5 +1,5 @@
 {
-  "name": "@remotish/adapter-rpc",
+  "name": "@remotish/adapter-git-http",
   "version": "0.1.0-beta.14",
   "type": "module",
   "license": "0BSD",
@@ -14,7 +14,9 @@
     "README.md"
   ],
   "dependencies": {
-    "@remotish/adapter-sdk": "workspace:*"
+    "@isomorphic-git/lightning-fs": "4.10.3",
+    "@remotish/adapter-sdk": "workspace:*",
+    "isomorphic-git": "1.42.2"
   },
   "scripts": {
     "build": "tsc -b",

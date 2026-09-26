@@ -42,7 +42,10 @@ test('Browser RPC VSIX participates in packaged smoke and release controls', () 
     /remotish-browser-rpc-provider\.vsix$/u,
   );
   assert.match(root.scripts['test:vscode-web:vsix'], /release:browser-rpc-provider:vsix/u);
-  assert.match(root.scripts['prepare:vscode-web-vsix'], /remotish-browser-rpc-provider\.vsix$/u);
+  assert.match(
+    root.scripts['prepare:vscode-web-vsix'],
+    /remotish-browser-rpc-provider\.vsix(?: |$)/u,
+  );
   assert.match(workflow, /browser_rpc_provider_version=/u);
   assert.match(workflow, /test "\$browser_rpc_provider_version" = "\$version"/u);
   assert.match(workflow, /sha256sum[\s\S]*remotish-browser-rpc-provider\.vsix/u);

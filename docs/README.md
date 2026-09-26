@@ -16,6 +16,8 @@ Read these in order:
 If your backend is conventional HTTP, also inspect [`@remotish/adapter-http`](../adapters/http-example/README.md). For a production-style public API integration, inspect [`@remotish/adapter-github`](../adapters/github/README.md).
 
 For a transport-neutral, versioned repository protocol, inspect [`@remotish/adapter-rpc`](../adapters/rpc/README.md).
+For a single HTTPS Git clone URL and bearer token, inspect the [Git HTTP adapter](../adapters/git-http/README.md)
+and [provider pilot](../extensions/git-http-provider/README.md).
 
 ## VS Code / Code-OSS integrators
 
@@ -38,6 +40,8 @@ For a transport-neutral, versioned repository protocol, inspect [`@remotish/adap
 | [`@remotish/adapter-http`](../adapters/http-example/README.md) | Minimal browser-first HTTP mapping |
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
 | [`@remotish/adapter-rpc`](../adapters/rpc/README.md) | Transport-neutral, versioned repository RPC adapter |
+| [`@remotish/adapter-git-http`](../adapters/git-http/README.md) | Generic Git smart HTTP adapter pilot |
+| [Git HTTP provider](../extensions/git-http-provider/README.md) | Web and desktop provider pilot for one Git clone URL |
 | [Bitbucket Browser RPC example](../examples/browser-rpc-bitbucket/README.md) | Tampermonkey read/write endpoint for Bitbucket Cloud |
 | [Bitbucket Data Center Browser RPC example](../examples/browser-rpc-bitbucket-datacenter/README.md) | Tampermonkey read and branch management endpoint for Bitbucket Data Center 9.4 |
 | [`apps/demo-web`](../apps/demo-web/README.md) | Complete VS Code Web composition |
