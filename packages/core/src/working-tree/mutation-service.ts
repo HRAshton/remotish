@@ -122,9 +122,11 @@ export class WorkingTreeMutations {
   private async renameDirectory(from: RepoPath, to: RepoPath): Promise<void> {
     const files = await listVisibleFiles(this.view, from);
     const directories = await listVisibleDirectories(this.view, from);
-    const contents = await Promise.all(
-      files.map(async (path) => ({ path, content: await this.view.readFile(path) })),
-    );
+    const contents: { path: RepoPath; content: Uint8Array }[] = [];
+    // Finish remote reads before changing the overlay; a failed read leaves the rename untouched.
+    for (const path of files) {
+      contents.push({ path, content: await this.view.readFile(path) });
+    }
 
     for (const directory of directories) {
       const suffix = directory.slice(from.length);

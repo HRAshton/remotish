@@ -74,6 +74,45 @@ test('working tree: directory rename becomes file-level renames and can be parti
   ]);
 });
 
+test('working tree: directory rename respects a bounded remote transport', async () => {
+  const paths = Array.from({ length: 40 }, (_, index) => `src/file-${index}.txt`);
+  let pending = 0;
+  let peak = 0;
+  let reads = 0;
+  const adapter = {
+    async readDirectory(_revision, path) {
+      if (path === '') {
+        return [{ name: 'src', path: 'src', type: 'directory' }];
+      }
+      if (path === 'src') {
+        return paths.map((file) => ({ name: file.slice(4), path: file, type: 'file' }));
+      }
+      return [];
+    },
+    async readFile(_revision, path) {
+      pending += 1;
+      peak = Math.max(peak, pending);
+      try {
+        if (pending > 32) {
+          throw new Error('RATE_LIMITED');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        reads += 1;
+        return encoder.encode(path);
+      } finally {
+        pending -= 1;
+      }
+    },
+  };
+  const tree = new WorkingTree(new RepositoryReader(adapter), 'C1');
+
+  await tree.rename('src', 'lib', false);
+  assert.equal(reads, paths.length);
+  assert.ok(peak <= 32);
+  assert.equal(tree.hasChanges, true);
+  assert.equal(decoder.decode(await tree.readFile('lib/file-39.txt')), 'src/file-39.txt');
+});
+
 test('working tree: remote branch movement never mutates the immutable base', async () => {
   const adapter = new FixtureAdapter();
   const tree = new WorkingTree(new RepositoryReader(adapter), 'C3');
