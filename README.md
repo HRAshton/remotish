@@ -63,8 +63,10 @@ A successful commit is already published remotely. Remotish does not create loca
 @remotish/adapter-http      small HTTP protocol example
 @remotish/adapter-github    production-style GitHub reference adapter
 @remotish/adapter-rpc       transport-neutral, versioned RPC adapter
+@remotish/adapter-git-http  Git smart HTTP adapter pilot
 extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
+extensions/git-http-provider  HTTPS Git provider pilot for Web and desktop
 apps/demo-web               browser-safe Remotish host extension
 examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
 examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript example
@@ -82,6 +84,8 @@ corepack pnpm vscode:web
 ```
 
 The launcher loads the Remotish host and fixture provider as separate extensions. Run **Remotish Demo: Open Fixture Repository** to open the deterministic fixture through the same provider discovery, canonical workspace, filesystem, SCM, branch and history paths used by real providers.
+
+For one HTTPS Git repository, see the [Git HTTP provider pilot](extensions/git-http-provider/README.md).
 
 ## Suitable backends
 
