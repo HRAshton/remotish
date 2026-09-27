@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -49,6 +49,10 @@ test('static web registry is explicit about live, setup and source-only examples
     const serialized = JSON.stringify(example);
     assert.doesNotMatch(serialized, /clientSecret|accessToken|privateKey|password/iu);
   }
+
+  const gitHttp = registry.examples.find((example) => example.id === 'git-http');
+  assert.equal(gitHttp?.kind, 'setup');
+  assert.match(gitHttp.summary, /pairing key.*userscript.*bearer token/u);
 });
 
 test('static web deployment stays aligned with the pinned VS Code and pnpm versions', () => {
@@ -62,8 +66,12 @@ test('static web deployment stays aligned with the pinned VS Code and pnpm versi
   assert.match(workflow, /--target server-web --out out-vscode-reh-web-min/u);
   assert.match(workflow, /node build\/next\/index\.ts bundle --minify --nls/u);
   assert.match(workflow, /pnpm bundle:web-static:extensions/u);
-  assert.match(workflow, /pnpm prepare:web-static \.vscode-web-source\/out-vscode-reh-web-min/u);
-  assert.match(workflow, /VSCODE_WEB_BUILD: \.vscode-web-source\/out-vscode-reh-web-min/u);
+  for (const config of [workflow, ciWorkflow]) {
+    assert.match(config, /npm run gulp copy-codicons compile-web-extensions-build/u);
+    assert.match(config, /cp -a \.build\/web\/extensions\/\. \.build\/extensions\//u);
+    assert.match(config, /VSCODE_WEB_BUILD: \.vscode-web-source/u);
+  }
+  assert.match(workflow, /pnpm prepare:web-static \.vscode-web-source artifacts\/web-demo/u);
   assert.match(ciWorkflow, / {2}pull_request:/u);
   assert.match(ciWorkflow, / {2}static-web:/u);
   assert.match(ciWorkflow, new RegExp(`^  VSCODE_VERSION: ${vscodeVersion}$`, 'mu'));
@@ -72,7 +80,6 @@ test('static web deployment stays aligned with the pinned VS Code and pnpm versi
     ciWorkflow,
     /node build\/next\/index\.ts bundle --minify --nls --target server-web/u,
   );
-  assert.match(ciWorkflow, /VSCODE_WEB_BUILD: \.vscode-web-source\/out-vscode-reh-web-min/u);
   assert.match(workflow, /actions\/upload-pages-artifact@[0-9a-f]{40}/u);
   assert.match(workflow, /actions\/deploy-pages@[0-9a-f]{40}/u);
 });
@@ -93,9 +100,10 @@ test('static workbench uses relative assets and bundles only browser extension o
   assert.doesNotMatch(assembler, /https?:\/\/(?:localhost|127\.0\.0\.1)/u);
 });
 
-test('static assembler packages raw vscode-web-min output under out/', async () => {
+test('static assembler packages Code-OSS output and built-in extensions', async () => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), 'remotish-static-web-'));
-  const rawBuild = join(temporaryRoot, 'out-vscode-web-min');
+  const sourceRoot = join(temporaryRoot, 'vscode-source');
+  const rawBuild = join(sourceRoot, 'out-vscode-reh-web-min');
   const output = join(temporaryRoot, 'web-demo');
 
   try {
@@ -130,15 +138,19 @@ test('static assembler packages raw vscode-web-min output under out/', async () 
       'nls.messages.js',
       'vs/code/browser/workbench/workbench.js',
       'vs/code/browser/workbench/workbench.css',
+      'vs/code/browser/workbench/callback.html',
     ]) {
       const target = join(rawBuild, path);
       await mkdir(join(target, '..'), { recursive: true });
       await writeFile(target, `// ${path}\n`);
     }
+    const builtInExtension = join(sourceRoot, '.build/web/extensions/git');
+    await mkdir(builtInExtension, { recursive: true });
+    await writeFile(join(builtInExtension, 'package.json'), '{}\n');
 
     const result = spawnSync(
       process.execPath,
-      [join(temporaryRoot, 'scripts/prepare-static-web.mjs'), rawBuild, output],
+      [join(temporaryRoot, 'scripts/prepare-static-web.mjs'), sourceRoot, output],
       {
         encoding: 'utf8',
       },
@@ -148,11 +160,18 @@ test('static assembler packages raw vscode-web-min output under out/', async () 
       'workbench/static/build/out/nls.messages.js',
       'workbench/static/build/out/vs/code/browser/workbench/workbench.js',
       'workbench/static/build/out/vs/code/browser/workbench/workbench.css',
+      'workbench/static/build/out/vs/code/browser/workbench/callback.html',
+      'workbench/static/build/extensions/git/package.json',
       'extensions/host/dist/extension.js',
       'workbench/index.html',
     ]) {
       assert.equal((await stat(join(output, path))).isFile(), true, path);
     }
+    const workbench = await readFile(join(output, 'workbench/index.html'), 'utf8');
+    assert.match(
+      workbench,
+      /callbackRoute: new URL\('\.\/static\/build\/out\/vs\/code\/browser\/workbench\/callback\.html'/u,
+    );
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
@@ -178,10 +197,21 @@ test('static assembler accepts the pinned Code-OSS build output', {
       'workbench/static/build/out/nls.messages.js',
       'workbench/static/build/out/vs/code/browser/workbench/workbench.js',
       'workbench/static/build/out/vs/code/browser/workbench/workbench.css',
+      'workbench/static/build/out/vs/code/browser/workbench/callback.html',
       'workbench/index.html',
     ]) {
       assert.equal((await stat(join(output, path))).isFile(), true, path);
     }
+    const builtInExtensions = await readdir(
+      join(process.env.VSCODE_WEB_BUILD, '.build/web/extensions'),
+    );
+    assert.ok(builtInExtensions.length > 0, 'Code-OSS built-in extensions are missing');
+    assert.equal(
+      (
+        await stat(join(output, 'workbench/static/build/extensions', builtInExtensions[0]))
+      ).isDirectory(),
+      true,
+    );
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

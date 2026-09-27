@@ -3,12 +3,14 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
-const vscodeBuildDirectory = resolve(process.argv[2] ?? '');
+const vscodeSourceDirectory = resolve(process.argv[2] ?? '');
+const vscodeBuildDirectory = resolve(vscodeSourceDirectory, 'out-vscode-reh-web-min');
+const vscodeExtensionsDirectory = resolve(vscodeSourceDirectory, '.build/web/extensions');
 const outputDirectory = resolve(process.argv[3] ?? 'artifacts/web-demo');
 
 if (!process.argv[2]) {
   throw new Error(
-    'Usage: node scripts/prepare-static-web.mjs <out-vscode-web-min> [output-directory]',
+    'Usage: node scripts/prepare-static-web.mjs <vscode-source-directory> [output-directory]',
   );
 }
 
@@ -29,14 +31,22 @@ for (const relativePath of [
   'nls.messages.js',
   'vs/code/browser/workbench/workbench.js',
   'vs/code/browser/workbench/workbench.css',
+  'vs/code/browser/workbench/callback.html',
 ]) {
   await requireFile(resolve(vscodeBuildDirectory, relativePath));
+}
+const builtInExtensions = await stat(vscodeExtensionsDirectory);
+if (!builtInExtensions.isDirectory()) {
+  throw new Error(`Expected directory: ${vscodeExtensionsDirectory}`);
 }
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await cp(resolve(repositoryRoot, 'site'), outputDirectory, { recursive: true });
 await cp(vscodeBuildDirectory, resolve(outputDirectory, 'workbench/static/build/out'), {
+  recursive: true,
+});
+await cp(vscodeExtensionsDirectory, resolve(outputDirectory, 'workbench/static/build/extensions'), {
   recursive: true,
 });
 
@@ -93,7 +103,7 @@ const workbenchHtml = `<!doctype html>
 
     const config = {
       workspaceUri: { scheme: 'tmp', path: '/default.code-workspace' },
-      callbackRoute: window.location.pathname,
+      callbackRoute: new URL('./static/build/out/vs/code/browser/workbench/callback.html', window.location.href).pathname,
       additionalBuiltinExtensions: extensionPaths.map((path) =>
         asUriComponents(new URL(path, window.location.href)),
       ),

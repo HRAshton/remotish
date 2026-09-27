@@ -126,12 +126,16 @@ jobs:
 
       - name: Build minified Code-OSS web assets
         working-directory: .vscode-web-source
-        run: node build/next/index.ts bundle --minify --nls --target server-web --out out-vscode-reh-web-min
+        run: |
+          npm run gulp copy-codicons compile-web-extensions-build
+          mkdir -p .build/extensions
+          cp -a .build/web/extensions/. .build/extensions/
+          node build/next/index.ts bundle --minify --nls --target server-web --out out-vscode-reh-web-min
 
       - name: Smoke test static assembly against Code-OSS output
         run: node --test tests/meta/static-web.test.mjs
         env:
-          VSCODE_WEB_BUILD: .vscode-web-source/out-vscode-reh-web-min
+          VSCODE_WEB_BUILD: .vscode-web-source
 
   github-public:
     runs-on: ubuntu-latest

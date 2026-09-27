@@ -14,8 +14,8 @@
     {
       "id": "git-http",
       "name": "Git over HTTPS",
-      "summary": "Connect one HTTPS Git repository from the browser. CORS and authentication must be allowed by the remote.",
-      "kind": "live",
+      "summary": "Requires a pairing key and a Git HTTP userscript with a bearer token before opening the workbench. See the setup guide.",
+      "kind": "setup",
       "provider": "git-http",
       "command": "Remotish Git HTTP: Configure Repository",
       "launch": "workbench/",
