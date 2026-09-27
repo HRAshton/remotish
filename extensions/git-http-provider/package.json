@@ -2,7 +2,7 @@
   "name": "remotish-git-http-provider",
   "displayName": "Remotish Git HTTP Provider",
   "description": "One-repository HTTPS Git provider for Remotish.",
-  "version": "0.1.0-beta.14",
+  "version": "0.1.0-beta.15",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
@@ -64,7 +64,7 @@
   "dependencies": {
     "@remotish/adapter-git-http": "workspace:*",
     "@remotish/adapter-sdk": "workspace:*",
-    "memfs": "4.50.0"
+    "memfs": "4.79.0"
   },
   "scripts": {
     "typecheck": "tsc -b --pretty false"

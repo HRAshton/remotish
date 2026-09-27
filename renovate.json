@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard", "helpers:pinGitHubActionDigests"],
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigests",
+    "group:allNonMajor"
+  ],
   "baseBranches": ["master"],
   "timezone": "UTC",
   "schedule": ["* 0-5 * * 1"],
@@ -10,13 +15,6 @@
   "automergeType": "pr",
   "platformAutomerge": true,
   "packageRules": [
-    {
-      "description": "Group non-major npm development dependencies",
-      "matchManagers": ["npm"],
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "development dependencies"
-    },
     {
       "description": "Group GitHub Actions updates",
       "matchManagers": ["github-actions"],
