@@ -26,9 +26,9 @@ async function copyExtension(source, target) {
 }
 
 for (const relativePath of [
-  'out/nls.messages.js',
-  'out/vs/code/browser/workbench/workbench.js',
-  'out/vs/code/browser/workbench/workbench.css',
+  'nls.messages.js',
+  'vs/code/browser/workbench/workbench.js',
+  'vs/code/browser/workbench/workbench.css',
 ]) {
   await requireFile(resolve(vscodeBuildDirectory, relativePath));
 }
@@ -36,7 +36,7 @@ for (const relativePath of [
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 await cp(resolve(repositoryRoot, 'site'), outputDirectory, { recursive: true });
-await cp(vscodeBuildDirectory, resolve(outputDirectory, 'workbench/static/build'), {
+await cp(vscodeBuildDirectory, resolve(outputDirectory, 'workbench/static/build/out'), {
   recursive: true,
 });
 

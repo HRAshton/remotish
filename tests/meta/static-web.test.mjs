@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 const rootManifest = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
@@ -72,4 +75,69 @@ test('static workbench uses relative assets and bundles only browser extension o
   assert.match(assembler, /additionalBuiltinExtensions/u);
   assert.match(assembler, /extensionEnabledApiProposals/u);
   assert.doesNotMatch(assembler, /https?:\/\/(?:localhost|127\.0\.0\.1)/u);
+});
+
+test('static assembler packages raw vscode-web-min output under out/', async () => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'remotish-static-web-'));
+  const rawBuild = join(temporaryRoot, 'out-vscode-web-min');
+  const output = join(temporaryRoot, 'web-demo');
+
+  try {
+    await mkdir(join(temporaryRoot, 'scripts'), { recursive: true });
+    await cp(
+      new URL('../../scripts/prepare-static-web.mjs', import.meta.url),
+      join(temporaryRoot, 'scripts/prepare-static-web.mjs'),
+    );
+    await cp(new URL('../../site/', import.meta.url), join(temporaryRoot, 'site'), {
+      recursive: true,
+    });
+    for (const name of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) {
+      await cp(new URL(`../../${name}`, import.meta.url), join(temporaryRoot, name));
+    }
+
+    for (const source of [
+      'apps/demo-web',
+      'extensions/fixture-provider',
+      'extensions/browser-rpc-provider',
+      'extensions/git-http-provider',
+    ]) {
+      const target = join(temporaryRoot, source);
+      await mkdir(join(target, 'dist'), { recursive: true });
+      await cp(
+        new URL(`../../${source}/package.json`, import.meta.url),
+        join(target, 'package.json'),
+      );
+      await writeFile(join(target, 'dist/extension.js'), '// bundled extension fixture\n');
+    }
+
+    for (const path of [
+      'nls.messages.js',
+      'vs/code/browser/workbench/workbench.js',
+      'vs/code/browser/workbench/workbench.css',
+    ]) {
+      const target = join(rawBuild, path);
+      await mkdir(join(target, '..'), { recursive: true });
+      await writeFile(target, `// ${path}\n`);
+    }
+
+    const result = spawnSync(
+      process.execPath,
+      [join(temporaryRoot, 'scripts/prepare-static-web.mjs'), rawBuild, output],
+      {
+        encoding: 'utf8',
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    for (const path of [
+      'workbench/static/build/out/nls.messages.js',
+      'workbench/static/build/out/vs/code/browser/workbench/workbench.js',
+      'workbench/static/build/out/vs/code/browser/workbench/workbench.css',
+      'extensions/host/dist/extension.js',
+      'workbench/index.html',
+    ]) {
+      assert.equal((await stat(join(output, path))).isFile(), true, path);
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
