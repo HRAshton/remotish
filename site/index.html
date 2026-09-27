@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Static browser demos and adapter examples for Remotish."
+    />
+    <title>Remotish Web Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Remotish</p>
+        <h1>Remote repositories as editable VS Code Web workspaces</h1>
+        <p class="lede">
+          This site is entirely static. The Code-OSS workbench and browser-safe Remotish providers
+          run in your browser; credentials are never built into the site.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="./workbench/">Open workbench</a>
+          <a class="button" href="https://github.com/HRAshton/remotish">View source</a>
+        </div>
+      </header>
+
+      <section aria-labelledby="examples-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Examples</p>
+            <h2 id="examples-heading">Choose a provider or adapter</h2>
+          </div>
+          <p>
+            Live examples use the shared workbench. Setup examples require a browser-side bridge;
+            source examples show adapter implementations without embedding credentials.
+          </p>
+        </div>
+        <div id="examples" class="cards" aria-live="polite">
+          <p>Loading examples…</p>
+        </div>
+      </section>
+
+      <section class="notes" aria-labelledby="security-heading">
+        <div>
+          <p class="eyebrow">Security boundary</p>
+          <h2 id="security-heading">Static means no bundled secrets</h2>
+        </div>
+        <p>
+          Tokens, OAuth client secrets, private repository credentials and privileged proxy
+          credentials do not belong in this deployment. Providers that need authentication obtain
+          it from the user or from an external endpoint designed for that purpose.
+        </p>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
