@@ -17,7 +17,7 @@ export function encodeBytes(bytes: Uint8Array, limit = MAX_BODY_BYTES): string {
   return value;
 }
 
-export function decodeBytes(value: string, limit = MAX_BODY_BYTES): Uint8Array {
+export function decodeBytes(value: string, limit = MAX_BODY_BYTES): Uint8Array<ArrayBuffer> {
   if (value.length > Math.ceil(limit / 3) * 4 + 4 || value.length % 4 !== 0) {
     throw invalidBytes();
   }
@@ -98,7 +98,10 @@ export function randomId(): string {
     .join('');
 }
 
-function decodePacket(raw: unknown): { readonly iv: Uint8Array; readonly ciphertext: string } {
+function decodePacket(raw: unknown): {
+  readonly iv: Uint8Array<ArrayBuffer>;
+  readonly ciphertext: string;
+} {
   if (typeof raw !== 'string' || raw.length > MAX_PACKET_CHARS) {
     throw invalidPacket();
   }
