@@ -13,9 +13,23 @@
     "apps/demo-web/build",
     "extensions/browser-rpc-provider/build",
     "extensions/fixture-provider/build",
-    "extensions/git-http-provider/build"
+    "extensions/git-http-provider/build",
+    "examples/browser-rpc-bitbucket/build",
+    "examples/browser-rpc-bitbucket-datacenter/build"
   ],
   "extension": [".js"],
+  "exclude-after-remap": true,
+  "exclude": [
+    "adapters/github/src/types.ts",
+    "packages/adapter-fixture/src/model.ts",
+    "packages/adapter-sdk/src/adapter.ts",
+    "packages/adapter-sdk/src/capabilities.ts",
+    "packages/adapter-sdk/src/commit.ts",
+    "packages/adapter-sdk/src/primitives.ts",
+    "packages/adapter-sdk/src/repository.ts",
+    "packages/core/src/persistence/workspace-storage.ts",
+    "packages/core/src/working-tree/change.ts"
+  ],
   "reporter": ["text", "lcov", "json-summary"],
   "reports-dir": "coverage",
   "temp-directory": "coverage/.v8"
