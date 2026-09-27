@@ -61,7 +61,7 @@ export function decodeWorkspaceSnapshot(value: unknown): WorkspaceSnapshot {
     const item = requireRecord(file, field, validation);
     return {
       path: requireString(item.path, `${field}.path`, validation),
-      contentBase64: requireString(item.contentBase64, `${field}.contentBase64`, validation),
+      contentBase64: requireContentBase64(item.contentBase64, `${field}.contentBase64`),
     };
   });
   return toWorkspaceSnapshotSync(stored, (files) =>
@@ -70,6 +70,13 @@ export function decodeWorkspaceSnapshot(value: unknown): WorkspaceSnapshot {
       content: decodeBase64(file.contentBase64, file.path),
     })),
   );
+}
+
+function requireContentBase64(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw validation.invalid(`${field} must be a string`);
+  }
+  return value;
 }
 
 function encodeBase64(content: Uint8Array): string {
