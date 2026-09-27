@@ -66,10 +66,15 @@ jobs:
 
       - name: Build minified Code-OSS web assets
         working-directory: .vscode-web-source
-        run: npm run gulp vscode-web-min
+        run: npx tsx build/next/index.ts bundle --minify --nls --target server-web --out out-vscode-reh-web-min
 
       - name: Assemble static demo
-        run: pnpm prepare:web-static .vscode-web-source/out-vscode-web-min artifacts/web-demo
+        run: pnpm prepare:web-static .vscode-web-source/out-vscode-reh-web-min artifacts/web-demo
+
+      - name: Smoke test static assembly against Code-OSS output
+        run: node --test tests/meta/static-web.test.mjs
+        env:
+          VSCODE_WEB_BUILD: .vscode-web-source/out-vscode-reh-web-min
 
       - name: Check Pages artifact size
         run: |

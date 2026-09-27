@@ -4,6 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const rootManifest = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
 const registry = JSON.parse(await readFile(new URL('../../site/examples.json', import.meta.url)));
@@ -54,9 +55,10 @@ test('static web deployment stays aligned with the pinned VS Code and pnpm versi
   assert.match(pnpmVersion ?? '', /^\d+\.\d+\.\d+$/u);
   assert.match(workflow, new RegExp(`^  VSCODE_VERSION: ${vscodeVersion}$`, 'mu'));
   assert.match(workflow, new RegExp(`^          version: ${pnpmVersion}$`, 'mu'));
-  assert.match(workflow, /npm run gulp vscode-web-min/u);
+  assert.match(workflow, /--target server-web --out out-vscode-reh-web-min/u);
   assert.match(workflow, /pnpm bundle:web-static:extensions/u);
-  assert.match(workflow, /pnpm prepare:web-static/u);
+  assert.match(workflow, /pnpm prepare:web-static \.vscode-web-source\/out-vscode-reh-web-min/u);
+  assert.match(workflow, /VSCODE_WEB_BUILD: \.vscode-web-source\/out-vscode-reh-web-min/u);
   assert.match(workflow, /actions\/upload-pages-artifact@[0-9a-f]{40}/u);
   assert.match(workflow, /actions\/deploy-pages@[0-9a-f]{40}/u);
 });
@@ -133,6 +135,35 @@ test('static assembler packages raw vscode-web-min output under out/', async () 
       'workbench/static/build/out/vs/code/browser/workbench/workbench.js',
       'workbench/static/build/out/vs/code/browser/workbench/workbench.css',
       'extensions/host/dist/extension.js',
+      'workbench/index.html',
+    ]) {
+      assert.equal((await stat(join(output, path))).isFile(), true, path);
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('static assembler accepts the pinned Code-OSS build output', {
+  skip: !process.env.VSCODE_WEB_BUILD,
+}, async () => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'remotish-vscode-build-'));
+  const output = join(temporaryRoot, 'web-demo');
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('../../scripts/prepare-static-web.mjs', import.meta.url)),
+        process.env.VSCODE_WEB_BUILD,
+        output,
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    for (const path of [
+      'workbench/static/build/out/nls.messages.js',
+      'workbench/static/build/out/vs/code/browser/workbench/workbench.js',
+      'workbench/static/build/out/vs/code/browser/workbench/workbench.css',
       'workbench/index.html',
     ]) {
       assert.equal((await stat(join(output, path))).isFile(), true, path);
