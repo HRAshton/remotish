@@ -297,6 +297,10 @@ test('Web bridge proves redirect control before use and confines bearer requests
   const requests = [];
   let aborted = 0;
   let nextResponse = 'success';
+  let markPendingDispatched;
+  const pendingDispatched = new Promise((resolve) => {
+    markPendingDispatched = resolve;
+  });
   runUserscript(script, (details) => {
     requests.push(details);
     if (details.url === probeUrl) {
@@ -326,6 +330,8 @@ test('Web bridge proves redirect control before use and confines bearer requests
           responseHeaders: 'Location: https://elsewhere.example/\r\n',
         }),
       );
+    } else if (nextResponse === 'pending') {
+      markPendingDispatched();
     }
     return {
       abort() {
@@ -366,7 +372,7 @@ test('Web bridge proves redirect control before use and confines bearer requests
   nextResponse = 'pending';
   const controller = new AbortController();
   const pending = bridge.request({ ...input, signal: controller.signal });
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await pendingDispatched;
   controller.abort();
   await assert.rejects(pending, (error) => error.code === 'CANCELLED');
   await new Promise((resolve) => setTimeout(resolve, 10));
