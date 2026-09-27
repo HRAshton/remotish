@@ -12,6 +12,10 @@ const workflow = await readFile(
   new URL('../../.github/workflows/pages.yml', import.meta.url),
   'utf8',
 );
+const ciWorkflow = await readFile(
+  new URL('../../.github/workflows/ci.yml', import.meta.url),
+  'utf8',
+);
 const assembler = await readFile(
   new URL('../../scripts/prepare-static-web.mjs', import.meta.url),
   'utf8',
@@ -56,9 +60,19 @@ test('static web deployment stays aligned with the pinned VS Code and pnpm versi
   assert.match(workflow, new RegExp(`^  VSCODE_VERSION: ${vscodeVersion}$`, 'mu'));
   assert.match(workflow, new RegExp(`^          version: ${pnpmVersion}$`, 'mu'));
   assert.match(workflow, /--target server-web --out out-vscode-reh-web-min/u);
+  assert.match(workflow, /node build\/next\/index\.ts bundle --minify --nls/u);
   assert.match(workflow, /pnpm bundle:web-static:extensions/u);
   assert.match(workflow, /pnpm prepare:web-static \.vscode-web-source\/out-vscode-reh-web-min/u);
   assert.match(workflow, /VSCODE_WEB_BUILD: \.vscode-web-source\/out-vscode-reh-web-min/u);
+  assert.match(ciWorkflow, / {2}pull_request:/u);
+  assert.match(ciWorkflow, / {2}static-web:/u);
+  assert.match(ciWorkflow, new RegExp(`^  VSCODE_VERSION: ${vscodeVersion}$`, 'mu'));
+  assert.match(ciWorkflow, /ref: \$\{\{ env\.VSCODE_VERSION \}\}/u);
+  assert.match(
+    ciWorkflow,
+    /node build\/next\/index\.ts bundle --minify --nls --target server-web/u,
+  );
+  assert.match(ciWorkflow, /VSCODE_WEB_BUILD: \.vscode-web-source\/out-vscode-reh-web-min/u);
   assert.match(workflow, /actions\/upload-pages-artifact@[0-9a-f]{40}/u);
   assert.match(workflow, /actions\/deploy-pages@[0-9a-f]{40}/u);
 });
