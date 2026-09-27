@@ -108,12 +108,15 @@ jobs:
           path: .vscode-web-source
           persist-credentials: false
 
+      - name: Isolate Code-OSS build from workspace dependencies
+        run: cp -a .vscode-web-source "$RUNNER_TEMP/vscode-source"
+
       - name: Use Code-OSS build Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24.18.0
           cache: npm
-          cache-dependency-path: .vscode-web-source/package-lock.json
+          cache-dependency-path: ${{ runner.temp }}/vscode-source/package-lock.json
 
       - name: Install Code-OSS native build prerequisites
         run: |
@@ -121,11 +124,11 @@ jobs:
           sudo apt-get install --yes libkrb5-dev libsecret-1-dev libx11-dev libxkbfile-dev
 
       - name: Install Code-OSS dependencies
-        working-directory: .vscode-web-source
+        working-directory: ${{ runner.temp }}/vscode-source
         run: npm ci
 
       - name: Build minified Code-OSS web assets
-        working-directory: .vscode-web-source
+        working-directory: ${{ runner.temp }}/vscode-source
         run: |
           npm run gulp copy-codicons compile-web-extensions-build
           mkdir -p .build/extensions
@@ -135,7 +138,7 @@ jobs:
       - name: Smoke test static assembly against Code-OSS output
         run: node --test tests/meta/static-web.test.mjs
         env:
-          VSCODE_WEB_BUILD: .vscode-web-source
+          VSCODE_WEB_BUILD: ${{ runner.temp }}/vscode-source
 
   github-public:
     runs-on: ubuntu-latest

@@ -69,9 +69,13 @@ test('static web deployment stays aligned with the pinned VS Code and pnpm versi
   for (const config of [workflow, ciWorkflow]) {
     assert.match(config, /npm run gulp copy-codicons compile-web-extensions-build/u);
     assert.match(config, /cp -a \.build\/web\/extensions\/\. \.build\/extensions\//u);
-    assert.match(config, /VSCODE_WEB_BUILD: \.vscode-web-source/u);
+    assert.match(config, /cp -a \.vscode-web-source "\$RUNNER_TEMP\/vscode-source"/u);
+    assert.match(config, /VSCODE_WEB_BUILD: \$\{\{ runner\.temp \}\}\/vscode-source/u);
   }
-  assert.match(workflow, /pnpm prepare:web-static \.vscode-web-source artifacts\/web-demo/u);
+  assert.match(
+    workflow,
+    /pnpm prepare:web-static "\$RUNNER_TEMP\/vscode-source" artifacts\/web-demo/u,
+  );
   assert.match(ciWorkflow, / {2}pull_request:/u);
   assert.match(ciWorkflow, / {2}static-web:/u);
   assert.match(ciWorkflow, new RegExp(`^  VSCODE_VERSION: ${vscodeVersion}$`, 'mu'));
