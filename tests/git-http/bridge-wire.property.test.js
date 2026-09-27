@@ -4,9 +4,7 @@ const fc = require('fast-check');
 
 const PROPERTY_PARAMETERS = { numRuns: 500, seed: 0x5eedc0de };
 const HEX = [...'0123456789abcdef'];
-const printableAscii = fc
-  .integer({ min: 32, max: 126 })
-  .map((value) => String.fromCharCode(value));
+const printableAscii = fc.integer({ min: 32, max: 126 }).map((value) => String.fromCharCode(value));
 const id = fc.string({ unit: fc.constantFrom(...HEX), minLength: 32, maxLength: 32 });
 const smallText = fc.string({ unit: printableAscii, maxLength: 64 });
 const headers = fc

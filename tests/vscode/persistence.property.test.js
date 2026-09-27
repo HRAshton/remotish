@@ -3,9 +3,7 @@ const test = require('node:test');
 const fc = require('fast-check');
 
 const PROPERTY_PARAMETERS = { numRuns: 500, seed: 0x5eedc0de };
-const textUnit = fc
-  .integer({ min: 1, max: 126 })
-  .map((value) => String.fromCharCode(value));
+const textUnit = fc.integer({ min: 1, max: 126 }).map((value) => String.fromCharCode(value));
 const text = fc.string({ unit: textUnit, minLength: 1, maxLength: 32 });
 const branchName = fc.oneof(fc.constant('__proto__'), fc.constant('constructor'), text);
 const overlay = fc.record(
@@ -46,9 +44,7 @@ const snapshot = fc
       version: 1,
       selectedBranch,
       branches,
-      ...(pending
-        ? { pendingCommitPublication: { ...pending, branch: selectedBranch } }
-        : {}),
+      ...(pending ? { pendingCommitPublication: { ...pending, branch: selectedBranch } } : {}),
     };
   });
 
