@@ -197,12 +197,21 @@ export class GitReader {
     options?: RemoteRequestOptions,
   ): Promise<{ readonly head: string; readonly offset: number }> {
     if (request.cursor) {
-      const match = /^([0-9a-f]{40}):(\d{1,5})$/u.exec(request.cursor);
-      // biome-ignore lint/suspicious/noUnnecessaryConditions: RegExp.exec can return null for an invalid cursor.
-      if (!match?.[1] || !match[2]) {
+      const parts = request.cursor.split(':');
+      const head = parts[0];
+      const offsetText = parts[1];
+
+      if (
+        parts.length !== 2 ||
+        !head ||
+        !offsetText ||
+        !/^[0-9a-f]{40}$/u.test(head) ||
+        !/^\d{1,5}$/u.test(offsetText)
+      ) {
         throw new RemotishError('INVALID_REQUEST', 'Invalid Git history cursor.');
       }
-      return { head: requireRevision(match[1]), offset: Number(match[2]) };
+
+      return { head: requireRevision(head), offset: Number(offsetText) };
     }
     if (request.revision) {
       return { head: requireRevision(request.revision), offset: 0 };
