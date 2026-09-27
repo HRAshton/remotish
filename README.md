@@ -1,6 +1,8 @@
 # Remotish
 
 [![CI](https://github.com/HRAshton/remotish/actions/workflows/ci.yml/badge.svg)](https://github.com/HRAshton/remotish/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HRAshton/remotish/badge)](https://scorecard.dev/viewer/?uri=github.com/HRAshton/remotish)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14965/badge)](https://www.bestpractices.dev/projects/14965)
 [![License: 0BSD](https://img.shields.io/badge/license-0BSD-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](package.json)
