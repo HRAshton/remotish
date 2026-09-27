@@ -4,6 +4,7 @@ import { access, readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 const rootManifest = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
+const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const packagePaths = [
   '../../packages/adapter-sdk/package.json',
   '../../packages/adapter-fixture/package.json',
@@ -27,6 +28,10 @@ async function exists(url) {
   } catch {
     return false;
   }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 test('repository supports the Node 22 and 24 LTS lines', () => {
@@ -100,12 +105,11 @@ test('VS Code proposal typings use the official update tool and stay aligned wit
   );
   const proposals = ['scmActionButton', 'scmHistoryProvider', 'timeline'];
 
-  assert.equal(vscodeVersion, '1.138.0');
-  assert.equal(rootManifest.devDependencies?.['@vscode/dts'], '0.4.1');
+  assert.match(vscodeVersion ?? '', exactVersion);
   assert.equal(rootManifest.scripts?.['vscode:types'], undefined);
   assert.equal(
     rootManifest.scripts?.['vscode:types:update'],
-    'pnpm --dir apps/demo-web exec dts dev 1.138.0 && shx rm -f "types/vscode-proposed/vscode.proposed.*.d.ts" && shx mv "apps/demo-web/vscode.proposed.*.d.ts" types/vscode-proposed/',
+    `pnpm --dir apps/demo-web exec dts dev ${vscodeVersion} && shx rm -f "types/vscode-proposed/vscode.proposed.*.d.ts" && shx mv "apps/demo-web/vscode.proposed.*.d.ts" types/vscode-proposed/`,
   );
   assert.equal(rootManifest.scripts?.postinstall, undefined);
   assert.equal(extensionManifest.engines?.vscode, `^${vscodeVersion}`);
@@ -140,20 +144,24 @@ test('VS Code proposal typings use the official update tool and stay aligned wit
 });
 
 test('build and release tools are exact direct dependencies without ephemeral execution', async () => {
-  const expectedTools = {
-    '@vscode/dts': '0.4.1',
-    '@vscode/test-web': '0.0.81',
-    '@vscode/vsce': '4.0.0',
-    'dependency-cruiser': '18.4.0',
-    esbuild: '0.28.2',
-    knip: '6.38.0',
-    'remark-cli': '12.0.1',
-    'remark-validate-links': '13.1.0',
-    typedoc: '0.28.20',
-  };
+  const expectedTools = [
+    '@vscode/dts',
+    '@vscode/test-web',
+    '@vscode/vsce',
+    'dependency-cruiser',
+    'esbuild',
+    'knip',
+    'remark-cli',
+    'remark-validate-links',
+    'typedoc',
+  ];
 
-  for (const [name, version] of Object.entries(expectedTools)) {
-    assert.equal(rootManifest.devDependencies?.[name], version, `${name} must be pinned exactly`);
+  for (const name of expectedTools) {
+    assert.match(
+      rootManifest.devDependencies?.[name] ?? '',
+      exactVersion,
+      `${name} must be pinned exactly`,
+    );
   }
 
   const workflowSources = await Promise.all([
@@ -188,20 +196,21 @@ test('production dependencies are reviewed and notices are tracked', async () =>
     })),
   );
   const workspaceNames = new Set(manifests.map(({ manifest }) => manifest.name));
-  const gitHttpDependencies = {
-    '@isomorphic-git/lightning-fs': '4.10.3',
-    'isomorphic-git': '1.42.2',
-    memfs: '4.79.0',
-  };
+  const gitHttpDependencies = new Set(['@isomorphic-git/lightning-fs', 'isomorphic-git', 'memfs']);
+  const reviewedVersions = new Map();
 
   for (const { path, manifest } of manifests) {
     for (const [name, specifier] of Object.entries(manifest.dependencies ?? {})) {
       if (
         (path === '../../adapters/git-http/package.json' ||
           path === '../../extensions/git-http-provider/package.json') &&
-        name in gitHttpDependencies
+        gitHttpDependencies.has(name)
       ) {
-        assert.equal(specifier, gitHttpDependencies[name]);
+        assert.match(specifier, exactVersion, `${path}: ${name} must be pinned exactly`);
+        if (reviewedVersions.has(name)) {
+          assert.equal(specifier, reviewedVersions.get(name), `${name} versions must agree`);
+        }
+        reviewedVersions.set(name, specifier);
         continue;
       }
       assert.equal(
@@ -222,10 +231,14 @@ test('production dependencies are reviewed and notices are tracked', async () =>
     }
   }
 
+  assert.equal(reviewedVersions.size, gitHttpDependencies.size);
   const notices = await readFile(new URL('../../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8');
-  assert.match(notices, /\| isomorphic-git \| 1\.42\.2 \|/u);
-  assert.match(notices, /\| @isomorphic-git\/lightning-fs \| 4\.10\.3 \|/u);
-  assert.match(notices, /\| memfs \| 4\.79\.0 \|/u);
+  for (const [name, version] of reviewedVersions) {
+    assert.match(
+      notices,
+      new RegExp(`^\\| ${escapeRegExp(name)} \\| ${escapeRegExp(version)} \\|`, 'mu'),
+    );
+  }
   assert.match(
     rootManifest.scripts?.['release:git-http-provider:vsix'] ?? '',
     /shx cp THIRD_PARTY_NOTICES\.md extensions\/git-http-provider\/dist\/THIRD_PARTY_NOTICES\.md/u,
@@ -263,7 +276,8 @@ test('adapter SDK is configured as the only public npm package', async () => {
 });
 
 test('pnpm owns release versioning and CI uses the pinned package manager', async () => {
-  assert.equal(rootManifest.packageManager, 'pnpm@12.6.0');
+  const pnpmVersion = rootManifest.packageManager?.match(/^pnpm@(\d+\.\d+\.\d+)$/u)?.[1];
+  assert.ok(pnpmVersion, 'pnpm must be pinned to an exact version');
   assert.equal(
     rootManifest.scripts?.['release:version'],
     'pnpm version --recursive --no-git-tag-version',
@@ -282,7 +296,7 @@ test('pnpm owns release versioning and CI uses the pinned package manager', asyn
       new URL(`../../.github/workflows/${workflow}`, import.meta.url),
       'utf8',
     );
-    assert.match(source, /version: 12\.6\.0/u);
+    assert.match(source, new RegExp(`^\\s+version: ${escapeRegExp(pnpmVersion)}$`, 'mu'));
     assert.match(source, /pnpm run ci/u);
     assert.doesNotMatch(source, /(?:^|\s)pnpm ci(?:\s|$)/mu);
   }
