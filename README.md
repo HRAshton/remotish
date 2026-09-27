@@ -4,9 +4,8 @@
 [![Codecov](https://codecov.io/gh/HRAshton/remotish/graph/badge.svg)](https://app.codecov.io/gh/HRAshton/remotish)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HRAshton/remotish/badge)](https://scorecard.dev/viewer/?uri=github.com/HRAshton/remotish)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14965/badge)](https://www.bestpractices.dev/projects/14965)
+[![REUSE status](https://api.reuse.software/badge/github.com/HRAshton/remotish)](https://api.reuse.software/info/github.com/HRAshton/remotish)
 [![License: 0BSD](https://img.shields.io/badge/license-0BSD-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=nodedotjs&logoColor=white)](package.json)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](package.json)
 
 **Turn a remote repository-like backend into a native editable VS Code / Code-OSS workspace.**
 
@@ -100,9 +99,15 @@ It is **not** a Git implementation or a compatibility layer for arbitrary local 
 
 Remotish is prepared for a public beta release. The repository is currently pre-1.0. The adapter SDK is intentionally narrow, is published as `@remotish/adapter-sdk`, and is designed to become the long-term compatibility boundary. See [Adapter contract: compatibility](docs/adapter-contract.md#compatibility) before publishing third-party adapters.
 
-## Development and security
+## Development, security and supply chain
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development commands and [SECURITY.md](SECURITY.md) for vulnerability reporting. Release artifacts are built with pinned dependencies, checksums, SBOM generation and provenance attestations; details are in [Release security](docs/release-security.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development commands and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+CI covers the supported Node.js 22 and 24 lines, browser execution, packaged VSIX smoke tests, public GitHub integration, and coverage reporting.
+
+Release artifacts are built with pinned dependencies, checksums, CycloneDX SBOM generation and provenance attestations. Details are in [Release security](docs/release-security.md).
+
+Copyright and licensing metadata follows the [REUSE specification](https://api.reuse.software/info/github.com/HRAshton/remotish) and is machine-verifiable.
 
 ## Get involved
 
