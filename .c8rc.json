@@ -1,0 +1,22 @@
+{
+  "all": true,
+  "src": [
+    "packages/adapter-fixture/dist",
+    "packages/adapter-sdk/dist",
+    "packages/core/dist",
+    "packages/vscode/dist",
+    "packages/vscode-history/dist",
+    "adapters/git-http/dist",
+    "adapters/github/dist",
+    "adapters/http-example/dist",
+    "adapters/rpc/dist",
+    "apps/demo-web/build",
+    "extensions/browser-rpc-provider/build",
+    "extensions/fixture-provider/build",
+    "extensions/git-http-provider/build"
+  ],
+  "extension": [".js"],
+  "reporter": ["text", "lcov", "json-summary"],
+  "reports-dir": "coverage",
+  "temp-directory": "coverage/.v8"
+}
