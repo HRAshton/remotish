@@ -2,7 +2,7 @@
   "name": "remotish-git-http-provider",
   "displayName": "Remotish Git HTTP Provider",
   "description": "One-repository HTTPS Git provider for Remotish.",
-  "version": "0.1.0-beta.14",
+  "version": "0.1.0-beta.15",
   "publisher": "hrashton",
   "license": "0BSD",
   "private": true,
