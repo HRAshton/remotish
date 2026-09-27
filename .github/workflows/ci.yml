@@ -58,7 +58,7 @@ jobs:
           files: ./coverage/lcov.info
           flags: node
           name: node-tests
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
   vscode-web:
     runs-on: ubuntu-latest
