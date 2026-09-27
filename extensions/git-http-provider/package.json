@@ -64,7 +64,7 @@
   "dependencies": {
     "@remotish/adapter-git-http": "workspace:*",
     "@remotish/adapter-sdk": "workspace:*",
-    "memfs": "4.50.0"
+    "memfs": "4.79.0"
   },
   "scripts": {
     "typecheck": "tsc -b --pretty false"
