@@ -142,11 +142,11 @@ test('VS Code proposal typings use the official update tool and stay aligned wit
 test('build and release tools are exact direct dependencies without ephemeral execution', async () => {
   const expectedTools = {
     '@vscode/dts': '0.4.1',
-    '@vscode/test-web': '0.0.80',
+    '@vscode/test-web': '0.0.81',
     '@vscode/vsce': '4.0.0',
-    'dependency-cruiser': '18.3.1',
+    'dependency-cruiser': '18.4.0',
     esbuild: '0.28.2',
-    knip: '6.36.0',
+    knip: '6.38.0',
     'remark-cli': '12.0.1',
     'remark-validate-links': '13.1.0',
     typedoc: '0.28.20',
@@ -191,7 +191,7 @@ test('production dependencies are reviewed and notices are tracked', async () =>
   const gitHttpDependencies = {
     '@isomorphic-git/lightning-fs': '4.10.3',
     'isomorphic-git': '1.42.2',
-    memfs: '4.50.0',
+    memfs: '4.79.0',
   };
 
   for (const { path, manifest } of manifests) {
@@ -225,7 +225,7 @@ test('production dependencies are reviewed and notices are tracked', async () =>
   const notices = await readFile(new URL('../../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8');
   assert.match(notices, /\| isomorphic-git \| 1\.42\.2 \|/u);
   assert.match(notices, /\| @isomorphic-git\/lightning-fs \| 4\.10\.3 \|/u);
-  assert.match(notices, /\| memfs \| 4\.50\.0 \|/u);
+  assert.match(notices, /\| memfs \| 4\.79\.0 \|/u);
   assert.match(
     rootManifest.scripts?.['release:git-http-provider:vsix'] ?? '',
     /shx cp THIRD_PARTY_NOTICES\.md extensions\/git-http-provider\/dist\/THIRD_PARTY_NOTICES\.md/u,
@@ -263,7 +263,7 @@ test('adapter SDK is configured as the only public npm package', async () => {
 });
 
 test('pnpm owns release versioning and CI uses the pinned package manager', async () => {
-  assert.equal(rootManifest.packageManager, 'pnpm@12.5.1');
+  assert.equal(rootManifest.packageManager, 'pnpm@12.6.0');
   assert.equal(
     rootManifest.scripts?.['release:version'],
     'pnpm version --recursive --no-git-tag-version',
@@ -282,7 +282,7 @@ test('pnpm owns release versioning and CI uses the pinned package manager', asyn
       new URL(`../../.github/workflows/${workflow}`, import.meta.url),
       'utf8',
     );
-    assert.match(source, /version: 12\.5\.1/u);
+    assert.match(source, /version: 12\.6\.0/u);
     assert.match(source, /pnpm run ci/u);
     assert.doesNotMatch(source, /(?:^|\s)pnpm ci(?:\s|$)/mu);
   }
