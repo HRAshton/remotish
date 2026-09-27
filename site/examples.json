@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "examples": [
+    {
+      "id": "fixture",
+      "name": "Fixture repository",
+      "summary": "Deterministic in-browser repository for trying editing, SCM, branches, history and commits.",
+      "kind": "live",
+      "provider": "fixture-provider",
+      "command": "Remotish Demo: Open Fixture Repository",
+      "launch": "workbench/",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/extensions/fixture-provider"
+    },
+    {
+      "id": "git-http",
+      "name": "Git over HTTPS",
+      "summary": "Requires a pairing key and a Git HTTP userscript with a bearer token before opening the workbench. See the setup guide.",
+      "kind": "setup",
+      "provider": "git-http",
+      "command": "Remotish Git HTTP: Configure Repository",
+      "launch": "workbench/",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/extensions/git-http-provider"
+    },
+    {
+      "id": "browser-rpc-bitbucket",
+      "name": "Bitbucket Cloud through Browser RPC",
+      "summary": "Use the static Remotish workbench with the Bitbucket Cloud userscript endpoint running in your browser.",
+      "kind": "setup",
+      "provider": "browser-rpc",
+      "command": "Remotish Browser RPC: Configure Bridge Pairing Key",
+      "launch": "workbench/",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/examples/browser-rpc-bitbucket"
+    },
+    {
+      "id": "browser-rpc-bitbucket-datacenter",
+      "name": "Bitbucket Data Center through Browser RPC",
+      "summary": "Use the static Remotish workbench with the Bitbucket Data Center userscript endpoint running in your browser.",
+      "kind": "setup",
+      "provider": "browser-rpc",
+      "command": "Remotish Browser RPC: Configure Bridge Pairing Key",
+      "launch": "workbench/",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/examples/browser-rpc-bitbucket-datacenter"
+    },
+    {
+      "id": "http-adapter",
+      "name": "HTTP adapter",
+      "summary": "Protocol example for integrating a browser-accessible repository service with Remotish.",
+      "kind": "source",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/adapters/http-example"
+    },
+    {
+      "id": "github-adapter",
+      "name": "GitHub adapter",
+      "summary": "Reference adapter for GitHub repositories. Credentials are intentionally not embedded in the static demo.",
+      "kind": "source",
+      "docs": "https://github.com/HRAshton/remotish/tree/master/adapters/github"
+    }
+  ]
+}

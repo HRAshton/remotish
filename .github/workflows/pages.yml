@@ -1,0 +1,109 @@
+name: Static web demo
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  VSCODE_VERSION: 1.138.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 12.6.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm bundle:web-static:extensions
+
+      - name: Check out matching Code-OSS source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/vscode
+          ref: ${{ env.VSCODE_VERSION }}
+          path: .vscode-web-source
+          persist-credentials: false
+
+      - name: Isolate Code-OSS build from workspace dependencies
+        run: cp -a .vscode-web-source "$RUNNER_TEMP/vscode-source"
+
+      - name: Use Code-OSS build Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.18.0
+
+      - name: Install Code-OSS native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libkrb5-dev libsecret-1-dev libx11-dev libxkbfile-dev
+
+      - name: Install Code-OSS dependencies
+        working-directory: ${{ runner.temp }}/vscode-source
+        run: npm ci
+
+      - name: Build minified Code-OSS web assets
+        working-directory: ${{ runner.temp }}/vscode-source
+        run: |
+          npm run gulp copy-codicons compile-web-extensions-build
+          mkdir -p .build/extensions
+          cp -a .build/web/extensions/. .build/extensions/
+          node build/next/index.ts bundle --minify --nls --target server-web --out out-vscode-reh-web-min
+
+      - name: Assemble static demo
+        run: pnpm prepare:web-static "$RUNNER_TEMP/vscode-source" artifacts/web-demo
+
+      - name: Smoke test static assembly against Code-OSS output
+        run: node --test tests/meta/static-web.test.mjs
+        env:
+          VSCODE_WEB_BUILD: ${{ runner.temp }}/vscode-source
+
+      - name: Check Pages artifact size
+        run: |
+          bytes="$(du -sb artifacts/web-demo | cut -f1)"
+          echo "Static site size: ${bytes} bytes"
+          test "${bytes}" -lt 1073741824
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: artifacts/web-demo
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
