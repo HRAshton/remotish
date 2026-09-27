@@ -141,6 +141,15 @@ test('bootstrap URI round-trips an absolute target and slash-bearing branch', ()
   });
 });
 
+test('bootstrap URI rejects branches that are not well-formed Unicode', () => {
+  for (const branch of [String.fromCharCode(0xd800), String.fromCharCode(0xdc00)]) {
+    assert.throws(
+      () => createBrowserRpcBootstrapUri({ target, branch }),
+      errorCode('INVALID_REQUEST'),
+    );
+  }
+});
+
 test('bootstrap URI rejects unknown versions, ambiguous fields, and secret-bearing targets', () => {
   for (const uri of [
     `remotish-rpc://open/v2/${encodedTarget}`,

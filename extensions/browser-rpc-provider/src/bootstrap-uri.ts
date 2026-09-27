@@ -51,6 +51,7 @@ function validateBranch(value: unknown): string {
     value.length === 0 ||
     value.length > 2048 ||
     value !== value.trim() ||
+    containsUnpairedSurrogate(value) ||
     [...value].some((character) => {
       const code = character.charCodeAt(0);
       return code < 32 || code === 127;
@@ -59,6 +60,22 @@ function validateBranch(value: unknown): string {
     throw invalidBootstrap();
   }
   return value;
+}
+
+function containsUnpairedSurrogate(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) {
+        return true;
+      }
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function encodeText(value: string): string {
