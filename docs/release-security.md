@@ -68,7 +68,7 @@ The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that
 
 The project intentionally does not execute registry-resolved one-off CLIs during install or CI. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze that dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release installs on `pnpm install --frozen-lockfile`.
 
-The tag-only Open VSX publish job has one narrow exception: it installs the `ovsx` CLI globally at an exact version with lifecycle scripts disabled, then uses its native trusted-publishing/OIDC flow. The release-contract test pins that command and rejects token-based Open VSX publishing.
+The Open VSX CLI is an exact-version root `devDependency`, so its complete runtime dependency graph is frozen by `pnpm-lock.yaml` and restored with `pnpm install --frozen-lockfile` before publishing. The release workflow invokes that locked copy with `pnpm exec ovsx`; release-contract tests reject token-based Open VSX publishing.
 
 VS Code stable and proposed API declarations are vendored from the supported 1.139.1 source tag instead of being downloaded from a package postinstall hook. Maintainers refresh them explicitly with the exact `@vscode/dts` devDependency; the release-contract tests also reject ephemeral executors such as `pnpm dlx`, `pnpx`, `npx`, and `npm exec` from package scripts and workflows.
 
@@ -100,7 +100,7 @@ Publishing uses Open VSX trusted publishing rather than a stored registry token.
 `hrashton` namespace with this repository and `.github/workflows/release.yml` as a trusted GitHub
 Actions publisher, including the `open-vsx` environment when configuring the trust policy. The
 workflow grants only `contents: read` and `id-token: write` to the publish job and invokes
-`ovsx publish --trusted-publishing`; no `OVSX_PAT` secret is expected.
+`pnpm exec ovsx publish --trusted-publishing --skip-duplicate`; no `OVSX_PAT` secret is expected. `--skip-duplicate` makes a partially completed tagged release safe to rerun if one extension was already accepted before a later publish or registry smoke failed.
 
 After publishing, the workflow downloads the exact released versions of
 `hrashton.remotish` and `hrashton.remotish-github-provider` back from Open VSX and runs the public
