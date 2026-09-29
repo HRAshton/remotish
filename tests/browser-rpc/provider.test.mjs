@@ -132,13 +132,15 @@ test('broker enforces trusted origin and validates endpoint/session before regis
     );
   }
   assert.doesNotThrow(() =>
-    broker.register(
-      { origin: 'https://example.com' },
-      {
-        ...endpoint,
-        session: { version: 1, capabilities: { commits: false, localEdits: true } },
-      },
-    ).dispose(),
+    broker
+      .register(
+        { origin: 'https://example.com' },
+        {
+          ...endpoint,
+          session: { version: 1, capabilities: { commits: false, localEdits: true } },
+        },
+      )
+      .dispose(),
   );
   for (const session of [
     { version: 2, capabilities: { commits: false } },

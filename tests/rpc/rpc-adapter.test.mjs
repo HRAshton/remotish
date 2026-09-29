@@ -170,10 +170,7 @@ test('session capabilities control optional methods and reject invalid combinati
   assert.equal(readOnly.commit, undefined);
   assert.equal(readOnly.createBranch, undefined);
   assert.equal(readOnly.deleteBranch, undefined);
-  const localOnly = new RpcAdapter(
-    transport,
-    session({ commits: false, localEdits: true }),
-  );
+  const localOnly = new RpcAdapter(transport, session({ commits: false, localEdits: true }));
   assert.equal(localOnly.capabilities.localEdits, true);
   assert.equal(localOnly.commit, undefined);
   const limited = new RpcAdapter(transport, session({ commits: true }));
