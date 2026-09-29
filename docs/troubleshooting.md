@@ -56,3 +56,14 @@ It packages the VSIX, inspects its contents, unpacks that exact artifact and run
 ## Requests continue after cancellation
 
 Pass `RemoteRequestOptions.signal` through every adapter/client layer. With `fetch`, forward it as `RequestInit.signal`. For SDKs that do not accept an `AbortSignal`, stop downstream work as early as the SDK permits and classify explicit cancellation as `CANCELLED`.
+
+## Export diagnostics for support
+
+Run **Remotish: Export Diagnostics** from the Command Palette and choose a local JSON destination.
+
+The report is deliberately content-free. It contains host and extension versions, provider manifest
+metadata, aggregate active/pending workspace counts and aggregate persistence statistics. It does
+not include repository descriptors or IDs, workspace IDs, repository URLs, branch names, paths,
+file contents, commit messages, credentials, request headers or exception messages.
+
+Diagnostics are generated locally and are not uploaded or transmitted by Remotish.

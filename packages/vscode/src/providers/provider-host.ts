@@ -51,6 +51,11 @@ export interface RemotishProviderHostOptions {
   readonly defaultRestoreTimeoutMs?: number;
 }
 
+export interface RemotishProviderHostDiagnostics {
+  readonly activeWorkspaceCount: number;
+  readonly pendingPreparationCount: number;
+}
+
 /**
  * Owns provider discovery, repository preparation commands, canonical restoration, and the
  * VS Code host used by those workspaces.
@@ -124,6 +129,17 @@ export class RemotishProviderHost implements vscode.Disposable {
   /** Manifest-only provider information; reading it never activates providers. */
   listProviders(): readonly DiscoveredProvider[] {
     return this.discovery.list();
+  }
+
+  getDiagnostics(): RemotishProviderHostDiagnostics {
+    return {
+      activeWorkspaceCount: this.host.registry.list().length,
+      pendingPreparationCount: this.pendingPreparations.size,
+    };
+  }
+
+  getStorageDiagnostics(): ReturnType<StorageUriWorkspaceStorage['getDiagnostics']> {
+    return this.storage.getDiagnostics();
   }
 
   /** Internal/embedded registration path; ordinary provider extensions use discovery instead. */
