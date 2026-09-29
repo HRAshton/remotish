@@ -192,7 +192,7 @@ jobs:
           path: artifacts
 
       - name: Install Open VSX CLI
-        run: npm install --global ovsx@1.2.0
+        run: npm install --global --ignore-scripts ovsx@1.2.0
 
       - name: Publish stable registry extensions
         run: |
