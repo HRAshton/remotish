@@ -66,7 +66,9 @@ The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that
 
 ## Locked build and release tooling
 
-The project intentionally does not execute registry-resolved one-off CLIs during install, CI, or release. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze the complete resolved dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release on `pnpm install --frozen-lockfile`.
+The project intentionally does not execute registry-resolved one-off CLIs during install or CI. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze that dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release installs on `pnpm install --frozen-lockfile`.
+
+The tag-only Open VSX publish job has one narrow exception: it installs the `ovsx` CLI globally at an exact version with lifecycle scripts disabled, then uses its native trusted-publishing/OIDC flow. The release-contract test pins that command and rejects token-based Open VSX publishing.
 
 VS Code stable and proposed API declarations are vendored from the supported 1.139.1 source tag instead of being downloaded from a package postinstall hook. Maintainers refresh them explicitly with the exact `@vscode/dts` devDependency; the release-contract tests also reject ephemeral executors such as `pnpm dlx`, `pnpx`, `npx`, and `npm exec` from package scripts and workflows.
 
