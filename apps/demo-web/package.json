@@ -21,6 +21,10 @@
     "workspace"
   ],
   "browser": "./dist/extension.js",
+  "enabledApiProposals": [
+    "scmHistoryProvider",
+    "timeline"
+  ],
   "activationEvents": [
     "onFileSystem:remotish",
     "onFileSystem:remotish-base",
@@ -226,20 +230,10 @@
     ]
   },
   "dependencies": {
-    "@remotish/vscode": "workspace:*"
+    "@remotish/vscode": "workspace:*",
+    "@remotish/vscode-history": "workspace:*"
   },
   "scripts": {
     "typecheck": "tsc -b --pretty false"
-  },
-  "categories": [
-    "SCM Providers",
-    "Other"
-  ],
-  "keywords": [
-    "remote repositories",
-    "virtual filesystem",
-    "source control",
-    "code oss",
-    "open vsx"
-  ]
+  }
 }
