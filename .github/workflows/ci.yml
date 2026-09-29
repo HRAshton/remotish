@@ -79,6 +79,7 @@ jobs:
       - run: pnpm test:vscode-web
       - run: pnpm test:userscript-browser
       - run: pnpm test:vscode-web:vsix
+      - run: pnpm test:vscode-web:controlled-vsix
 
   github-public:
     runs-on: ubuntu-latest

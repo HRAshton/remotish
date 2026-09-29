@@ -60,7 +60,9 @@ Tests are injected only into the unpacked smoke-test copy, not into the release 
 
 The base `@remotish/vscode` host path uses stable APIs only and is smoke-tested without `enabledApiProposals` by `pnpm test:vscode-web:stable`.
 
-`apps/demo-web` remains proposal-enabled so the controlled Code OSS integration continues to qualify SCM History and Timeline. `release:vsix` runs `scripts/prepare-open-vsx-host.mjs`, which derives the public manifest with those proposals and the history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. The resulting `remotish.vsix` therefore uses only the stable host path. `@remotish/vscode-history` remains available for controlled hosts but is not part of the public registry dependency graph.
+`apps/demo-web` remains proposal-enabled so the controlled Code OSS integration continues to qualify SCM History and Timeline. `release:vsix` runs `scripts/prepare-open-vsx-host.mjs`, which derives the public manifest with those proposals and the history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. The resulting `remotish.vsix` therefore uses only the stable host path. `release:controlled-vsix` separately packages the proposal-enabled host as `remotish-controlled.vsix`; that artifact is attached to GitHub Releases but is never published to Open VSX. `@remotish/vscode-history` remains available for controlled hosts but is not part of the public registry dependency graph.
+
+A controlled-host release pair is supported only after the exact controlled VSIX passes browser qualification against the exact compatible COSW release artifact. The current support matrix and COSW proposal-grant boundary are documented in [Controlled-host Remotish](controlled-host-support.md).
 
 The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that host version.
 
