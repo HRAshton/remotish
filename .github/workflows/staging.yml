@@ -131,7 +131,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
-      pull-requests: write
+      issues: write
     steps:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - id: deploy
