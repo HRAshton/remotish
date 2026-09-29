@@ -213,12 +213,14 @@ jobs:
       pages: write
       id-token: write
       issues: write
+      pull-requests: write
     steps:
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
 
       - name: Update PR with staging link
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ needs.build.outputs.pr }}
