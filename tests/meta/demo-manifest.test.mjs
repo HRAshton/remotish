@@ -62,7 +62,6 @@ test('host manifest has no fixture or core runtime dependency', () => {
   assert.equal(manifest.dependencies?.['@remotish/core'], undefined);
   assert.deepEqual(manifest.dependencies, {
     '@remotish/vscode': 'workspace:*',
-    '@remotish/vscode-history': 'workspace:*',
   });
 });
 
@@ -83,8 +82,12 @@ test('revert is an inline action for files in the Changes group', () => {
   assert.equal(revert?.when, 'scmProvider == remotish && scmResourceGroup == changes');
 });
 
-test('controlled demo enables only the proposal-sensitive history APIs', () => {
-  assert.deepEqual(manifest.enabledApiProposals, ['scmHistoryProvider', 'timeline']);
+test('published host uses stable APIs and leaves history to controlled hosts', () => {
+  assert.equal(manifest.enabledApiProposals, undefined);
+  assert.match(hostSource, /@remotish\/vscode/u);
+  assert.doesNotMatch(hostSource, /@remotish\/vscode-history|RemotishHistoryHost/u);
+  assert.deepEqual(manifest.categories, ['SCM Providers', 'Other']);
+  assert.ok(manifest.keywords.includes('open vsx'));
 });
 
 test('stable smoke host uses the base package without proposed APIs', () => {
