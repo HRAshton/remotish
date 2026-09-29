@@ -1,43 +1,29 @@
-# Remotish
+# Remotish Web Host Extension
 
-Remotish is the stable-API host extension for remote repository providers. It supplies the virtual
-filesystem, Source Control UI, diffs, staging selection, branch UX, persistence, and provider
-discovery used by independently installed Remotish provider extensions.
+Browser-safe Remotish host extension used by the local and packaged Code-OSS Web smoke tests.
 
-The public extension intentionally uses only stable VS Code APIs. Native SCM History and file
-Timeline integration remain available to controlled Code OSS / VS Code hosts through the separate
-`@remotish/vscode-history` integration package, but are not required by the Open VSX build.
+The host contains no demo adapter. It discovers independently installed provider extensions from manifest metadata without activating them at startup. Providers consume only `@remotish/adapter-sdk`; provider → host bootstrap operations use the versioned `remotish.ensureRepository` and `remotish.openRepository` commands.
 
-## Open VSX
-
-Install **Remotish** (`hrashton.remotish`) from Open VSX. To open public GitHub repositories,
-install **Remotish GitHub Provider** (`hrashton.remotish-github-provider`); the provider declares
-Remotish as an extension dependency, so compatible clients can install the host automatically.
-
-A public repository can then be opened with a folder URI such as:
+The repository also ships `extensions/fixture-provider` as a separate deterministic demo provider:
 
 ```text
-remotish-github://open/v1/octocat/Hello-World
+Fixture provider extension
+  FixtureAdapter + RemotishAdapterProviderV1
+                    ↓
+             provider discovery
+                    ↓
+RemotishProviderHost / RemotishVsCodeHost
+                    ↓
+         filesystem + SCM + history
 ```
 
-For a browser-hosted Code OSS instance, URL-encode that URI as the outer `folder` value:
-
-```text
-https://code-oss.example/?folder=remotish-github%3A%2F%2Fopen%2Fv1%2Foctocat%2FHello-World
-```
-
-The provider opens a temporary bootstrap root, registers the anonymous public GitHub repository,
-and then switches to the canonical `remotish://<stable-workspace-id>/` workspace.
-
-## Development
-
-Run the repository-controlled demo from the repository root with:
+Run from the repository root:
 
 ```sh
 corepack pnpm install --frozen-lockfile
 corepack pnpm vscode:web
 ```
 
-See [Provider extensions](../../docs/provider-extensions.md),
-[Getting started](../../docs/getting-started.md), and
-[VS Code integration](../../docs/vscode-integration.md).
+The launcher loads both extensions. Run **Remotish Demo: Open Fixture Repository** to open the fixture through `remotish.openRepository`; the resulting `remotish://.../` authority is the normal stable provider-derived workspace ID, not a demo-only registry key.
+
+See [Provider extensions](../../docs/provider-extensions.md), [Getting started](../../docs/getting-started.md), and [VS Code integration](../../docs/vscode-integration.md).
