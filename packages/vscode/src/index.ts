@@ -1,10 +1,10 @@
-export {
-  REMOTISH_EXPORT_DIAGNOSTICS_COMMAND,
-  RemotishDiagnostics,
-} from './diagnostics.js';
 export type {
   RemotishDiagnosticReportV1,
   RemotishProviderDiagnosticV1,
+} from './diagnostics.js';
+export {
+  REMOTISH_EXPORT_DIAGNOSTICS_COMMAND,
+  RemotishDiagnostics,
 } from './diagnostics.js';
 export { createRevisionUri, createWorkingUri } from './filesystem/provider.js';
 export { parseRepositoryUri, WORKING_SCHEME } from './filesystem/uri.js';
