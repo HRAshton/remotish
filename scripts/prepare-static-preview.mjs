@@ -4,21 +4,28 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 
-const defaultPreviewExtensions = previewExtensionPaths(root);
+const providerPaths = {
+  'fixture-provider': 'extensions/fixture-provider/',
+  'browser-rpc-provider': 'extensions/browser-rpc-provider/',
+  'github-provider': 'extensions/github-provider/',
+  'git-http-provider': 'extensions/git-http-provider/',
+};
 
-function previewExtensionPaths(sourceRoot) {
+export function previewExtensionPaths(sourceRoot, providers = Object.keys(providerPaths)) {
+  const unknown = providers.filter((provider) => !(provider in providerPaths));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown preview provider(s): ${unknown.join(', ')}.`);
+  }
+
   return [
     new URL('apps/demo-web/', sourceRoot),
-    new URL('extensions/fixture-provider/', sourceRoot),
-    new URL('extensions/browser-rpc-provider/', sourceRoot),
-    new URL('extensions/github-provider/', sourceRoot),
-    new URL('extensions/git-http-provider/', sourceRoot),
+    ...providers.map((provider) => new URL(providerPaths[provider], sourceRoot)),
   ];
 }
 
 export async function prepareStaticPreview({
   dist,
-  extensionPaths = defaultPreviewExtensions,
+  extensionPaths = previewExtensionPaths(root),
   connectOrigins = ['https://api.github.com'],
 }) {
   const distPath = resolve(dist);
@@ -139,12 +146,18 @@ async function writeJson(path, value) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const dist = process.argv[2];
   const sourceRoot = process.argv[3];
-  if (!dist) {
-    throw new Error('Usage: node scripts/prepare-static-preview.mjs <dist> [source-root]');
+  const providers = process.argv.slice(4);
+  if (!dist || !sourceRoot) {
+    throw new Error(
+      'Usage: node scripts/prepare-static-preview.mjs <dist> <source-root> [provider ...]',
+    );
   }
-  const extensionPaths = sourceRoot
-    ? previewExtensionPaths(pathToFileURL(`${resolve(sourceRoot)}/`))
-    : defaultPreviewExtensions;
+  const extensionPaths = previewExtensionPaths(
+    pathToFileURL(`${resolve(sourceRoot)}/`),
+    providers,
+  );
   const installed = await prepareStaticPreview({ dist, extensionPaths });
-  console.log(`Installed ${installed.length} Remotish extensions into ${resolve(dist)}.`);
+  console.log(
+    `Installed ${installed.map((extension) => extension.id).join(', ')} into ${resolve(dist)}.`,
+  );
 }
