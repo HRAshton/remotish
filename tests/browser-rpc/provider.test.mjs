@@ -131,6 +131,15 @@ test('broker enforces trusted origin and validates endpoint/session before regis
       errorCode('INVALID_REQUEST'),
     );
   }
+  assert.doesNotThrow(() =>
+    broker.register(
+      { origin: 'https://example.com' },
+      {
+        ...endpoint,
+        session: { version: 1, capabilities: { commits: false, localEdits: true } },
+      },
+    ).dispose(),
+  );
   for (const session of [
     { version: 2, capabilities: { commits: false } },
     { version: 1, capabilities: { commits: false, forceWithLease: true } },
@@ -218,6 +227,23 @@ test('provider waits for a matching endpoint then forwards RPC calls through the
     new Uint8Array([0, 1, 2, 127, 128, 255]),
   );
   assert.deepEqual(endpoint.calls, ['getRepository', 'readFile']);
+  broker.dispose();
+});
+
+test('existing adapter rejects a local-edit capability change after endpoint reload', async () => {
+  const broker = new BrowserRpcEndpointBroker();
+  const first = broker.register({ origin: 'https://example.com' }, fakeEndpoint());
+  const adapter = await createBrowserRpcProvider(broker).createAdapter({ target });
+  first.dispose();
+  const replacement = broker.register(
+    { origin: 'https://example.com' },
+    {
+      ...fakeEndpoint(),
+      session: { version: 1, capabilities: { commits: false, localEdits: true } },
+    },
+  );
+  await assert.rejects(adapter.getRepository(), errorCode('UNSUPPORTED'));
+  replacement.dispose();
   broker.dispose();
 });
 

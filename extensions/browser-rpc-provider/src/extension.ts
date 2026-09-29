@@ -56,6 +56,7 @@ function capabilitySignature(session: unknown): string {
   const capabilities = decodeRpcSession(session).capabilities;
   return JSON.stringify([
     capabilities.commits,
+    capabilities.localEdits === true,
     capabilities.forceWithLease === true,
     capabilities.amend === true,
     capabilities.createBranch === true,
