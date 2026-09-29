@@ -206,7 +206,7 @@ test('VS Code host contract keeps version, engines, types, proposals, and Web sm
   assert.doesNotMatch(gitignore, /^\.vscode-types\/$/mu);
 });
 
-test('build and release tools are exact direct dependencies without ephemeral execution', async () => {
+test('repository build tools are exact direct dependencies without ephemeral execution', async () => {
   const expectedTools = [
     '@vscode/dts',
     '@vscode/test-web',
@@ -214,6 +214,7 @@ test('build and release tools are exact direct dependencies without ephemeral ex
     'dependency-cruiser',
     'esbuild',
     'knip',
+    'ovsx',
     'remark-cli',
     'remark-validate-links',
     'typedoc',

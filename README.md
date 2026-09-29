@@ -70,12 +70,27 @@ extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
 extensions/github-provider  anonymous public GitHub provider extension
 extensions/git-http-provider  HTTPS Git provider for Web and desktop
-apps/demo-web               browser-safe Remotish host extension
+apps/demo-web               controlled Code OSS Remotish host/demo extension
 examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
 examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript example
 ```
 
 Adapters depend on `@remotish/adapter-sdk`, not on VS Code or core internals.
+
+
+## Install from Open VSX
+
+For Code OSS clients backed by Open VSX, install **Remotish** (`hrashton.remotish`) and
+**Remotish GitHub Provider** (`hrashton.remotish-github-provider`). The GitHub provider declares
+the host as an extension dependency. The registry build of Remotish uses only stable VS Code APIs;
+SCM History and file Timeline integration stay opt-in for controlled hosts through
+`@remotish/vscode-history`.
+
+Open a public repository with the provider URI:
+
+```text
+remotish-github://open/v1/octocat/Hello-World
+```
 
 ## Try the demo
 

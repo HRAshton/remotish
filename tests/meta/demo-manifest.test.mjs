@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 import { BRANCH_COMMANDS } from '../../packages/vscode/dist/branches/commands.js';
 import { SCM_COMMANDS } from '../../packages/vscode/dist/scm/source-control.js';
+import { createOpenVsxHostManifest } from '../../scripts/prepare-open-vsx-host.mjs';
 
 const manifest = JSON.parse(
   await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
@@ -17,6 +18,14 @@ const stableManifest = JSON.parse(
 );
 const stableHostSource = await readFile(
   new URL('../../apps/demo-web/src/test/stable/extension.ts', import.meta.url),
+  'utf8',
+);
+const releaseHostSource = await readFile(
+  new URL('../../apps/demo-web/src/extension-stable.ts', import.meta.url),
+  'utf8',
+);
+const openVsxReadme = await readFile(
+  new URL('../../apps/demo-web/README.open-vsx.md', import.meta.url),
   'utf8',
 );
 
@@ -85,6 +94,24 @@ test('revert is an inline action for files in the Changes group', () => {
 
 test('controlled demo enables only the proposal-sensitive history APIs', () => {
   assert.deepEqual(manifest.enabledApiProposals, ['scmHistoryProvider', 'timeline']);
+});
+
+test('Open VSX host manifest strips proposed APIs from the controlled demo', () => {
+  const published = createOpenVsxHostManifest(manifest);
+
+  assert.equal(published.name, 'remotish');
+  assert.equal(published.publisher, 'hrashton');
+  assert.equal(published.version, manifest.version);
+  assert.equal(published.enabledApiProposals, undefined);
+  assert.deepEqual(published.dependencies, {
+    '@remotish/vscode': 'workspace:*',
+  });
+  assert.deepEqual(published.categories, ['SCM Providers', 'Other']);
+  assert.ok(published.keywords.includes('open vsx'));
+  assert.match(releaseHostSource, /@remotish\/vscode/u);
+  assert.doesNotMatch(releaseHostSource, /@remotish\/vscode-history|RemotishHistoryHost/u);
+  assert.match(openVsxReadme, /hrashton\.remotish-github-provider/u);
+  assert.match(openVsxReadme, /remotish-github:\/\/open\/v1\/octocat\/Hello-World/u);
 });
 
 test('stable smoke host uses the base package without proposed APIs', () => {

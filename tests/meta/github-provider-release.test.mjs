@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { createGitHubProviderReleaseManifest } from '../../scripts/prepare-github-provider-vsix.mjs';
+
 const root = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
 const manifest = JSON.parse(
   await readFile(new URL('../../extensions/github-provider/package.json', import.meta.url)),
@@ -28,6 +30,10 @@ test('GitHub provider is a browser-only anonymous public repository extension', 
   assert.equal(manifest.main, undefined);
   assert.equal(manifest.private, true);
   assert.equal(manifest.publisher, 'hrashton');
+  assert.equal(manifest.extensionDependencies, undefined);
+  assert.deepEqual(manifest.categories, ['SCM Providers', 'Other']);
+  assert.ok(manifest.keywords.includes('github'));
+  assert.ok(manifest.keywords.includes('open vsx'));
   assert.deepEqual(manifest.activationEvents, ['onFileSystem:remotish-github']);
   assert.deepEqual(manifest.capabilities.untrustedWorkspaces, { supported: true });
   assert.deepEqual(manifest.remotish, {
@@ -49,6 +55,13 @@ test('GitHub provider is a browser-only anonymous public repository extension', 
 });
 
 test('GitHub provider VSIX participates in packaged smoke and release controls', () => {
+  const published = createGitHubProviderReleaseManifest(manifest);
+  assert.deepEqual(published.extensionDependencies, ['hrashton.remotish']);
+  assert.deepEqual(published.categories, ['SCM Providers', 'Other']);
+  assert.ok(published.keywords.includes('github'));
+  assert.ok(published.keywords.includes('open vsx'));
+
+  assert.match(root.scripts['release:github-provider:vsix'], /prepare-github-provider-vsix\.mjs/u);
   assert.match(root.scripts['release:github-provider:vsix'], /remotish-github-provider\.vsix$/u);
   assert.match(
     root.scripts['test:vscode-web'],
@@ -65,4 +78,21 @@ test('GitHub provider VSIX participates in packaged smoke and release controls',
     /Attest build provenance[\s\S]*artifacts\/remotish-github-provider\.vsix/u,
   );
   assert.match(workflow, /gh release create[\s\S]*artifacts\/remotish-github-provider\.vsix/u);
+  assert.match(workflow, /open-vsx-publish:/u);
+  assert.match(workflow, /environment: open-vsx/u);
+  assert.match(workflow, /id-token: write/u);
+  assert.equal(root.devDependencies.ovsx, '1.2.0');
+  assert.doesNotMatch(workflow, /npm install --global/u);
+  assert.match(
+    workflow,
+    /pnpm exec ovsx publish artifacts\/remotish\.vsix --trusted-publishing --skip-duplicate/u,
+  );
+  assert.match(
+    workflow,
+    /pnpm exec ovsx publish artifacts\/remotish-github-provider\.vsix --trusted-publishing --skip-duplicate/u,
+  );
+  assert.match(workflow, /pnpm exec ovsx get hrashton\.remotish --versionRange/u);
+  assert.match(workflow, /pnpm exec ovsx get hrashton\.remotish-github-provider --versionRange/u);
+  assert.match(workflow, /remotish-github:\/\/open\/v1\/octocat\/Hello-World/u);
+  assert.doesNotMatch(workflow, /OVSX_PAT/u);
 });

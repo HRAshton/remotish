@@ -39,22 +39,21 @@ provider extension                    Remotish host
       │                                   │
       ├─ RemotishAdapterProviderV1 ──────► provider discovery
       │                                   │
-      └─ RemotishAdapter ────────────────► RemotishWorkspace + VFS/SCM/history
+      └─ RemotishAdapter ────────────────► RemotishWorkspace + VFS/SCM
 ```
 
 The host only starts generic infrastructure:
 
 ```ts
 import { RemotishProviderHost } from '@remotish/vscode';
-import { RemotishHistoryHost } from '@remotish/vscode-history';
 import * as vscode from 'vscode';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const providers = new RemotishProviderHost(context);
-  const history = new RemotishHistoryHost(providers.host);
-  context.subscriptions.push(providers, history);
+  context.subscriptions.push(new RemotishProviderHost(context));
 }
 ```
+
+Controlled Code OSS hosts that intentionally enable the `scmHistoryProvider` and `timeline` proposals can additionally compose `@remotish/vscode-history`; the public Open VSX host does not require it.
 
 The provider extension returns the public SDK contract and constructs its adapter only when requested:
 

@@ -17,18 +17,18 @@ Stable VS Code types come from the local `@types/vscode` package under `types/vs
 
 ## Proposal-sensitive APIs
 
-The base `@remotish/vscode` package is proposal-free. The controlled demo additionally composes `@remotish/vscode-history`, which uses:
+The base `@remotish/vscode` package and the published Open VSX host are proposal-free. The repository-controlled `apps/demo-web` host additionally composes `@remotish/vscode-history`, which uses:
 
 ```text
 scmHistoryProvider
 timeline
 ```
 
-Proposal declaration files for the controlled host are committed under `types/vscode-proposed/`. The root `package.json#codeOss` object declares the exact host version, release commit, and upstream Git blob IDs for the stable and proposal declarations. Release-contract tests verify those blobs, the local `@types/vscode` version, every extension engine, the enabled proposal set, and every Code-OSS Web launcher against that one host. Install and CI do not download declarations.
+Proposal declaration files for controlled-host qualification are committed under `types/vscode-proposed/`. The root `package.json#codeOss` object declares the exact host version, release commit, and upstream Git blob IDs for the stable and proposal declarations. Release-contract tests verify those blobs, the local `@types/vscode` version, every extension engine, and every Code-OSS Web launcher against that one host. Install and CI do not download declarations.
 
-`@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK, core, or base VS Code host.
+`@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK, core, or public VS Code host. It remains available for products that control their Code OSS build and proposal policy, but it is not a dependency of the Open VSX host artifact.
 
-The controlled demo enables these proposals because it targets a controlled Code-OSS/Web distribution. `pnpm test:vscode-web:stable` separately runs the base host with no `enabledApiProposals`. A normal Marketplace extension must follow Marketplace/proposed-API rules and can omit the history package while keeping the core workspace and SCM integration.
+Release packaging derives a public manifest from `apps/demo-web` with the proposal declarations and history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. `pnpm test:vscode-web:stable` exercises the proposal-free base composition, while the controlled demo and runtime-stub/history tests continue to qualify the optional history integration.
 
 ## Updating the host version
 

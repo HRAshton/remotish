@@ -5,6 +5,13 @@ Repository descriptors contain only `owner` and `repository`; tokens and alterna
 not accepted. The provider always constructs `@remotish/adapter-github` without a token, so remote
 commit, force-push, amend, create-branch and delete-branch capabilities remain disabled.
 
+
+## Install from Open VSX
+
+Install **Remotish GitHub Provider** (`hrashton.remotish-github-provider`) from Open VSX. The
+extension declares **Remotish** (`hrashton.remotish`) as an extension dependency, so compatible
+clients can pull in the stable-API host automatically.
+
 ## Bootstrap web link
 
 The temporary folder URI is:

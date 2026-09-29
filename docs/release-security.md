@@ -60,13 +60,15 @@ Tests are injected only into the unpacked smoke-test copy, not into the release 
 
 The base `@remotish/vscode` host path uses stable APIs only and is smoke-tested without `enabledApiProposals` by `pnpm test:vscode-web:stable`.
 
-The released controlled demo host additionally composes `@remotish/vscode-history`, so that artifact still requires the `scmHistoryProvider` and `timeline` proposals and is aimed at the controlled Code-OSS distribution described in [Code-OSS integration](code-oss-integration.md). A proposal-free embedding can omit the history package while retaining the core remote workspace and SCM behavior.
+`apps/demo-web` remains proposal-enabled so the controlled Code OSS integration continues to qualify SCM History and Timeline. `release:vsix` runs `scripts/prepare-open-vsx-host.mjs`, which derives the public manifest with those proposals and the history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. The resulting `remotish.vsix` therefore uses only the stable host path. `@remotish/vscode-history` remains available for controlled hosts but is not part of the public registry dependency graph.
 
 The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that host version.
 
 ## Locked build and release tooling
 
-The project intentionally does not execute registry-resolved one-off CLIs during install, CI, or release. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze the complete resolved dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release on `pnpm install --frozen-lockfile`.
+The project intentionally does not execute registry-resolved one-off CLIs during install or CI. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze that dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release installs on `pnpm install --frozen-lockfile`.
+
+The Open VSX CLI is an exact-version root `devDependency`, so its complete runtime dependency graph is frozen by `pnpm-lock.yaml` and restored with `pnpm install --frozen-lockfile` before publishing. The release workflow invokes that locked copy with `pnpm exec ovsx`; release-contract tests reject token-based Open VSX publishing.
 
 VS Code stable and proposed API declarations are vendored from the supported 1.139.1 source tag instead of being downloaded from a package postinstall hook. Maintainers refresh them explicitly with the exact `@vscode/dts` devDependency; the release-contract tests also reject ephemeral executors such as `pnpm dlx`, `pnpx`, `npx`, and `npm exec` from package scripts and workflows.
 
@@ -87,3 +89,22 @@ Do not report suspected vulnerabilities in a public issue. Follow [SECURITY.md](
 Publishing is designed for npm Trusted Publishing with GitHub Actions OIDC. Configure the `@remotish/adapter-sdk` package on npmjs.com with this repository and `.github/workflows/release.yml` as its trusted publisher, and protect the GitHub `npm` environment as appropriate. No long-lived `NPM_TOKEN` is expected in the workflow.
 
 For a beta version such as `0.1.0-beta.1`, publish with the `beta` npm dist-tag rather than replacing `latest`. Stable versions can use the default `latest` dist-tag.
+
+## Open VSX publishing
+
+Release tags publish only the stable-API Remotish host and the anonymous public GitHub provider to
+Open VSX under the `hrashton` namespace. Fixture, Browser RPC, and Git HTTP provider VSIXes remain
+GitHub-release-only.
+
+Publishing uses Open VSX trusted publishing rather than a stored registry token. Configure the
+`hrashton` namespace with this repository and `.github/workflows/release.yml` as a trusted GitHub
+Actions publisher, including the `open-vsx` environment when configuring the trust policy. The
+workflow grants only `contents: read` and `id-token: write` to the publish job and invokes
+`pnpm exec ovsx publish --trusted-publishing --skip-duplicate`; no `OVSX_PAT` secret is expected. `--skip-duplicate` makes a partially completed tagged release safe to rerun if one extension was already accepted before a later publish or registry smoke failed.
+
+After publishing, the workflow downloads the exact released versions of
+`hrashton.remotish` and `hrashton.remotish-github-provider` back from Open VSX and runs the public
+GitHub bootstrap smoke under the pinned Code OSS Web build. This checks the registry artifacts, the
+host/provider installation relationship, and the canonical public-repository open path rather than
+only testing the locally packaged VSIX files.
+
