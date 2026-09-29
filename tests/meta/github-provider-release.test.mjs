@@ -2,9 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
-import {
-  createGitHubProviderReleaseManifest,
-} from '../../scripts/prepare-github-provider-vsix.mjs';
+import { createGitHubProviderReleaseManifest } from '../../scripts/prepare-github-provider-vsix.mjs';
 
 const root = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
 const manifest = JSON.parse(
