@@ -191,13 +191,10 @@ jobs:
           name: release
           path: artifacts
 
-      - name: Install Open VSX CLI
-        run: npm install --global --ignore-scripts ovsx@1.2.0
-
       - name: Publish stable registry extensions
         run: |
-          ovsx publish artifacts/remotish.vsix --trusted-publishing
-          ovsx publish artifacts/remotish-github-provider.vsix --trusted-publishing
+          pnpm exec ovsx publish artifacts/remotish.vsix --trusted-publishing --skip-duplicate
+          pnpm exec ovsx publish artifacts/remotish-github-provider.vsix --trusted-publishing --skip-duplicate
 
       - name: Download published registry artifacts
         shell: bash
@@ -208,8 +205,8 @@ jobs:
           for attempt in 1 2 3 4 5; do
             rm -f artifacts/open-vsx-smoke/remotish.vsix artifacts/open-vsx-smoke/remotish-github-provider.vsix
 
-            if ovsx get hrashton.remotish --versionRange "$version" -o artifacts/open-vsx-smoke/remotish.vsix &&
-              ovsx get hrashton.remotish-github-provider --versionRange "$version" -o artifacts/open-vsx-smoke/remotish-github-provider.vsix; then
+            if pnpm exec ovsx get hrashton.remotish --versionRange "$version" -o artifacts/open-vsx-smoke/remotish.vsix &&
+              pnpm exec ovsx get hrashton.remotish-github-provider --versionRange "$version" -o artifacts/open-vsx-smoke/remotish-github-provider.vsix; then
               break
             fi
 
