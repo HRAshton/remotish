@@ -81,14 +81,18 @@ test('GitHub provider VSIX participates in packaged smoke and release controls',
   assert.match(workflow, /open-vsx-publish:/u);
   assert.match(workflow, /environment: open-vsx/u);
   assert.match(workflow, /id-token: write/u);
-  assert.match(workflow, /npm install --global --ignore-scripts ovsx@1\.2\.0/u);
-  assert.match(workflow, /ovsx publish artifacts\/remotish\.vsix --trusted-publishing/u);
+  assert.equal(root.devDependencies.ovsx, '1.2.0');
+  assert.doesNotMatch(workflow, /npm install --global/u);
   assert.match(
     workflow,
-    /ovsx publish artifacts\/remotish-github-provider\.vsix --trusted-publishing/u,
+    /pnpm exec ovsx publish artifacts\/remotish\.vsix --trusted-publishing --skip-duplicate/u,
   );
-  assert.match(workflow, /ovsx get hrashton\.remotish --versionRange/u);
-  assert.match(workflow, /ovsx get hrashton\.remotish-github-provider --versionRange/u);
+  assert.match(
+    workflow,
+    /pnpm exec ovsx publish artifacts\/remotish-github-provider\.vsix --trusted-publishing --skip-duplicate/u,
+  );
+  assert.match(workflow, /pnpm exec ovsx get hrashton\.remotish --versionRange/u);
+  assert.match(workflow, /pnpm exec ovsx get hrashton\.remotish-github-provider --versionRange/u);
   assert.match(workflow, /remotish-github:\/\/open\/v1\/octocat\/Hello-World/u);
   assert.doesNotMatch(workflow, /OVSX_PAT/u);
 });
