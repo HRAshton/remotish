@@ -342,7 +342,6 @@ installed example with one URL-only descriptor. Desktop bearer tokens stay in Se
 tokens stay in a customer-scoped Tampermonkey script on the Code-OSS origin. It uses Git smart HTTP
 and does not need a Bitbucket tab or a repository-semantic endpoint.
 
-
 ## GitHub public provider
 
 The [GitHub provider](../extensions/github-provider/README.md) is a browser-only concrete example
