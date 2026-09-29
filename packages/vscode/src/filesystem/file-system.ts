@@ -65,7 +65,7 @@ export class RepositoryFileSystem {
     if (resource.view === 'revision') {
       return true;
     }
-    return !workspace.capabilities.commits;
+    return !workspace.capabilities.commits && workspace.capabilities.localEdits !== true;
   }
 
   private async resolve(
@@ -84,7 +84,10 @@ export class RepositoryFileSystem {
     if (resolved.resource.view !== 'working') {
       throw new RemotishError('FORBIDDEN', 'Revision resources are read-only.');
     }
-    if (!resolved.workspace.capabilities.commits) {
+    if (
+      !resolved.workspace.capabilities.commits &&
+      resolved.workspace.capabilities.localEdits !== true
+    ) {
       throw new RemotishError('FORBIDDEN', 'This repository is read-only.');
     }
     return { resource: resolved.resource, workspace: resolved.workspace };

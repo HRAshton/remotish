@@ -55,11 +55,13 @@ export class RemotishSourceControl implements vscode.Disposable {
     this.sourceControl.quickDiffProvider = {
       provideOriginalResource: (uri) => this.originalResource(uri),
     };
-    this.sourceControl.acceptInputCommand = command(
-      SCM_COMMANDS.commitAndPush,
-      'Commit & Push',
-      workspaceId,
-    );
+    if (workspace.capabilities.commits) {
+      this.sourceControl.acceptInputCommand = command(
+        SCM_COMMANDS.commitAndPush,
+        'Commit & Push',
+        workspaceId,
+      );
+    }
 
     this.stagedChanges = this.sourceControl.createResourceGroup('staged', 'Staged Changes');
     this.stagedChanges.hideWhenEmpty = true;

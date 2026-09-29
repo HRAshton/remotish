@@ -58,6 +58,7 @@ export class GitHubAdapter implements RemotishAdapter {
     );
     this.capabilities = {
       commits: this.client.authenticated,
+      localEdits: true,
       forceWithLease: this.client.authenticated,
       amend: this.client.authenticated,
       createBranch: this.client.authenticated,
