@@ -421,7 +421,6 @@ test('release scripts delegate generic infrastructure to standard tooling', asyn
   assert.equal(await exists(new URL('../../.nvmrc', import.meta.url)), true);
 });
 
-
 test('controlled-host VSIX stays separate from the public registry artifact', async () => {
   const controlledRelease = rootManifest.scripts?.['release:controlled-vsix'] ?? '';
   const controlledSmoke = rootManifest.scripts?.['test:vscode-web:controlled-vsix'] ?? '';
