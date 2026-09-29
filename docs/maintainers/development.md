@@ -9,7 +9,7 @@ corepack enable
 corepack pnpm install --frozen-lockfile
 ```
 
-The committed proposal declaration set is validated by the release-contract tests. Install and CI do not fetch proposal declarations; maintainers update them explicitly with the pinned `@vscode/dts` tool.
+The committed stable and proposal declaration sets are validated by the release-contract tests against the controlled Code-OSS host contract. Install and CI do not fetch declarations; maintainers update them explicitly with the pinned `@vscode/dts` tool.
 
 ## Daily checks
 
@@ -61,13 +61,13 @@ corepack pnpm test:github-live
 
 ## Updating VS Code proposal declarations
 
-When changing the controlled VS Code / Code-OSS host version, update `@types/vscode` and `engines.vscode`, then refresh the vendored proposal declarations explicitly:
+When changing the controlled VS Code / Code-OSS host version, update `package.json#codeOss`, the local `types/vscode/package.json` version, every `engines.vscode`, and the Web-test commit pin, then refresh the vendored stable and proposal declarations explicitly:
 
 ```bash
 corepack pnpm vscode:types:update
 ```
 
-Review and commit the resulting files under `types/vscode-proposed`. Install and CI do not fetch proposal declarations.
+Review and commit the resulting files under `types/vscode/` and `types/vscode-proposed/`, and update the declaration blob IDs in `package.json#codeOss`. Vendored declaration directories preserve upstream bytes and are excluded from Biome formatting. Install and CI do not fetch declarations.
 
 ## Dependency boundaries
 
