@@ -72,7 +72,7 @@ test('GitHub provider VSIX participates in packaged smoke and release controls',
   assert.match(workflow, /open-vsx-publish:/u);
   assert.match(workflow, /environment: open-vsx/u);
   assert.match(workflow, /id-token: write/u);
-  assert.match(workflow, /npm install --global ovsx@1\.2\.0/u);
+  assert.match(workflow, /npm install --global --ignore-scripts ovsx@1\.2\.0/u);
   assert.match(
     workflow,
     /ovsx publish artifacts\/remotish\.vsix --trusted-publishing/u,
