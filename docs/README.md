@@ -25,6 +25,7 @@ and [provider](../extensions/git-http-provider/README.md).
 - [Code-OSS integration](code-oss-integration.md) - stable vs proposed APIs, host-version constraints and Workspace Trust.
 - [Architecture](architecture.md) - package boundaries and runtime ownership.
 - [Troubleshooting](troubleshooting.md) - common integration and adapter failures.
+- [Support and compatibility](support.md) - 1.x public API boundary, qualification matrix and upgrade policy.
 
 ## Maintainers
 

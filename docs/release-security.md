@@ -88,7 +88,7 @@ Do not report suspected vulnerabilities in a public issue. Follow [SECURITY.md](
 
 Publishing is designed for npm Trusted Publishing with GitHub Actions OIDC. Configure the `@remotish/adapter-sdk` package on npmjs.com with this repository and `.github/workflows/release.yml` as its trusted publisher, and protect the GitHub `npm` environment as appropriate. No long-lived `NPM_TOKEN` is expected in the workflow.
 
-For a beta version such as `0.1.0-beta.1`, publish with the `beta` npm dist-tag rather than replacing `latest`. Stable versions can use the default `latest` dist-tag.
+Prerelease channels do not replace `latest`: beta versions publish with the `beta` npm dist-tag, and release candidates such as `1.0.0-rc.1` publish with `next`. Stable versions use the default `latest` dist-tag.
 
 ## Open VSX publishing
 

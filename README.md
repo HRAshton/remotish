@@ -53,6 +53,7 @@ A successful commit is already published remotely. Remotish does not create loca
 - [Adapter contract](docs/adapter-contract.md) - precise SDK behavior, capabilities, errors and concurrency rules.
 - [VS Code integration](docs/vscode-integration.md) - wire a workspace into an extension or controlled Code-OSS build.
 - [Documentation index](docs/README.md) - all user, integrator and maintainer documentation.
+- [Support and compatibility](docs/support.md) - 1.x compatibility boundary and qualified host/runtime matrix.
 
 ## Packages
 
@@ -113,7 +114,7 @@ It is **not** a Git implementation or a compatibility layer for arbitrary local 
 
 ## Project status
 
-Remotish is prepared for a public beta release. The repository is currently pre-1.0. The adapter SDK is intentionally narrow, is published as `@remotish/adapter-sdk`, and is designed to become the long-term compatibility boundary. See [Adapter contract: compatibility](docs/adapter-contract.md#compatibility) before publishing third-party adapters.
+Remotish 1.0 is in release-candidate qualification. The public compatibility boundary is intentionally narrow: symbols exported from the `@remotish/adapter-sdk` package root follow the 1.x semantic-versioning contract. Framework internals, proposal-based history integration, and persistence formats are not public API. See [Support and compatibility](docs/support.md) and [Adapter contract: compatibility](docs/adapter-contract.md#compatibility) before publishing third-party adapters.
 
 ## Development, security and supply chain
 

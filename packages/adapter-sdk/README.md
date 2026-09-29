@@ -26,6 +26,8 @@ npm install @remotish/adapter-sdk
 
 The package contains the SDK runtime helpers and TypeScript declarations only. It does not install Remotish, VS Code integration, or a backend adapter.
 
-## Public beta compatibility
+## 1.x compatibility
 
-The SDK is pre-1.0 during the public beta. Pin or deliberately range the version you test against, import only from the package root, and review release notes before upgrading. The package root is the only supported public API surface.
+The package root is the supported public API surface. Starting with 1.0, it follows semantic versioning: incompatible contract or semantic changes require a major release, additive compatible API can ship in a minor release, and compatible fixes can ship in a patch release.
+
+Release candidates such as `1.0.0-rc.1` may still change before `1.0.0`. Import only from the package root and review release notes before upgrading.

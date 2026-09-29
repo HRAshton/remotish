@@ -266,11 +266,14 @@ Avoid hidden retries for non-idempotent publication unless the remote provides a
 
 Only symbols exported by the `@remotish/adapter-sdk` package root are public adapter API. Do not import SDK source paths or framework internals.
 
-The project is pre-1.0 today. The intended post-1.0 compatibility policy is semantic versioning:
+Starting with 1.0, the `@remotish/adapter-sdk` package-root API follows semantic versioning:
 
 - removing/changing a required member, changing established operation semantics, or narrowing accepted values requires a major version;
 - additive optional capabilities or result metadata can be minor-version changes when existing adapters continue to typecheck and behave correctly;
-- internal helpers that are not exported from the package root carry no compatibility guarantee.
+- compatible fixes that do not change the established public contract are patch-version changes;
+- internal helpers, source paths, framework packages, proposal-based integrations, and persistence formats that are not exported by the SDK package root carry no public compatibility guarantee.
+
+Release candidates may still change before `1.0.0`. Once `1.0.0` is published, the 1.x compatibility rules above apply.
 
 For implementation guidance, see [Build an adapter](adapter-authoring.md). For verification, see [Testing adapters](testing-adapters.md).
 
