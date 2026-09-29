@@ -90,10 +90,9 @@ async function updateExtensionIndex(distPath, installed) {
   const ids = new Set(installed.map((extension) => extension.id));
   const existing = Array.isArray(index.extensions) ? index.extensions : [];
   index.schemaVersion ??= 1;
-  index.extensions = [
-    ...existing.filter((extension) => !ids.has(extension.id)),
-    ...installed,
-  ].sort((left, right) => left.id.localeCompare(right.id));
+  index.extensions = [...existing.filter((extension) => !ids.has(extension.id)), ...installed].sort(
+    (left, right) => left.id.localeCompare(right.id),
+  );
   await writeJson(path, index);
 }
 
