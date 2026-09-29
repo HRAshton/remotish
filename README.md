@@ -70,7 +70,7 @@ extensions/fixture-provider  deterministic demo/reference provider extension
 extensions/browser-rpc-provider  authenticated browser-wide RPC provider extension
 extensions/github-provider  anonymous public GitHub provider extension
 extensions/git-http-provider  HTTPS Git provider for Web and desktop
-apps/demo-web               browser-safe Remotish host extension
+apps/demo-web               controlled Code OSS Remotish host/demo extension
 examples/browser-rpc-bitbucket  Bitbucket Cloud read/write userscript example
 examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript example
 ```
