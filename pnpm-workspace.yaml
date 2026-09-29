@@ -11,5 +11,6 @@ allowBuilds:
   '@playwright/browser-chromium': true
   '@vscode/vsce-sign': true
   esbuild: true
+  keytar: false
 
 minimumReleaseAge: 1440 # Require external releases to age for 24 hours before normal installation.
