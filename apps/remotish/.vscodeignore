@@ -1,7 +1,0 @@
-**/.DS_Store
-**/*.ts
-**/*.tsbuildinfo
-dist/test/**
-build/**
-src/**
-tsconfig.json
