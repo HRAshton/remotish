@@ -15,7 +15,7 @@
     "url": "https://github.com/HRAshton/remotish/issues"
   },
   "engines": {
-    "vscode": "^1.138.0"
+    "vscode": "^1.139.1"
   },
   "browser": "./dist/extension.js",
   "activationEvents": [

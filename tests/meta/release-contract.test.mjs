@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -99,42 +100,98 @@ test('releaseable workspace packages share the root release version', async () =
   }
 });
 
-test('VS Code proposal typings use the official update tool and stay aligned with the host', async () => {
-  const vscodeVersion = rootManifest.devDependencies?.['@types/vscode'];
-  const extensionManifest = JSON.parse(
-    await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
+test('VS Code host contract keeps version, engines, types, proposals, and Web smoke aligned', async () => {
+  const hostVersion = rootManifest.codeOss?.version;
+  const hostCommit = rootManifest.codeOss?.commit;
+  const declarationBlobs = rootManifest.codeOss?.declarationBlobs ?? {};
+  const typeManifest = JSON.parse(
+    await readFile(new URL('../../types/vscode/package.json', import.meta.url)),
+  );
+  const extensionManifestPaths = [
+    '../../apps/demo-web/package.json',
+    '../../extensions/fixture-provider/package.json',
+    '../../extensions/browser-rpc-provider/package.json',
+    '../../extensions/github-provider/package.json',
+    '../../extensions/git-http-provider/package.json',
+  ];
+  const extensionManifests = await Promise.all(
+    extensionManifestPaths.map(async (path) => ({
+      path,
+      manifest: JSON.parse(await readFile(new URL(path, import.meta.url))),
+    })),
   );
   const stableSmokeManifest = JSON.parse(
     await readFile(new URL('../../apps/demo-web/src/test/stable/package.json', import.meta.url)),
   );
   const proposals = ['scmHistoryProvider', 'timeline'];
 
-  assert.match(vscodeVersion ?? '', exactVersion);
-  assert.equal(rootManifest.scripts?.['vscode:types'], undefined);
+  assert.match(hostVersion ?? '', exactVersion);
+  assert.match(hostCommit ?? '', /^[0-9a-f]{40}$/u);
+  assert.equal(rootManifest.devDependencies?.['@types/vscode'], 'link:types/vscode');
+  assert.equal(typeManifest.name, '@types/vscode');
+  assert.equal(typeManifest.version, hostVersion);
+  assert.equal(typeManifest.types, 'index.d.ts');
+  assert.equal(typeManifest.private, true);
   assert.equal(
     rootManifest.scripts?.['vscode:types:update'],
-    `pnpm --dir apps/demo-web exec dts dev ${vscodeVersion} && shx rm -f "types/vscode-proposed/vscode.proposed.*.d.ts" && shx mv "apps/demo-web/vscode.proposed.*.d.ts" types/vscode-proposed/`,
+    `pnpm --dir apps/demo-web exec dts ${hostVersion} && shx mkdir -p types/vscode && shx mv "apps/demo-web/vscode.d.ts" types/vscode/index.d.ts && pnpm --dir apps/demo-web exec dts dev ${hostVersion} && shx rm -f "types/vscode-proposed/vscode.proposed.*.d.ts" && shx mv "apps/demo-web/vscode.proposed.*.d.ts" types/vscode-proposed/`,
   );
   assert.equal(rootManifest.scripts?.postinstall, undefined);
-  assert.equal(extensionManifest.engines?.vscode, `^${vscodeVersion}`);
-  assert.deepEqual(extensionManifest.enabledApiProposals, proposals);
-  assert.equal(stableSmokeManifest.engines?.vscode, `^${vscodeVersion}`);
-  assert.equal(stableSmokeManifest.enabledApiProposals, undefined);
 
-  for (const name of proposals) {
+  for (const { path, manifest } of extensionManifests) {
     assert.equal(
-      await exists(
-        new URL(`../../types/vscode-proposed/vscode.proposed.${name}.d.ts`, import.meta.url),
-      ),
-      true,
+      manifest.engines?.vscode,
+      `^${hostVersion}`,
+      `${path} has a different host engine`,
     );
   }
+  assert.deepEqual(extensionManifests[0].manifest.enabledApiProposals, proposals);
+  assert.equal(stableSmokeManifest.engines?.vscode, `^${hostVersion}`);
+  assert.equal(stableSmokeManifest.enabledApiProposals, undefined);
+
+  function gitBlobSha(source) {
+    const bytes = Buffer.from(source);
+    return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+  }
+
+  const declarationPaths = {
+    vscode: '../../types/vscode/index.d.ts',
+    scmHistoryProvider: '../../types/vscode-proposed/vscode.proposed.scmHistoryProvider.d.ts',
+    timeline: '../../types/vscode-proposed/vscode.proposed.timeline.d.ts',
+  };
+  assert.deepEqual(Object.keys(declarationBlobs).sort(), Object.keys(declarationPaths).sort());
+  for (const [name, path] of Object.entries(declarationPaths)) {
+    const source = await readFile(new URL(path, import.meta.url), 'utf8');
+    assert.equal(
+      gitBlobSha(source),
+      declarationBlobs[name],
+      `${path} does not match the declared Code-OSS host declaration blob`,
+    );
+  }
+
   assert.deepEqual(
     (await readdir(new URL('../../types/vscode-proposed/', import.meta.url)))
       .filter((name) => name.startsWith('vscode.proposed.') && name.endsWith('.d.ts'))
       .sort(),
     proposals.map((name) => `vscode.proposed.${name}.d.ts`).sort(),
   );
+
+  for (const scriptName of [
+    'vscode:web',
+    'test:vscode-web:stable',
+    'test:vscode-web',
+    'test:vscode-web:vsix',
+  ]) {
+    const script = rootManifest.scripts?.[scriptName] ?? '';
+    const launches = script.split('vscode-test-web').length - 1;
+    const pins = script.split(`vscode-test-web --quality=stable --commit=${hostCommit}`).length - 1;
+    assert.ok(launches > 0, `${scriptName} does not launch Code-OSS Web`);
+    assert.equal(
+      pins,
+      launches,
+      `${scriptName} must pin every Code-OSS Web launch to the declared host commit`,
+    );
+  }
 
   assert.equal(
     await exists(new URL('../../scripts/check-vscode-types.mjs', import.meta.url)),

@@ -7,7 +7,7 @@
   "license": "0BSD",
   "private": true,
   "engines": {
-    "vscode": "^1.138.0"
+    "vscode": "^1.139.1"
   },
   "main": "./dist/extension-desktop.js",
   "browser": "./dist/extension.js",

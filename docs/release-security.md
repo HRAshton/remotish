@@ -15,7 +15,7 @@ A release build is expected to satisfy all of these controls:
 - build/release CLIs never use ephemeral package execution: the required tools are exact-version root `devDependencies`, and the committed pnpm lockfile freezes their resolved dependency graphs.
 - release-contract tests reject reintroduction of ephemeral package execution in package scripts and workflows.
 - the canonical `pnpm run ci` gate runs declaration-contract, lint, build/test, production-dependency policy and native pnpm SBOM checks before packaging.
-- the browser host, deterministic fixture-provider, Browser RPC provider, GitHub provider, and Git HTTP provider extensions are bundled and packaged with exact-version development dependencies declared in the root `package.json`; VS Code proposal declarations are committed under `types/vscode-proposed`, and release-contract tests keep their set aligned with the pinned 1.138.0 host and enabled proposals.
+- the browser host, deterministic fixture-provider, Browser RPC provider, GitHub provider, and Git HTTP provider extensions are bundled and packaged with exact-version development dependencies declared in the root `package.json`; VS Code stable and proposal declarations are committed under `types/vscode` and `types/vscode-proposed`; release-contract tests verify their upstream blob IDs, every extension engine, the enabled proposal set, and every Web launcher against the pinned 1.139.1 host.
 - VSIX contents are governed by each extension's `.vscodeignore`; the exact locally produced host and provider packages are unpacked and smoke-tested together under Code-OSS Web.
 - the packaged smoke verifies manifest-only provider discovery, lazy provider activation, Browser RPC handshake and repository preparation, GitHub and Git HTTP provider activation/descriptor validation, real `?folder=remotish-rpc://...` and `?folder=remotish-github://...` bootstrap launches, anonymous public GitHub reads/local edits, and host virtual-filesystem behavior.
 - SHA-256 checksums cover all five VSIXes, the source archive, SBOM, and tracked third-party notices.
@@ -62,13 +62,13 @@ The base `@remotish/vscode` host path uses stable APIs only and is smoke-tested 
 
 The released controlled demo host additionally composes `@remotish/vscode-history`, so that artifact still requires the `scmHistoryProvider` and `timeline` proposals and is aimed at the controlled Code-OSS distribution described in [Code-OSS integration](code-oss-integration.md). A proposal-free embedding can omit the history package while retaining the core remote workspace and SCM behavior.
 
-The current target is VS Code / Code-OSS 1.138.0. Requalify before changing that host version.
+The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that host version.
 
 ## Locked build and release tooling
 
 The project intentionally does not execute registry-resolved one-off CLIs during install, CI, or release. Build, analysis, documentation, VS Code test, and packaging tools are exact-version root `devDependencies` and are invoked through normal package scripts, which resolve executables from the local installation. The committed `pnpm-lock.yaml` is expected to freeze the complete resolved dependency graph; regenerate and commit it whenever `package.json` changes, and keep CI/release on `pnpm install --frozen-lockfile`.
 
-VS Code proposed API declarations are vendored from the supported 1.138.0 declaration set instead of being downloaded from a package postinstall hook. Maintainers refresh them explicitly with the exact `@vscode/dts` devDependency; the release-contract tests also reject ephemeral executors such as `pnpm dlx`, `pnpx`, `npx`, and `npm exec` from package scripts and workflows.
+VS Code stable and proposed API declarations are vendored from the supported 1.139.1 source tag instead of being downloaded from a package postinstall hook. Maintainers refresh them explicitly with the exact `@vscode/dts` devDependency; the release-contract tests also reject ephemeral executors such as `pnpm dlx`, `pnpx`, `npx`, and `npm exec` from package scripts and workflows.
 
 Before CI or release, regenerate and commit `pnpm-lock.yaml` with the pinned pnpm version after any dependency change. CI deliberately uses `pnpm install --frozen-lockfile` so an absent or stale lockfile fails closed.
 

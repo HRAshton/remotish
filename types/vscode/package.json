@@ -1,0 +1,7 @@
+{
+  "name": "@types/vscode",
+  "version": "1.139.1",
+  "private": true,
+  "license": "MIT",
+  "types": "index.d.ts"
+}
