@@ -19,45 +19,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      pr_number: ${{ steps.pr.outputs.number }}
-      head_sha: ${{ steps.pr.outputs.head_sha }}
-      head_repo: ${{ steps.pr.outputs.head_repo }}
-      cosw_tag: ${{ steps.cosw.outputs.tag }}
+      pr: ${{ steps.pr.outputs.number }}
+      sha: ${{ steps.pr.outputs.sha }}
+      cosw: ${{ steps.cosw.outputs.tag }}
     steps:
-      - name: Resolve selected PR
+      - name: Resolve PR
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
-        shell: bash
         run: |
           set -euo pipefail
-
-          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
-            echo "PR number must be a positive integer." >&2
-            exit 1
-          fi
-
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "PR number must be a positive integer." >&2; exit 1; }
           pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
-          if [[ "$(jq -r '.state' <<<"$pr")" != 'open' ]]; then
-            echo "PR #$PR_NUMBER is not open." >&2
-            exit 1
-          fi
-
-          head_sha="$(jq -r '.head.sha' <<<"$pr")"
-          head_repo="$(jq -r '.head.repo.full_name' <<<"$pr")"
-          test -n "$head_sha"
-          test "$head_repo" != 'null'
-
+          [[ "$(jq -r .state <<<"$pr")" == open ]] || { echo "PR #$PR_NUMBER is not open." >&2; exit 1; }
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
-          echo "head_repo=$head_repo" >> "$GITHUB_OUTPUT"
-          echo "Selected PR #$PR_NUMBER at $head_sha from $head_repo."
+          echo "sha=$(jq -r .head.sha <<<"$pr")" >> "$GITHUB_OUTPUT"
+          echo "repo=$(jq -r .head.repo.full_name <<<"$pr")" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ steps.pr.outputs.head_repo }}
-          ref: ${{ steps.pr.outputs.head_sha }}
+          repository: ${{ steps.pr.outputs.repo }}
+          ref: ${{ steps.pr.outputs.sha }}
           path: source
           persist-credentials: false
 
@@ -71,7 +54,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
 
-      - name: Build PR browser extensions
+      - name: Build browser extensions
         run: |
           pnpm --dir source install --frozen-lockfile
           pnpm --dir source bundle:demo
@@ -80,68 +63,84 @@ jobs:
           pnpm --dir source bundle:github-provider:extension
           pnpm --dir source bundle:git-http-provider:extension
 
-      - name: Resolve matching Code-OSS Static Web release
+      - name: Resolve matching COSW release
         id: cosw
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
-
-          code_oss_version="$(node --print "require('./source/package.json').codeOss.version")"
-          releases="$(gh api --paginate --slurp 'repos/HRAshton/code-oss-static-web/releases?per_page=100')"
-          release="$(
-            jq -c --arg version "$code_oss_version" '
-              [
-                .[][]
-                | select(.draft == false and .prerelease == false)
-                | . as $release
-                | (.tag_name | capture("^v(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)-web\\.(?<revision>[0-9]+)$")) as $tag
-                | select($tag.version == $version)
-                | { release: $release, revision: ($tag.revision | tonumber) }
-              ]
-              | sort_by(.revision)
-              | last
-              | .release // empty
-            ' <<<"$releases"
-          )"
-
-          if [[ -z "$release" ]]; then
-            echo "No released Code-OSS Static Web build matches Code-OSS $code_oss_version." >&2
-            exit 1
-          fi
-
-          tag="$(jq -r '.tag_name' <<<"$release")"
-          asset_name="code-oss-static-web-${tag#v}.tar.gz"
-          asset="$(jq -c --arg name "$asset_name" '.assets[] | select(.name == $name)' <<<"$release")"
-          if [[ -z "$asset" ]]; then
-            echo "Release $tag does not contain $asset_name." >&2
-            exit 1
-          fi
-
-          asset_url="$(jq -r '.browser_download_url' <<<"$asset")"
+          version="$(node --print "require('./source/package.json').codeOss.version")"
+          prefix="v${version}-web."
+          release="$(gh api 'repos/HRAshton/code-oss-static-web/releases?per_page=100' | jq -c --arg prefix "$prefix" '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | startswith($prefix)) | . + {_revision: (try (.tag_name | split("-web.")[1] | tonumber) catch -1)} | select(._revision >= 0)] | sort_by(._revision) | last // empty')"
+          [[ -n "$release" ]] || { echo "No COSW release matches Code-OSS $version." >&2; exit 1; }
+          tag="$(jq -r .tag_name <<<"$release")"
+          name="code-oss-static-web-${tag#v}.tar.gz"
+          asset="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<<"$release")"
+          [[ -n "$asset" ]] || { echo "$tag does not contain $name." >&2; exit 1; }
           digest="$(jq -r '.digest // empty' <<<"$asset")"
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "Release asset $asset_name does not expose a SHA-256 digest." >&2
-            exit 1
-          fi
-
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "$name has no SHA-256 digest." >&2; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "asset_url=$asset_url" >> "$GITHUB_OUTPUT"
+          echo "url=$(jq -r .browser_download_url <<<"$asset")" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Using $tag for Code-OSS $code_oss_version."
 
-      - name: Assemble staging distribution
+      - name: Assemble staging site
         env:
-          COSW_URL: ${{ steps.cosw.outputs.asset_url }}
+          COSW_URL: ${{ steps.cosw.outputs.url }}
           COSW_DIGEST: ${{ steps.cosw.outputs.digest }}
           COSW_TAG: ${{ steps.cosw.outputs.tag }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          PR_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-          PR_HEAD_REPO: ${{ steps.pr.outputs.head_repo }}
-        shell: bash
+          PR_SHA: ${{ steps.pr.outputs.sha }}
         run: |
           set -euo pipefail
           mkdir -p .work staging
-         Ý\›KY˜Z[K[ØØ][ÛˆK\Ú[[K\ÚÝËY\œ›Üˆ‰ÓÔÕ×ÕT“ˆ[ÈÛÜšËØÛÜÝË\‹™Þ‚ˆXÚÈ‰ÐÓÔÕ×ÑQÑTÕÜÚLMŽŸHÛÜšËØÛÜÝË\‹™ÞˆˆÚLMœÝ[HXÈBˆ\ˆ^™ˆÛÜšËØÛÜÝË\‹™ÞˆPÈÝYÚ[™Âˆ›ÙHÛÝ\˜ÙKÜØÜš\ËÜ™\\™K\Ý]XË\™]šY]Ë›ZœÈÝYÚ[™ÂˆœH[ˆˆKX\™Èˆ‰—Ó•SP‘TˆˆˆKX\™ÈXYÚH‰—ÒPQÔÒHˆˆKX\™ÈXY™\ÜÚ]ÜžH‰—ÒPQÔ‘TÈˆˆKX\™ÈÛÜÝÕYÈ‰ÓÔÕ×ÕQÈˆˆKX\™ÈÛÜšÙ›ÝÔ[ˆ‰ÒUP—ÔÑT•‘T—ÕT“ÉÒUP—Ô‘TÔÒUÔ–KØXÝ[ÛœËÜ[œËÉÒUP—Ô•S—ÒQˆˆ	ÞÂˆØÚ[XU™\œÚ[ÛŽˆKˆ[™\]Y\Ýˆ
-	ˆÛ[X™\ŠKˆXYÚNˆ	XYÚKˆXY™\ÜÚ]ÜžNˆ	XY™\ÜÚ]ÜžKˆ6öFT÷757FF–5vV%&VÆV6S¢F6÷7uFrÀ¢v÷&¶fÆ÷u'Vã¢Gv÷&¶fÆ÷u'Và¢Òrâ7Fv–ær÷&VÖ÷F—6‚×7Fv–æræ§6öà ¢ÒæÖS¢WÆöB7Fv–ærvW2'F–f7@¢W6W3¢7F–öç2÷WÆöB×vW2Ö'F–f7Df33#FC3SCsC#sf#ƒ#vc†f3S&fc&63C–3’2cP¢v—Fƒ ¢Fƒ¢7Fv–æp ¢FWÆ÷“ ¢æVVG3¢'V–Æ@¢'Vç2Ööã¢V'VçGRÖÆFW7@¢Vçf—&öæÖVçC ¢æÖS¢v—F‡V"×vW0¢W&Ã¢G·²7FW2æFWÆ÷–ÖVçBæ÷WGWG2çvU÷W&Â×Ð¢W&Ö—76–öç3 ¢6öçFVçG3¢&V@¢vW3¢w&—FP¢–B×Fö¶Vã¢w&—FP¢VÆÂ×&WVW7G3¢w&—FP¢7FW3 ¢ÒæÖS¢6öæf–wW&Rv—D‡V"vW0¢W6W3¢7F–öç2ö6öæf–wW&R×vW4CV&fS“&6fV#vFS–FVS“&#f#ƒ#SFB2c` ¢ÒæÖS¢FWÆ÷’7Fv–æp¢–C¢FWÆ÷–ÖVç@¢W6W3¢7F–öç2öFWÆ÷’×vW43c†cƒ#S#ƒcCVSFf#s“6CFCFS3C#c#–6cS3Cb2cP ¢ÒæÖS¢&V6÷&B7Fv–ærFWÆ÷–ÖVçBöâ ¢Vçc ¢t…õDô´Tã¢G·²v—F‡V"çFö¶Vâ×Ð¢%ôåTÔ$U#¢G·²æVVG2æ'V–ÆBæ÷WGWG2ç%öçVÖ&W"×Ð¢„TEõ4„¢G·²æVVG2æ'V–ÆBæ÷WGWG2æ†VE÷6†×Ð¢4õ5uõDs¢G·²æVVG2æ'V–ÆBæ÷WGWG2æ6÷7u÷Fr×Ð¢tUõU$Ã¢G·²7FW2æFWÆ÷–ÖVçBæ÷WGWG2çvU÷W&Â×Ð¢6†VÆÃ¢&6€¢'Vã¢À¢6WBÖWVò—Vf–À¢6†÷'E÷6†Ò"G´„TEõ4„££wÒ ¢'Vå÷W&ÃÒ"Dt•D…T%õ4U%dU%õU$ÂòDt•D…T%õ$Uõ4•Dõ%’ö7F–öç2÷'Vç2òDt•D…T%õ%Tåô”B ¢&öG“Ò"B†6BÃÄTôeô$ôE¢ÂÒÒ&VÖ÷F—6‚×7Fv–ær×&Wf–WrÒÓà¢7Fv–ærv2WFFVBg&öÒF†—2"BÆG6†÷'E÷6†ÆW6–ærÆD4õ5uõDuÆà ¢´÷Vâ7Fv–æuÒ‚EtUõU$Â’+r¶FWÆ÷–ÖVçB'VåÒ‚G'Vå÷W&Â ¢F†—2—2öæR6†&VB7Fv–ærVçf—&öæÖVçBÂ6òÆFW"ÖçVÂFWÆ÷–ÖVçBÖ’&WÆ6R—Bâ&R×'Vâ¢¤FWÆ÷’"Fò7Fv–ær¢¢v—F‚"2E%ôåTÔ$U"Fò&Vg&W6‚—Bà¢Tôeô$ôE¢’  ¢6öÖÖVçEö–CÒ"B€¢v‚’Ò×v–æFRÒ×6ÇW''&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2òE%ôåTÔ$U"ö6öÖÖVçG3÷W%÷vSÓ"À¢Â§×"u²åµÕµÒÂ6VÆV7B‚çW6W"æÆöv–âÓÒ&v—F‡V"Ö7F–öç5¶&÷EÒ"’Â6VÆV7B‚æ&öG’Â7F'G7v—F‚‚#ÂÒÒ&VÖ÷F—6‚×7Fv–ær×&Wf–WrÒÓâ"’•ÒÂÆ7BÂæ–BòòV×G’p¢’  ¢–bµ²Öâ"F6öÖÖVçEö–B"ÕÓ²F†Và¢v‚’ÒÖÖWF†öBD4‚'&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2ö6öÖÖVçG2òF6öÖÖVçEö–B"Öb&öG“Ò"F&öG’"âöFWböçVÆÀ¢VÇ6P¢v‚’ÒÖÖWF†öBõ5B'&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2òE%ôåTÔ$U"ö6öÖÖVçG2"Öb&öG“Ò"F&öG’"âöFWböçVÆÀ¢f ¢°¢V6†ò"222&VÖ÷F—6‚7Fv–ær ¢V6†ð¢V6†ò"Ò#¢2E%ôåTÔ$U"…ÆG6†÷'E÷6†Æ’ ¢V6†ò"Ò6öFRÔõ527FF–2vV#¢ÆD4õ5uõDuÆ ¢V6†ò"ÒU$Ã¢EtUõU$Â ¢Òãâ"Dt•D…T%õ5DUõ5TÔÔ%’ 
+          curl --fail --location --silent --show-error "$COSW_URL" -o .work/cosw.tar.gz
+          echo "${COSW_DIGEST#sha256:}  .work/cosw.tar.gz" | sha256sum -c -
+          tar -xzf .work/cosw.tar.gz -C staging
+          node source/scripts/prepare-static-preview.mjs staging
+          jq -n --arg pr "$PR_NUMBER" --arg sha "$PR_SHA" --arg cosw "$COSW_TAG" '{pullRequest: ($pr | tonumber), headSha: $sha, codeOssStaticWebRelease: $cosw}' > staging/remotish-staging.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: staging
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+      - name: Update PR with staging link
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.build.outputs.pr }}
+          HEAD_SHA: ${{ needs.build.outputs.sha }}
+          COSW_TAG: ${{ needs.build.outputs.cosw }}
+          PAGE_URL: ${{ steps.deploy.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          short="${HEAD_SHA:0:7}"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="<!-- remotish-staging-preview -->
+          Staging was updated from this PR at \`$short\` using \`$COSW_TAG\`.
+
+          [Open staging]($PAGE_URL) Â· [deployment run]($run_url)
+
+          This is one shared staging environment; a later manual deployment may replace it."
+          id="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" --jq '.[] | select(.user.login == "github-actions[bot]") | select(.body | startswith("<!-- remotish-staging-preview -->")) | .id' | tail -n1)"
+          if [[ -n "$id" ]]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+          fi
+          printf '### Remotish staging\n\n- PR: #%s (`%s`)\n- COSW: `%s`\n- URL: %s\n' "$PR_NUMBER" "$short" "$COSW_TAG" "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
