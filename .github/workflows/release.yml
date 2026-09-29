@@ -156,7 +156,9 @@ jobs:
         run: |
           publish_args=(--access public)
 
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+          if [[ "$GITHUB_REF_NAME" == *-rc.* ]]; then
+            publish_args+=(--tag next)
+          elif [[ "$GITHUB_REF_NAME" == *-* ]]; then
             publish_args+=(--tag beta)
           fi
 
