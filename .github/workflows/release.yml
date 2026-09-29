@@ -206,9 +206,10 @@ jobs:
           mkdir -p artifacts/open-vsx-smoke
 
           for attempt in 1 2 3 4 5; do
-            rm -f               artifacts/open-vsx-smoke/remotish.vsix               artifacts/open-vsx-smoke/remotish-github-provider.vsix
+            rm -f artifacts/open-vsx-smoke/remotish.vsix artifacts/open-vsx-smoke/remotish-github-provider.vsix
 
-            if ovsx get hrashton.remotish               --versionRange "$version"               -o artifacts/open-vsx-smoke/remotish.vsix               && ovsx get hrashton.remotish-github-provider                 --versionRange "$version"                 -o artifacts/open-vsx-smoke/remotish-github-provider.vsix; then
+            if ovsx get hrashton.remotish --versionRange "$version" -o artifacts/open-vsx-smoke/remotish.vsix &&
+              ovsx get hrashton.remotish-github-provider --versionRange "$version" -o artifacts/open-vsx-smoke/remotish-github-provider.vsix; then
               break
             fi
 
@@ -224,7 +225,7 @@ jobs:
 
       - name: Prepare registry VSIX smoke
         run: |
-          node scripts/prepare-vsix-smoke.mjs             artifacts/open-vsx-smoke/remotish.vsix             artifacts/open-vsx-smoke/remotish-github-provider.vsix
+          node scripts/prepare-vsix-smoke.mjs artifacts/open-vsx-smoke/remotish.vsix artifacts/open-vsx-smoke/remotish-github-provider.vsix
 
       - name: Smoke public GitHub open path from Open VSX artifacts
         run: >
