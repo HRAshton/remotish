@@ -152,10 +152,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       'Usage: node scripts/prepare-static-preview.mjs <dist> <source-root> [provider ...]',
     );
   }
-  const extensionPaths = previewExtensionPaths(
-    pathToFileURL(`${resolve(sourceRoot)}/`),
-    providers,
-  );
+  const extensionPaths = previewExtensionPaths(pathToFileURL(`${resolve(sourceRoot)}/`), providers);
   const installed = await prepareStaticPreview({ dist, extensionPaths });
   console.log(
     `Installed ${installed.map((extension) => extension.id).join(', ')} into ${resolve(dist)}.`,
