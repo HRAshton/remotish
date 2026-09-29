@@ -50,8 +50,5 @@
     "virtual filesystem",
     "source control",
     "open vsx"
-  ],
-  "extensionDependencies": [
-    "hrashton.remotish"
   ]
 }
