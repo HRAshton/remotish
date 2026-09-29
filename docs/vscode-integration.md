@@ -102,7 +102,7 @@ const history = new RemotishHistoryHost(host);
 context.subscriptions.push(history);
 ```
 
-`@remotish/vscode` itself uses only stable VS Code APIs. The published Remotish host composes that stable package only. `@remotish/vscode-history` uses proposal-sensitive APIs (`scmHistoryProvider` and `timeline`) and is an optional integration for controlled hosts that explicitly enable those proposals.
+`@remotish/vscode` itself uses only stable VS Code APIs. The published Remotish host composes that stable package only. `@remotish/vscode-history` uses proposal-sensitive APIs (`scmHistoryProvider` and `timeline`) and is an optional integration for controlled hosts that explicitly enable those proposals. The repository-controlled `apps/demo-web` host composes both packages for qualification; release packaging instead bundles `apps/demo-web/src/extension-stable.ts` with a staged proposal-free manifest.
 
 Run `pnpm test:vscode-web:stable` to exercise the proposal-free composition under Code-OSS Web with no `enabledApiProposals`. See [Code-OSS integration](code-oss-integration.md) for versioning and distribution constraints.
 
