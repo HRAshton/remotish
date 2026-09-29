@@ -724,6 +724,38 @@ function deferred() {
   return { promise, resolve };
 }
 
+test('workspace commit: local-only adapters can persist edits without publication', async () => {
+  const inner = new FixtureAdapter();
+  const adapter = new Proxy(inner, {
+    get(target, property, receiver) {
+      if (property === 'capabilities') {
+        return { commits: false, localEdits: true };
+      }
+      if (property === 'commit') {
+        return undefined;
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const storage = new MemoryWorkspaceStorage();
+  const first = await RemotishWorkspace.open(adapter, storage);
+
+  await first.writeFile('README.md', encoder.encode('local only\n'), {
+    create: false,
+    overwrite: true,
+  });
+  assert.equal(first.hasChanges, true);
+  assert.equal(decoder.decode(await first.readFile('README.md')), 'local only\n');
+
+  const restored = await RemotishWorkspace.open(adapter, storage);
+  assert.equal(decoder.decode(await restored.readFile('README.md')), 'local only\n');
+  await assert.rejects(
+    restored.commitAndPush('Cannot publish'),
+    (error) => error instanceof RemotishError && error.code === 'UNSUPPORTED',
+  );
+});
+
 test('workspace commit: read-only adapters may omit the commit method entirely', async () => {
   const inner = new FixtureAdapter();
   const adapter = new Proxy(inner, {

@@ -86,6 +86,7 @@ test('github adapter: public repositories are readable without authentication', 
   const adapter = new GitHubAdapter({ owner: 'acme', repository: 'demo', fetch });
 
   assert.equal(adapter.capabilities.commits, false);
+  assert.equal(adapter.capabilities.localEdits, true);
   assert.equal((await adapter.getRepository()).defaultBranch, 'main');
   assert.deepEqual(await adapter.getBranches(), [
     { name: 'main', revision: 'C1', isDefault: true },

@@ -45,6 +45,7 @@ test('github provider accepts only credential-free owner/repository descriptors'
   const adapter = await provider.createAdapter(repository);
   assert.deepEqual(adapter.capabilities, {
     commits: false,
+    localEdits: true,
     forceWithLease: false,
     amend: false,
     createBranch: false,
