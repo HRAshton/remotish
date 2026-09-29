@@ -151,7 +151,7 @@ test('VS Code host contract keeps version, engines, types, proposals, and Web sm
 
   function gitBlobSha(source) {
     const bytes = Buffer.from(source);
-    return createHash('sha1').update(`blob ${bytes.length}\\0`).update(bytes).digest('hex');
+    return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
   }
 
   const declarationPaths = {
