@@ -162,8 +162,84 @@ jobs:
 
           npm publish "${publish_args[@]}"
 
+
+  open-vsx-publish:
+    needs: package
+    runs-on: ubuntu-latest
+    environment: open-vsx
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 12.6.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release
+          path: artifacts
+
+      - name: Install Open VSX CLI
+        run: npm install --global ovsx@1.2.0
+
+      - name: Publish stable registry extensions
+        run: |
+          ovsx publish artifacts/remotish.vsix --trusted-publishing
+          ovsx publish artifacts/remotish-github-provider.vsix --trusted-publishing
+
+      - name: Download published registry artifacts
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p artifacts/open-vsx-smoke
+
+          for attempt in 1 2 3 4 5; do
+            rm -f               artifacts/open-vsx-smoke/remotish.vsix               artifacts/open-vsx-smoke/remotish-github-provider.vsix
+
+            if ovsx get hrashton.remotish               --versionRange "$version"               -o artifacts/open-vsx-smoke/remotish.vsix               && ovsx get hrashton.remotish-github-provider                 --versionRange "$version"                 -o artifacts/open-vsx-smoke/remotish-github-provider.vsix; then
+              break
+            fi
+
+            if [[ "$attempt" = 5 ]]; then
+              echo "Open VSX did not serve the published release artifacts."
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+      - run: pnpm bundle:demo:tests
+
+      - name: Prepare registry VSIX smoke
+        run: |
+          node scripts/prepare-vsix-smoke.mjs             artifacts/open-vsx-smoke/remotish.vsix             artifacts/open-vsx-smoke/remotish-github-provider.vsix
+
+      - name: Smoke public GitHub open path from Open VSX artifacts
+        run: >
+          pnpm exec vscode-test-web
+          --quality=stable
+          --commit=04c0d99f4fb0d8afe6ce4f0c58e31e183ac3e4b1
+          --browserType=chromium
+          --headless=true
+          --folder-uri=remotish-github://open/v1/octocat/Hello-World
+          --extensionDevelopmentPath=artifacts/vsix-smoke/extension
+          --extensionTestsPath=artifacts/vsix-smoke/extension/dist/test/suite/github-bootstrap.js
+          --extensionPath=artifacts/vsix-smoke/providers
+
   release:
-    needs: [package, npm-publish]
+    needs: [package, npm-publish, open-vsx-publish]
     runs-on: ubuntu-latest
     environment: release
     permissions:
