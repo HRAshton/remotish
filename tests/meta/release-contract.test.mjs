@@ -214,6 +214,7 @@ test('repository build tools are exact direct dependencies without ephemeral exe
     'dependency-cruiser',
     'esbuild',
     'knip',
+    'ovsx',
     'remark-cli',
     'remark-validate-links',
     'typedoc',
