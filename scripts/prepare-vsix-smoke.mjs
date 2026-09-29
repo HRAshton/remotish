@@ -17,6 +17,7 @@ const smokeRoot = resolve('artifacts/vsix-smoke');
 const extensionRoot = resolve(smokeRoot, 'extension');
 const providersRoot = resolve(smokeRoot, 'providers');
 const testBundle = resolve('apps/demo-web/dist/test/suite/vsix.js');
+const controlledTestBundle = resolve('apps/demo-web/dist/test/suite/controlled-vsix.js');
 const bootstrapTestBundle = resolve('apps/demo-web/dist/test/suite/bootstrap.js');
 const githubBootstrapTestBundle = resolve('apps/demo-web/dist/test/suite/github-bootstrap.js');
 
@@ -42,6 +43,7 @@ mkdirSync(smokeRoot, { recursive: true });
 extractVsix(hostVsix, smokeRoot);
 mkdirSync(dirname(resolve(extensionRoot, 'dist/test/suite/vsix.js')), { recursive: true });
 cpSync(testBundle, resolve(extensionRoot, 'dist/test/suite/vsix.js'));
+cpSync(controlledTestBundle, resolve(extensionRoot, 'dist/test/suite/controlled-vsix.js'));
 cpSync(bootstrapTestBundle, resolve(extensionRoot, 'dist/test/suite/bootstrap.js'));
 cpSync(githubBootstrapTestBundle, resolve(extensionRoot, 'dist/test/suite/github-bootstrap.js'));
 
