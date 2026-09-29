@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { createGitHubProviderReleaseManifest } from '../../scripts/prepare-github-provider-vsix.mjs';
+
 const root = JSON.parse(await readFile(new URL('../../package.json', import.meta.url)));
 const manifest = JSON.parse(
   await readFile(new URL('../../extensions/github-provider/package.json', import.meta.url)),
@@ -28,7 +30,7 @@ test('GitHub provider is a browser-only anonymous public repository extension', 
   assert.equal(manifest.main, undefined);
   assert.equal(manifest.private, true);
   assert.equal(manifest.publisher, 'hrashton');
-  assert.deepEqual(manifest.extensionDependencies, ['hrashton.remotish']);
+  assert.equal(manifest.extensionDependencies, undefined);
   assert.deepEqual(manifest.categories, ['SCM Providers', 'Other']);
   assert.ok(manifest.keywords.includes('github'));
   assert.ok(manifest.keywords.includes('open vsx'));
@@ -53,6 +55,13 @@ test('GitHub provider is a browser-only anonymous public repository extension', 
 });
 
 test('GitHub provider VSIX participates in packaged smoke and release controls', () => {
+  const published = createGitHubProviderReleaseManifest(manifest);
+  assert.deepEqual(published.extensionDependencies, ['hrashton.remotish']);
+  assert.deepEqual(published.categories, ['SCM Providers', 'Other']);
+  assert.ok(published.keywords.includes('github'));
+  assert.ok(published.keywords.includes('open vsx'));
+
+  assert.match(root.scripts['release:github-provider:vsix'], /prepare-github-provider-vsix\.mjs/u);
   assert.match(root.scripts['release:github-provider:vsix'], /remotish-github-provider\.vsix$/u);
   assert.match(
     root.scripts['test:vscode-web'],
