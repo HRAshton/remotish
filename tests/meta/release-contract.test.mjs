@@ -139,7 +139,11 @@ test('VS Code host contract keeps version, engines, types, proposals, and Web sm
   assert.equal(rootManifest.scripts?.postinstall, undefined);
 
   for (const { path, manifest } of extensionManifests) {
-    assert.equal(manifest.engines?.vscode, `^${hostVersion}`, `${path} has a different host engine`);
+    assert.equal(
+      manifest.engines?.vscode,
+      `^${hostVersion}`,
+      `${path} has a different host engine`,
+    );
   }
   assert.deepEqual(extensionManifests[0].manifest.enabledApiProposals, proposals);
   assert.equal(stableSmokeManifest.engines?.vscode, `^${hostVersion}`);
