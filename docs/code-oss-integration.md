@@ -30,6 +30,8 @@ Proposal declaration files for controlled-host qualification are committed under
 
 Release packaging derives a public manifest from `apps/demo-web` with the proposal declarations and history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. `pnpm test:vscode-web:stable` exercises the proposal-free base composition, while the controlled demo and runtime-stub/history tests continue to qualify the optional history integration.
 
+Tagged releases also publish `remotish-controlled.vsix` as a GitHub-only asset using the proposal-enabled `apps/demo-web/src/extension.ts` entrypoint. The controlled artifact is never sent to Open VSX. See [Controlled-host Remotish](controlled-host-support.md) for the distribution boundary, support matrix, COSW proposal-grant link, and qualification requirements.
+
 ## Updating the host version
 
 Treat a VS Code / Code-OSS version change as an integration change, not a dependency-only bump:
