@@ -420,3 +420,40 @@ test('release scripts delegate generic infrastructure to standard tooling', asyn
   assert.equal(await exists(new URL('../../.node-version', import.meta.url)), false);
   assert.equal(await exists(new URL('../../.nvmrc', import.meta.url)), true);
 });
+
+
+test('controlled-host VSIX stays separate from the public registry artifact', async () => {
+  const controlledRelease = rootManifest.scripts?.['release:controlled-vsix'] ?? '';
+  const controlledSmoke = rootManifest.scripts?.['test:vscode-web:controlled-vsix'] ?? '';
+  assert.match(controlledRelease, /apps\/demo-web/u);
+  assert.match(controlledRelease, /remotish-controlled\.vsix/u);
+  assert.match(controlledSmoke, /artifacts\/remotish-controlled\.vsix/u);
+  assert.match(controlledSmoke, /controlled-vsix\.js/u);
+
+  const ciWorkflow = await readFile(
+    new URL('../../.github/workflows/ci.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(ciWorkflow, /pnpm test:vscode-web:controlled-vsix/u);
+
+  const releaseWorkflow = await readFile(
+    new URL('../../.github/workflows/release.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(releaseWorkflow, /pnpm test:vscode-web:controlled-vsix/u);
+  assert.match(releaseWorkflow, /remotish-controlled\.vsix/u);
+
+  const openVsxStart = releaseWorkflow.indexOf('  open-vsx-publish:');
+  const releaseStart = releaseWorkflow.indexOf('\n  release:', openVsxStart);
+  assert.ok(openVsxStart >= 0 && releaseStart > openVsxStart);
+  const openVsxJob = releaseWorkflow.slice(openVsxStart, releaseStart);
+  assert.doesNotMatch(openVsxJob, /remotish-controlled\.vsix/u);
+
+  const support = await readFile(
+    new URL('../../docs/controlled-host-support.md', import.meta.url),
+    'utf8',
+  );
+  assert.match(support, /code-oss-static-web\/issues\/17/u);
+  assert.match(support, /No qualified released pair yet/u);
+  assert.match(support, /v1\.139\.1-web\.1/u);
+});
