@@ -87,3 +87,22 @@ Do not report suspected vulnerabilities in a public issue. Follow [SECURITY.md](
 Publishing is designed for npm Trusted Publishing with GitHub Actions OIDC. Configure the `@remotish/adapter-sdk` package on npmjs.com with this repository and `.github/workflows/release.yml` as its trusted publisher, and protect the GitHub `npm` environment as appropriate. No long-lived `NPM_TOKEN` is expected in the workflow.
 
 For a beta version such as `0.1.0-beta.1`, publish with the `beta` npm dist-tag rather than replacing `latest`. Stable versions can use the default `latest` dist-tag.
+
+## Open VSX publishing
+
+Release tags publish only the stable-API Remotish host and the anonymous public GitHub provider to
+Open VSX under the `hrashton` namespace. Fixture, Browser RPC, and Git HTTP provider VSIXes remain
+GitHub-release-only.
+
+Publishing uses Open VSX trusted publishing rather than a stored registry token. Configure the
+`hrashton` namespace with this repository and `.github/workflows/release.yml` as a trusted GitHub
+Actions publisher, including the `open-vsx` environment when configuring the trust policy. The
+workflow grants only `contents: read` and `id-token: write` to the publish job and invokes
+`ovsx publish --trusted-publishing`; no `OVSX_PAT` secret is expected.
+
+After publishing, the workflow downloads the exact released versions of
+`hrashton.remotish` and `hrashton.remotish-github-provider` back from Open VSX and runs the public
+GitHub bootstrap smoke under the pinned Code OSS Web build. This checks the registry artifacts, the
+host/provider installation relationship, and the canonical public-repository open path rather than
+only testing the locally packaged VSIX files.
+
