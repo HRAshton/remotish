@@ -13,7 +13,7 @@ The main `@remotish/vscode` package uses native editor primitives for:
 - QuickPick and status-bar branch controls;
 - workspace storage APIs.
 
-Stable VS Code types come from the pinned `@types/vscode` package (`1.138.0` in this repository).
+Stable VS Code types come from the local `@types/vscode` package under `types/vscode/`, vendored byte-for-byte from the controlled Code-OSS tag. The current controlled host is `1.139.1`.
 
 ## Proposal-sensitive APIs
 
@@ -24,7 +24,7 @@ scmHistoryProvider
 timeline
 ```
 
-Proposal declaration files for the controlled host are committed under `types/vscode-proposed/`. Release-contract tests verify that the pinned `@types/vscode`, extension engine, enabled proposal list, and vendored declaration set stay aligned. Install and CI do not download proposal declarations.
+Proposal declaration files for the controlled host are committed under `types/vscode-proposed/`. The root `package.json#codeOss` object declares the exact host version, release commit, and upstream Git blob IDs for the stable and proposal declarations. Release-contract tests verify those blobs, the local `@types/vscode` version, every extension engine, the enabled proposal set, and every Code-OSS Web launcher against that one host. Install and CI do not download declarations.
 
 `@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK, core, or base VS Code host.
 
@@ -34,12 +34,13 @@ The controlled demo enables these proposals because it targets a controlled Code
 
 Treat a VS Code / Code-OSS version change as an integration change, not a dependency-only bump:
 
-1. update the pinned `@types/vscode` and extension `engines.vscode` values together;
-2. run `pnpm vscode:types:update` to refresh the enabled proposal declarations from that exact VS Code tag via the official `@vscode/dts` tool, then review and commit the resulting files;
-3. typecheck and run the complete test suite;
-4. run the source Code-OSS Web smoke test;
-5. package the VSIX and run the smoke test against the unpacked exact artifact;
-6. manually qualify proposal-dependent native SCM/history behavior when adopting a new controlled host.
+1. update `package.json#codeOss.version`, its exact release commit, the local `types/vscode/package.json` version, and every extension `engines.vscode` value together;
+2. run `pnpm vscode:types:update` to refresh the stable and enabled proposal declarations from that exact VS Code tag via the official `@vscode/dts` tool, then record the resulting upstream Git blob IDs in `package.json#codeOss.declarationBlobs`;
+3. update every `vscode-test-web` launcher to the declared release commit;
+4. typecheck and run the complete test suite;
+5. run the source Code-OSS Web smoke test;
+6. package the VSIX and run the smoke test against the unpacked exact artifact;
+7. manually qualify proposal-dependent native SCM/history behavior when adopting a new controlled host.
 
 ## Verification levels
 
