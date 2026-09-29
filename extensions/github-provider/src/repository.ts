@@ -20,7 +20,11 @@ export function decodeGitHubRepository(value: unknown): GitHubRepositoryDescript
   if (keys.length !== 2 || keys[0] !== 'owner' || keys[1] !== 'repository') {
     throw invalidRepository();
   }
-  if (typeof data.owner !== 'string' || !OWNER.test(data.owner) || data.owner !== data.owner.trim()) {
+  if (
+    typeof data.owner !== 'string' ||
+    !OWNER.test(data.owner) ||
+    data.owner !== data.owner.trim()
+  ) {
     throw invalidRepository();
   }
   if (
