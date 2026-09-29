@@ -39,5 +39,19 @@
   },
   "scripts": {
     "typecheck": "tsc -b --pretty false"
-  }
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "github",
+    "remote repositories",
+    "virtual filesystem",
+    "source control",
+    "open vsx"
+  ],
+  "extensionDependencies": [
+    "hrashton.remotish"
+  ]
 }
