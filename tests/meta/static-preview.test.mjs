@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { prepareStaticPreview } from '../../scripts/prepare-static-preview.mjs';
 
 test('prepares a Code-OSS distribution with browser extensions', async () => {
@@ -15,7 +15,7 @@ test('prepares a Code-OSS distribution with browser extensions', async () => {
     await mkdir(resolve(extension, 'dist'), { recursive: true });
     await writeFile(
       resolve(dist, 'index.html'),
-      "<meta http-equiv=\"Content-Security-Policy\" content=\"connect-src 'self';\">",
+      '<meta http-equiv="Content-Security-Policy" content="connect-src \'self\';">',
     );
     await writeFile(
       resolve(dist, 'additional-extensions.json'),
@@ -60,10 +60,7 @@ test('prepares a Code-OSS distribution with browser extensions', async () => {
     const installed = index.extensions.find((item) => item.id === 'hrashton.preview-test');
     assert.equal(installed.version, '1.0.0');
     assert.equal(
-      await readFile(
-        resolve(dist, 'extensions/hrashton.preview-test/dist/extension.js'),
-        'utf8',
-      ),
+      await readFile(resolve(dist, 'extensions/hrashton.preview-test/dist/extension.js'), 'utf8'),
       'export {};\n',
     );
     assert.match(
