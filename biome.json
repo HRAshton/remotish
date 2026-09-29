@@ -16,6 +16,8 @@
       "!!**/coverage",
       "!!**/.vscode-test-web",
       "!!**/*.tsbuildinfo",
+      "!!types/vscode/**",
+      "!!types/vscode-proposed/**",
       "!pnpm-lock.yaml"
     ]
   },
