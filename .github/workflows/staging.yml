@@ -7,6 +7,26 @@ on:
         description: Pull request number to deploy
         required: true
         type: string
+      fixture_provider:
+        description: Include fixture provider
+        required: true
+        default: true
+        type: boolean
+      browser_rpc_provider:
+        description: Include browser RPC provider
+        required: true
+        default: true
+        type: boolean
+      github_provider:
+        description: Include GitHub provider
+        required: true
+        default: true
+        type: boolean
+      git_http_provider:
+        description: Include Git HTTP provider
+        required: true
+        default: true
+        type: boolean
 
 concurrency:
   group: remotish-staging
@@ -22,6 +42,7 @@ jobs:
       pr: ${{ steps.pr.outputs.number }}
       sha: ${{ steps.pr.outputs.sha }}
       cosw: ${{ steps.cosw.outputs.tag }}
+      extensions: ${{ steps.extensions.outputs.summary }}
     steps:
       - name: Resolve PR
         id: pr
@@ -71,14 +92,50 @@ jobs:
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
 
-      - name: Build browser extensions
+      - name: Select staging extensions
+        id: extensions
+        env:
+          FIXTURE: ${{ inputs.fixture_provider }}
+          BROWSER_RPC: ${{ inputs.browser_rpc_provider }}
+          GITHUB_PROVIDER: ${{ inputs.github_provider }}
+          GIT_HTTP: ${{ inputs.git_http_provider }}
         run: |
+          set -euo pipefail
+          providers=()
+          [[ "$FIXTURE" == true ]] && providers+=(fixture-provider)
+          [[ "$BROWSER_RPC" == true ]] && providers+=(browser-rpc-provider)
+          [[ "$GITHUB_PROVIDER" == true ]] && providers+=(github-provider)
+          [[ "$GIT_HTTP" == true ]] && providers+=(git-http-provider)
+
+          {
+            printf 'providers='
+            printf '%s ' "${providers[@]}"
+            printf '\n'
+          } >> "$GITHUB_OUTPUT"
+
+          summary="hrashton.remotish"
+          for provider in "${providers[@]}"; do
+            summary+=", hrashton.remotish-${provider}"
+          done
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+
+      - name: Build selected browser extensions
+        env:
+          PROVIDERS: ${{ steps.extensions.outputs.providers }}
+        run: |
+          set -euo pipefail
           pnpm --dir source install --frozen-lockfile
           pnpm --dir source bundle:demo
-          pnpm --dir source bundle:fixture-provider:extension
-          pnpm --dir source bundle:browser-rpc-provider:extension
-          pnpm --dir source bundle:github-provider:extension
-          pnpm --dir source bundle:git-http-provider:extension
+
+          for provider in $PROVIDERS; do
+            case "$provider" in
+              fixture-provider) pnpm --dir source bundle:fixture-provider:extension ;;
+              browser-rpc-provider) pnpm --dir source bundle:browser-rpc-provider:extension ;;
+              github-provider) pnpm --dir source bundle:github-provider:extension ;;
+              git-http-provider) pnpm --dir source bundle:git-http-provider:extension ;;
+              *) echo "Unknown provider: $provider" >&2; exit 1 ;;
+            esac
+          done
 
       - name: Resolve matching COSW release
         id: cosw
@@ -107,14 +164,23 @@ jobs:
           COSW_TAG: ${{ steps.cosw.outputs.tag }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           PR_SHA: ${{ steps.pr.outputs.sha }}
+          PROVIDERS: ${{ steps.extensions.outputs.providers }}
+          EXTENSIONS: ${{ steps.extensions.outputs.summary }}
         run: |
           set -euo pipefail
           mkdir -p .work staging
           curl --fail --location --silent --show-error "$COSW_URL" -o .work/cosw.tar.gz
           echo "${COSW_DIGEST#sha256:}  .work/cosw.tar.gz" | sha256sum -c -
           tar -xzf .work/cosw.tar.gz -C staging
-          node tooling/scripts/prepare-static-preview.mjs staging source
-          jq -n --arg pr "$PR_NUMBER" --arg sha "$PR_SHA" --arg cosw "$COSW_TAG" '{pullRequest: ($pr | tonumber), headSha: $sha, codeOssStaticWebRelease: $cosw}' > staging/remotish-staging.json
+          # shellcheck disable=SC2086
+          node tooling/scripts/prepare-static-preview.mjs staging source $PROVIDERS
+          jq -n \
+            --arg pr "$PR_NUMBER" \
+            --arg sha "$PR_SHA" \
+            --arg cosw "$COSW_TAG" \
+            --arg extensions "$EXTENSIONS" \
+            '{pullRequest: ($pr | tonumber), headSha: $sha, codeOssStaticWebRelease: $cosw, extensions: ($extensions | split(", "))}' \
+            > staging/remotish-staging.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
@@ -143,6 +209,7 @@ jobs:
           PR_NUMBER: ${{ needs.build.outputs.pr }}
           HEAD_SHA: ${{ needs.build.outputs.sha }}
           COSW_TAG: ${{ needs.build.outputs.cosw }}
+          EXTENSIONS: ${{ needs.build.outputs.extensions }}
           PAGE_URL: ${{ steps.deploy.outputs.page_url }}
         run: |
           set -euo pipefail
@@ -150,6 +217,8 @@ jobs:
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           body="<!-- remotish-staging-preview -->
           Staging was updated from this PR at \`$short\` using \`$COSW_TAG\`.
+
+          Extensions: $EXTENSIONS
 
           [Open staging]($PAGE_URL) · [deployment run]($run_url)
 
@@ -160,4 +229,4 @@ jobs:
           else
             gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
           fi
-          printf '### Remotish staging\n\n- PR: #%s (`%s`)\n- COSW: `%s`\n- URL: %s\n' "$PR_NUMBER" "$short" "$COSW_TAG" "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Remotish staging\n\n- PR: #%s (`%s`)\n- COSW: `%s`\n- Extensions: %s\n- URL: %s\n' "$PR_NUMBER" "$short" "$COSW_TAG" "$EXTENSIONS" "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
