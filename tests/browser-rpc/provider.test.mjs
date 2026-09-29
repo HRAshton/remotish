@@ -244,7 +244,7 @@ test('existing adapter rejects a local-edit capability change after endpoint rel
       session: { version: 1, capabilities: { commits: false, localEdits: true } },
     },
   );
-  await assert.rejects(adapter.getRepository(), errorCode('UNSUPPORTED'));
+  await assert.rejects(adapter.getRepository(), errorCode('OFFLINE'));
   replacement.dispose();
   broker.dispose();
 });
