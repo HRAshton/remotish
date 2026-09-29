@@ -144,6 +144,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/adapter-sdk
 
+  extensions/github-provider:
+    dependencies:
+      '@remotish/adapter-github':
+        specifier: workspace:*
+        version: link:../../adapters/github
+      '@remotish/adapter-sdk':
+        specifier: workspace:*
+        version: link:../../packages/adapter-sdk
+
   extensions/git-http-provider:
     dependencies:
       '@remotish/adapter-git-http':

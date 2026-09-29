@@ -341,3 +341,14 @@ The [Git HTTP provider](../extensions/git-http-provider/README.md) is an indepen
 installed example with one URL-only descriptor. Desktop bearer tokens stay in SecretStorage; Web
 tokens stay in a customer-scoped Tampermonkey script on the Code-OSS origin. It uses Git smart HTTP
 and does not need a Bitbucket tab or a repository-semantic endpoint.
+
+
+## GitHub public provider
+
+The [GitHub provider](../extensions/github-provider/README.md) is a browser-only concrete example
+for public repositories. Its descriptor allowlist is exactly `owner` and `repository`, and it
+constructs `@remotish/adapter-github` without a token. The
+`remotish-github://open/v1/<owner>/<repository>` bootstrap folder prepares the repository,
+persists only that credential-free identity, and redirects to the canonical `remotish://` root.
+Existing branches and history remain readable and local overlay edits remain available; remote
+publication and branch mutation are disabled.

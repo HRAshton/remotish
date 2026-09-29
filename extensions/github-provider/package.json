@@ -1,0 +1,43 @@
+{
+  "name": "remotish-github-provider",
+  "displayName": "Remotish GitHub Provider",
+  "description": "Anonymous read-only GitHub.com public repository provider for Remotish.",
+  "version": "0.1.0-beta.15",
+  "publisher": "hrashton",
+  "license": "0BSD",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HRAshton/remotish.git"
+  },
+  "homepage": "https://github.com/HRAshton/remotish/tree/master/extensions/github-provider#readme",
+  "bugs": {
+    "url": "https://github.com/HRAshton/remotish/issues"
+  },
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "browser": "./dist/extension.js",
+  "activationEvents": [
+    "onFileSystem:remotish-github"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "remotish": {
+    "provider": true,
+    "apiVersion": 1,
+    "id": "github",
+    "displayName": "GitHub"
+  },
+  "dependencies": {
+    "@remotish/adapter-github": "workspace:*",
+    "@remotish/adapter-sdk": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty false"
+  }
+}

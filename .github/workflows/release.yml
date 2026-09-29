@@ -38,6 +38,7 @@ jobs:
           host_version="$(node --print "require('./apps/demo-web/package.json').version")"
           fixture_provider_version="$(node --print "require('./extensions/fixture-provider/package.json').version")"
           browser_rpc_provider_version="$(node --print "require('./extensions/browser-rpc-provider/package.json').version")"
+          github_provider_version="$(node --print "require('./extensions/github-provider/package.json').version")"
           git_http_provider_version="$(node --print "require('./extensions/git-http-provider/package.json').version")"
 
           test "$GITHUB_REF_NAME" = "v$version"
@@ -45,6 +46,7 @@ jobs:
           test "$host_version" = "$version"
           test "$fixture_provider_version" = "$version"
           test "$browser_rpc_provider_version" = "$version"
+          test "$github_provider_version" = "$version"
           test "$git_http_provider_version" = "$version"
 
       - run: pnpm install --frozen-lockfile
@@ -64,6 +66,7 @@ jobs:
             remotish.vsix \
             remotish-fixture-provider.vsix \
             remotish-browser-rpc-provider.vsix \
+            remotish-github-provider.vsix \
             remotish-git-http-provider.vsix \
             remotish-framework.tar.gz \
             remotish.cdx.json \
@@ -77,6 +80,7 @@ jobs:
             artifacts/remotish.vsix
             artifacts/remotish-fixture-provider.vsix
             artifacts/remotish-browser-rpc-provider.vsix
+            artifacts/remotish-github-provider.vsix
             artifacts/remotish-git-http-provider.vsix
             artifacts/remotish-framework.tar.gz
             artifacts/remotish.cdx.json
@@ -190,6 +194,7 @@ jobs:
             artifacts/remotish.vsix \
             artifacts/remotish-fixture-provider.vsix \
             artifacts/remotish-browser-rpc-provider.vsix \
+            artifacts/remotish-github-provider.vsix \
             artifacts/remotish-git-http-provider.vsix \
             artifacts/remotish-framework.tar.gz \
             artifacts/remotish.cdx.json \

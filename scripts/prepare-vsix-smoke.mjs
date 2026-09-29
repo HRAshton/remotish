@@ -9,6 +9,7 @@ const providerVsixes = (
     : [
         'artifacts/remotish-fixture-provider.vsix',
         'artifacts/remotish-browser-rpc-provider.vsix',
+        'artifacts/remotish-github-provider.vsix',
         'artifacts/remotish-git-http-provider.vsix',
       ]
 ).map((vsix) => resolve(vsix));
@@ -17,6 +18,7 @@ const extensionRoot = resolve(smokeRoot, 'extension');
 const providersRoot = resolve(smokeRoot, 'providers');
 const testBundle = resolve('apps/demo-web/dist/test/suite/vsix.js');
 const bootstrapTestBundle = resolve('apps/demo-web/dist/test/suite/bootstrap.js');
+const githubBootstrapTestBundle = resolve('apps/demo-web/dist/test/suite/github-bootstrap.js');
 
 function extractVsix(archive, destination) {
   const windows = process.platform === 'win32';
@@ -41,6 +43,10 @@ extractVsix(hostVsix, smokeRoot);
 mkdirSync(dirname(resolve(extensionRoot, 'dist/test/suite/vsix.js')), { recursive: true });
 cpSync(testBundle, resolve(extensionRoot, 'dist/test/suite/vsix.js'));
 cpSync(bootstrapTestBundle, resolve(extensionRoot, 'dist/test/suite/bootstrap.js'));
+cpSync(
+  githubBootstrapTestBundle,
+  resolve(extensionRoot, 'dist/test/suite/github-bootstrap.js'),
+);
 
 mkdirSync(providersRoot, { recursive: true });
 for (const providerVsix of providerVsixes) {
