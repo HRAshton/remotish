@@ -37,7 +37,24 @@ jobs:
           echo "sha=$(jq -r .head.sha <<<"$pr")" >> "$GITHUB_OUTPUT"
           echo "repo=$(jq -r .head.repo.full_name <<<"$pr")" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Require workflow from the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+            echo "Run staging from the default branch ($DEFAULT_BRANCH)." >&2
+            exit 1
+          fi
+
+      - name: Check out trusted staging tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          persist-credentials: false
+
+      - name: Check out selected PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ steps.pr.outputs.repo }}
           ref: ${{ steps.pr.outputs.sha }}
@@ -96,7 +113,7 @@ jobs:
           curl --fail --location --silent --show-error "$COSW_URL" -o .work/cosw.tar.gz
           echo "${COSW_DIGEST#sha256:}  .work/cosw.tar.gz" | sha256sum -c -
           tar -xzf .work/cosw.tar.gz -C staging
-          node source/scripts/prepare-static-preview.mjs staging
+          node tooling/scripts/prepare-static-preview.mjs staging source
           jq -n --arg pr "$PR_NUMBER" --arg sha "$PR_SHA" --arg cosw "$COSW_TAG" '{pullRequest: ($pr | tonumber), headSha: $sha, codeOssStaticWebRelease: $cosw}' > staging/remotish-staging.json
 
       - name: Upload Pages artifact
