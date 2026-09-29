@@ -49,10 +49,7 @@ test('GitHub provider is a browser-only anonymous public repository extension', 
 });
 
 test('GitHub provider VSIX participates in packaged smoke and release controls', () => {
-  assert.match(
-    root.scripts['release:github-provider:vsix'],
-    /remotish-github-provider\.vsix$/u,
-  );
+  assert.match(root.scripts['release:github-provider:vsix'], /remotish-github-provider\.vsix$/u);
   assert.match(
     root.scripts['test:vscode-web'],
     /remotish-github:\/\/open\/v1\/octocat\/Hello-World/u,

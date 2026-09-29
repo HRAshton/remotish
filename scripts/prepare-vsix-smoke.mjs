@@ -43,10 +43,7 @@ extractVsix(hostVsix, smokeRoot);
 mkdirSync(dirname(resolve(extensionRoot, 'dist/test/suite/vsix.js')), { recursive: true });
 cpSync(testBundle, resolve(extensionRoot, 'dist/test/suite/vsix.js'));
 cpSync(bootstrapTestBundle, resolve(extensionRoot, 'dist/test/suite/bootstrap.js'));
-cpSync(
-  githubBootstrapTestBundle,
-  resolve(extensionRoot, 'dist/test/suite/github-bootstrap.js'),
-);
+cpSync(githubBootstrapTestBundle, resolve(extensionRoot, 'dist/test/suite/github-bootstrap.js'));
 
 mkdirSync(providersRoot, { recursive: true });
 for (const providerVsix of providerVsixes) {

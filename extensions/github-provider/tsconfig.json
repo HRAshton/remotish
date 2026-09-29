@@ -7,8 +7,5 @@
     "moduleResolution": "Bundler"
   },
   "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../../packages/adapter-sdk" },
-    { "path": "../../adapters/github" }
-  ]
+  "references": [{ "path": "../../packages/adapter-sdk" }, { "path": "../../adapters/github" }]
 }

@@ -1,8 +1,8 @@
 import {
   REMOTISH_ENSURE_REPOSITORY_COMMAND,
   REMOTISH_REPOSITORY_COMMAND_VERSION,
-  type RemotishRepositoryRequest,
   RemotishError,
+  type RemotishRepositoryRequest,
 } from '@remotish/adapter-sdk';
 import * as vscode from 'vscode';
 import {
@@ -37,12 +37,16 @@ export function decodeGitHubBootstrapUri(value: unknown): GitHubRepositoryDescri
   ) {
     throw invalidBootstrap();
   }
-  const match = /^\/v1\/([^/]+)\/([^/]+)$/u.exec(uri.path);
-  if (!match) {
+  const prefix = '/v1/';
+  if (!uri.path.startsWith(prefix)) {
     throw invalidBootstrap();
   }
-  const owner = decodeDirectSegment(match[1] ?? '');
-  const repository = decodeDirectSegment(match[2] ?? '');
+  const segments = uri.path.slice(prefix.length).split('/');
+  if (segments.length !== 2) {
+    throw invalidBootstrap();
+  }
+  const owner = decodeDirectSegment(segments[0] ?? '');
+  const repository = decodeDirectSegment(segments[1] ?? '');
   return decodeGitHubRepository({ owner, repository });
 }
 
@@ -53,7 +57,7 @@ export class GitHubBootstrapFileSystem implements vscode.FileSystemProvider, vsc
   readonly onDidChangeFile = this.changes.event;
   private readonly attempts = new Map<string, Promise<void>>();
   private finalizationTail: Promise<void> = Promise.resolve();
-  private disposed = false;
+  private disposed: boolean = false;
   private generation = 0;
 
   constructor(private readonly context: vscode.ExtensionContext) {}

@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 
 interface ActivatedGitHubProvider {
   validateRepository(repository: Readonly<Record<string, string>>): void;
-  createAdapter(
-    repository: Readonly<Record<string, string>>,
-  ): { readonly capabilities: { readonly commits: boolean } } | Promise<{
-    readonly capabilities: { readonly commits: boolean };
-  }>;
+  createAdapter(repository: Readonly<Record<string, string>>):
+    | { readonly capabilities: { readonly commits: boolean } }
+    | Promise<{
+        readonly capabilities: { readonly commits: boolean };
+      }>;
 }
 
 /** Verify discovery, lazy activation, descriptor strictness, and anonymous capabilities. */
