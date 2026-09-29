@@ -55,6 +55,8 @@ jobs:
 
       - run: pnpm test:vscode-web:vsix
 
+      - run: pnpm test:vscode-web:controlled-vsix
+
       - run: pnpm release:source
 
       - run: cp THIRD_PARTY_NOTICES.md artifacts/THIRD_PARTY_NOTICES.md
@@ -64,6 +66,7 @@ jobs:
         run: |
           sha256sum \
             remotish.vsix \
+            remotish-controlled.vsix \
             remotish-fixture-provider.vsix \
             remotish-browser-rpc-provider.vsix \
             remotish-github-provider.vsix \
@@ -78,6 +81,7 @@ jobs:
         with:
           subject-path: |
             artifacts/remotish.vsix
+            artifacts/remotish-controlled.vsix
             artifacts/remotish-fixture-provider.vsix
             artifacts/remotish-browser-rpc-provider.vsix
             artifacts/remotish-github-provider.vsix
@@ -266,6 +270,7 @@ jobs:
 
           gh release create "$GITHUB_REF_NAME" \
             artifacts/remotish.vsix \
+            artifacts/remotish-controlled.vsix \
             artifacts/remotish-fixture-provider.vsix \
             artifacts/remotish-browser-rpc-provider.vsix \
             artifacts/remotish-github-provider.vsix \
