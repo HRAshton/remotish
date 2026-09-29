@@ -30,10 +30,7 @@ async function prepare() {
     new URL('extensions/github-provider/README.md', root),
     new URL('README.md', stageUrl),
   );
-  await copyFile(
-    new URL('extensions/github-provider/LICENSE', root),
-    new URL('LICENSE', stageUrl),
-  );
+  await copyFile(new URL('extensions/github-provider/LICENSE', root), new URL('LICENSE', stageUrl));
   await copyFile(
     new URL('extensions/github-provider/dist/extension.js', root),
     new URL('dist/extension.js', stageUrl),
