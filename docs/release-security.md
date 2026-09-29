@@ -60,7 +60,7 @@ Tests are injected only into the unpacked smoke-test copy, not into the release 
 
 The base `@remotish/vscode` host path uses stable APIs only and is smoke-tested without `enabledApiProposals` by `pnpm test:vscode-web:stable`.
 
-The released controlled demo host additionally composes `@remotish/vscode-history`, so that artifact still requires the `scmHistoryProvider` and `timeline` proposals and is aimed at the controlled Code-OSS distribution described in [Code-OSS integration](code-oss-integration.md). A proposal-free embedding can omit the history package while retaining the core remote workspace and SCM behavior.
+The released `remotish.vsix` also uses only that stable path. `@remotish/vscode-history` remains available for controlled Code OSS hosts that explicitly opt into the `scmHistoryProvider` and `timeline` proposals, but it is not part of the public registry host dependency graph.
 
 The current target is VS Code / Code-OSS 1.139.1. Requalify before changing that host version.
 
