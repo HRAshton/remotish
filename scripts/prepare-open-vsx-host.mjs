@@ -36,10 +36,7 @@ async function prepare() {
   await rm(stageUrl, { recursive: true, force: true });
   await mkdir(new URL('dist/', stageUrl), { recursive: true });
   await writeFile(new URL('package.json', stageUrl), `${JSON.stringify(manifest, null, 2)}\n`);
-  await copyFile(
-    new URL('apps/demo-web/README.open-vsx.md', root),
-    new URL('README.md', stageUrl),
-  );
+  await copyFile(new URL('apps/demo-web/README.open-vsx.md', root), new URL('README.md', stageUrl));
   await copyFile(new URL('apps/demo-web/LICENSE', root), new URL('LICENSE', stageUrl));
 }
 
