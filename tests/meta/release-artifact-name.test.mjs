@@ -16,7 +16,10 @@ test('host VSIX uses the Remotish product artifact name everywhere release tooli
   const releaseVsix = rootManifest.scripts?.['release:vsix'] ?? '';
   const prepareVsix = rootManifest.scripts?.['prepare:vscode-web-vsix'] ?? '';
 
-  assert.match(releaseVsix, /--out \.\.\/\.\.\/artifacts\/remotish\.vsix$/u);
+  assert.equal(
+    releaseVsix,
+    'pnpm build && pnpm bundle:open-vsx-host && pnpm --dir artifacts/open-vsx-host exec vsce package --no-dependencies --allow-missing-repository --out ../remotish.vsix',
+  );
   assert.equal(
     prepareVsix,
     'node scripts/prepare-vsix-smoke.mjs artifacts/remotish.vsix artifacts/remotish-fixture-provider.vsix artifacts/remotish-browser-rpc-provider.vsix artifacts/remotish-github-provider.vsix artifacts/remotish-git-http-provider.vsix',
