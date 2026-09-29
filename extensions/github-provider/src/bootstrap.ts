@@ -214,7 +214,13 @@ export function restoreGitHubWorkspace(
   } catch {
     throw invalidRecord();
   }
-  return { provider: GITHUB_PROVIDER_ID, repository };
+  return {
+    provider: GITHUB_PROVIDER_ID,
+    repository: {
+      owner: repository.owner,
+      repository: repository.repository,
+    },
+  };
 }
 
 function decodePreparedWorkspaceId(value: unknown): string {
