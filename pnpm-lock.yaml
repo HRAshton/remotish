@@ -122,6 +122,9 @@ importers:
       '@remotish/vscode':
         specifier: workspace:*
         version: link:../../packages/vscode
+      '@remotish/vscode-history':
+        specifier: workspace:*
+        version: link:../../packages/vscode-history
 
   extensions/browser-rpc-provider:
     dependencies:
