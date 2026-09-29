@@ -2,7 +2,7 @@
 
 ## The workspace opens read-only
 
-Check `adapter.capabilities.commits`. When it is `false`, Remotish deliberately blocks working-tree mutations. If it is `true`, the adapter must implement `commit()` or `RemotishWorkspace.open()` will reject the adapter contract.
+Check `adapter.capabilities.commits` and `adapter.capabilities.localEdits`. Working-tree mutations are available when `commits` is true or `localEdits` is true. A `commits: true` adapter must implement `commit()` or `RemotishWorkspace.open()` will reject the adapter contract; `localEdits: true` does not enable remote publication.
 
 ## `Invalid adapter contract`
 

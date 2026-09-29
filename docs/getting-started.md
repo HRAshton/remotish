@@ -101,7 +101,7 @@ export class MyAdapter implements RemotishAdapter {
 }
 ```
 
-Start read-only. Once metadata, immutable reads, branch heads and history are correct, add `commit()` and set `commits: true`. Add force-with-lease, amend, branch creation and branch deletion only when the remote can honor their exact semantics.
+Start read-only. If you want editable local overlays without remote publication, keep `commits: false` and add `localEdits: true`. Once the backend can publish safely, add `commit()` and set `commits: true`. Add force-with-lease, amend, branch creation and branch deletion only when the remote can honor their exact semantics.
 
 Continue with [Build an adapter](adapter-authoring.md).
 
