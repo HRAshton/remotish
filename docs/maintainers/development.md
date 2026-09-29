@@ -117,7 +117,7 @@ Any host-version change must follow the qualification path in [Code-OSS integrat
 
 The repository has one shared GitHub Pages staging environment. It is updated only when a maintainer runs **Deploy PR to staging** from GitHub Actions and supplies an open pull request number.
 
-The workflow builds that exact PR head, reads the pinned `package.json#codeOss.version`, selects the highest published `v<version>-web.N` release from `HRAshton/code-oss-static-web`, verifies the release archive digest, and injects the PR's browser extensions into the qualified static distribution. A missing matching COSW release fails the deployment rather than falling back to another host version.
+The Remotish host is always included; the fixture, browser RPC, GitHub and Git HTTP providers can be selected independently in the dispatch form. The workflow builds that exact PR head, reads the pinned `package.json#codeOss.version`, selects the highest published `v<version>-web.N` release from `HRAshton/code-oss-static-web`, verifies the release archive digest, and injects the selected PR-built browser extensions into the qualified static distribution. A missing matching COSW release fails the deployment rather than falling back to another host version.
 
 Running the workflow again refreshes staging from the PR's current head. Running it for another PR replaces the shared staging site. The deployment comment records the tested PR head and COSW release. GitHub Pages must be configured to use GitHub Actions as its source.
 
