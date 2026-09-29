@@ -22,7 +22,7 @@ The example/demo adapters are reference implementations, but vulnerabilities tha
 
 ## Supported versions
 
-Until the project reaches a stable 1.x support policy, security fixes are made on the actively maintained main line and the latest released pre-1.0 version where practical. Older snapshots may require upgrading to receive a fix.
+During the 1.0 release-candidate phase, security fixes are made on the actively maintained main line and the latest 1.0 release candidate where practical. After 1.0.0, security fixes target the actively maintained 1.x line and the latest supported release. Older snapshots may require upgrading to receive a fix. See [Support and compatibility](docs/support.md) for the current support matrix.
 
 ## Disclosure
 
