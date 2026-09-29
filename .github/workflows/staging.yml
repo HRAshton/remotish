@@ -1,0 +1,147 @@
+name: Deploy PR to staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to deploy
+        required: true
+        type: string
+
+concurrency:
+  group: remotish-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      head_repo: ${{ steps.pr.outputs.head_repo }}
+      cosw_tag: ${{ steps.cosw.outputs.tag }}
+    steps:
+      - name: Resolve selected PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PR number must be a positive integer." >&2
+            exit 1
+          fi
+
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          if [[ "$(jq -r '.state' <<<"$pr")" != 'open' ]]; then
+            echo "PR #$PR_NUMBER is not open." >&2
+            exit 1
+          fi
+
+          head_sha="$(jq -r '.head.sha' <<<"$pr")"
+          head_repo="$(jq -r '.head.repo.full_name' <<<"$pr")"
+          test -n "$head_sha"
+          test "$head_repo" != 'null'
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "head_repo=$head_repo" >> "$GITHUB_OUTPUT"
+          echo "Selected PR #$PR_NUMBER at $head_sha from $head_repo."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.pr.outputs.head_repo }}
+          ref: ${{ steps.pr.outputs.head_sha }}
+          path: source
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 12.6.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+
+      - name: Build PR browser extensions
+        run: |
+          pnpm --dir source install --frozen-lockfile
+          pnpm --dir source bundle:demo
+          pnpm --dir source bundle:fixture-provider:extension
+          pnpm --dir source bundle:browser-rpc-provider:extension
+          pnpm --dir source bundle:github-provider:extension
+          pnpm --dir source bundle:git-http-provider:extension
+
+      - name: Resolve matching Code-OSS Static Web release
+        id: cosw
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          code_oss_version="$(node --print "require('./source/package.json').codeOss.version")"
+          releases="$(gh api --paginate --slurp 'repos/HRAshton/code-oss-static-web/releases?per_page=100')"
+          release="$(
+            jq -c --arg version "$code_oss_version" '
+              [
+                .[][]
+                | select(.draft == false and .prerelease == false)
+                | . as $release
+                | (.tag_name | capture("^v(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)-web\\.(?<revision>[0-9]+)$")) as $tag
+                | select($tag.version == $version)
+                | { release: $release, revision: ($tag.revision | tonumber) }
+              ]
+              | sort_by(.revision)
+              | last
+              | .release // empty
+            ' <<<"$releases"
+          )"
+
+          if [[ -z "$release" ]]; then
+            echo "No released Code-OSS Static Web build matches Code-OSS $code_oss_version." >&2
+            exit 1
+          fi
+
+          tag="$(jq -r '.tag_name' <<<"$release")"
+          asset_name="code-oss-static-web-${tag#v}.tar.gz"
+          asset="$(jq -c --arg name "$asset_name" '.assets[] | select(.name == $name)' <<<"$release")"
+          if [[ -z "$asset" ]]; then
+            echo "Release $tag does not contain $asset_name." >&2
+            exit 1
+          fi
+
+          asset_url="$(jq -r '.browser_download_url' <<<"$asset")"
+          digest="$(jq -r '.digest // empty' <<<"$asset")"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Release asset $asset_name does not expose a SHA-256 digest." >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "asset_url=$asset_url" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Using $tag for Code-OSS $code_oss_version."
+
+      - name: Assemble staging distribution
+        env:
+          COSW_URL: ${{ steps.cosw.outputs.asset_url }}
+          COSW_DIGEST: ${{ steps.cosw.outputs.digest }}
+          COSW_TAG: ${{ steps.cosw.outputs.tag }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_HEAD_REPO: ${{ steps.pr.outputs.head_repo }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .work staging
+         İ\›KY˜Z[K[ØØ][ÛˆK\Ú[[K\ÚİËY\œ›Üˆ‰ÓÔÕ×ÕT“ˆ[ÈÛÜšËØÛÜİË\‹™Ş‚ˆXÚÈ‰ĞÓÔÕ×ÑQÑTÕÜÚLMŸHÛÜšËØÛÜİË\‹™ŞˆˆÚLMœİ[HXÈBˆ\ˆ^™ˆÛÜšËØÛÜİË\‹™ŞˆPÈİYÚ[™Âˆ›ÙHÛİ\˜ÙKÜØÜš\ËÜ™\\™K\İ]XË\™]šY]Ë›ZœÈİYÚ[™ÂˆœH[ˆˆKX\™Èˆ‰—Ó•SP‘TˆˆˆKX\™ÈXYÚH‰—ÒPQÔÒHˆˆKX\™ÈXY™\ÜÚ]ÜH‰—ÒPQÔ‘TÈˆˆKX\™ÈÛÜİÕYÈ‰ÓÔÕ×ÕQÈˆˆKX\™ÈÛÜšÙ›İÔ[ˆ‰ÒUP—ÔÑT•‘T—ÕT“ÉÒUP—Ô‘TÔÒUÔ–KØXİ[ÛœËÜ[œËÉÒUP—Ô•S—ÒQˆˆ	ŞÂˆØÚ[XU™\œÚ[ÛˆKˆ[™\]Y\İˆ
+	ˆÛ[X™\ŠKˆXYÚNˆ	XYÚKˆXY™\ÜÚ]ÜNˆ	XY™\ÜÚ]ÜKˆ6öFT÷757FF–5vV%&VÆV6S¢F6÷7uFrÀ¢v÷&¶fÆ÷u'Vã¢Gv÷&¶fÆ÷u'Và¢Òrâ7Fv–ær÷&VÖ÷F—6‚×7Fv–æræ§6öà ¢ÒæÖS¢WÆöB7Fv–ærvW2'F–f7@¢W6W3¢7F–öç2÷WÆöB×vW2Ö'F–f7Df33#FC3SCsC#sf#ƒ#vc†f3S&fc&63C–3’2cP¢v—Fƒ ¢Fƒ¢7Fv–æp ¢FWÆ÷“ ¢æVVG3¢'V–Æ@¢'Vç2Ööã¢V'VçGRÖÆFW7@¢Vçf—&öæÖVçC ¢æÖS¢v—F‡V"×vW0¢W&Ã¢G·²7FW2æFWÆ÷–ÖVçBæ÷WGWG2çvU÷W&Â×Ğ¢W&Ö—76–öç3 ¢6öçFVçG3¢&V@¢vW3¢w&—FP¢–B×Fö¶Vã¢w&—FP¢VÆÂ×&WVW7G3¢w&—FP¢7FW3 ¢ÒæÖS¢6öæf–wW&Rv—D‡V"vW0¢W6W3¢7F–öç2ö6öæf–wW&R×vW4CV&fS“&6fV#vFS–FVS“&#f#ƒ#SFB2c` ¢ÒæÖS¢FWÆ÷’7Fv–æp¢–C¢FWÆ÷–ÖVç@¢W6W3¢7F–öç2öFWÆ÷’×vW43c†cƒ#S#ƒcCVSFf#s“6CFCFS3C#c#–6cS3Cb2cP ¢ÒæÖS¢&V6÷&B7Fv–ærFWÆ÷–ÖVçBöâ ¢Vçc ¢t…õDô´Tã¢G·²v—F‡V"çFö¶Vâ×Ğ¢%ôåTÔ$U#¢G·²æVVG2æ'V–ÆBæ÷WGWG2ç%öçVÖ&W"×Ğ¢„TEõ4„¢G·²æVVG2æ'V–ÆBæ÷WGWG2æ†VE÷6†×Ğ¢4õ5uõDs¢G·²æVVG2æ'V–ÆBæ÷WGWG2æ6÷7u÷Fr×Ğ¢tUõU$Ã¢G·²7FW2æFWÆ÷–ÖVçBæ÷WGWG2çvU÷W&Â×Ğ¢6†VÆÃ¢&6€¢'Vã¢À¢6WBÖWVò—Vf–À¢6†÷'E÷6†Ò"G´„TEõ4„££wÒ ¢'Vå÷W&ÃÒ"Dt•D…T%õ4U%dU%õU$ÂòDt•D…T%õ$Uõ4•Dõ%’ö7F–öç2÷'Vç2òDt•D…T%õ%Tåô”B ¢&öG“Ò"B†6BÃÄTôeô$ôE¢ÂÒÒ&VÖ÷F—6‚×7Fv–ær×&Wf–WrÒÓà¢7Fv–ærv2WFFVBg&öÒF†—2"BÆG6†÷'E÷6†ÆW6–ærÆD4õ5uõDuÆà ¢´÷Vâ7Fv–æuÒ‚EtUõU$Â’+r¶FWÆ÷–ÖVçB'VåÒ‚G'Vå÷W&Â ¢F†—2—2öæR6†&VB7Fv–ærVçf—&öæÖVçBÂ6òÆFW"ÖçVÂFWÆ÷–ÖVçBÖ’&WÆ6R—Bâ&R×'Vâ¢¤FWÆ÷’"Fò7Fv–ær¢¢v—F‚"2E%ôåTÔ$U"Fò&Vg&W6‚—Bà¢Tôeô$ôE¢’  ¢6öÖÖVçEö–CÒ"B€¢v‚’Ò×v–æFRÒ×6ÇW''&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2òE%ôåTÔ$U"ö6öÖÖVçG3÷W%÷vSÓ"À¢Â§×"u²åµÕµÒÂ6VÆV7B‚çW6W"æÆöv–âÓÒ&v—F‡V"Ö7F–öç5¶&÷EÒ"’Â6VÆV7B‚æ&öG’Â7F'G7v—F‚‚#ÂÒÒ&VÖ÷F—6‚×7Fv–ær×&Wf–WrÒÓâ"’•ÒÂÆ7BÂæ–BòòV×G’p¢’  ¢–bµ²Öâ"F6öÖÖVçEö–B"ÕÓ²F†Và¢v‚’ÒÖÖWF†öBD4‚'&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2ö6öÖÖVçG2òF6öÖÖVçEö–B"Öb&öG“Ò"F&öG’"âöFWböçVÆÀ¢VÇ6P¢v‚’ÒÖÖWF†öBõ5B'&W÷2òDt•D…T%õ$Uõ4•Dõ%’ö—77VW2òE%ôåTÔ$U"ö6öÖÖVçG2"Öb&öG“Ò"F&öG’"âöFWböçVÆÀ¢f ¢°¢V6†ò"222&VÖ÷F—6‚7Fv–ær ¢V6†ğ¢V6†ò"Ò#¢2E%ôåTÔ$U"…ÆG6†÷'E÷6†Æ’ ¢V6†ò"Ò6öFRÔõ527FF–2vV#¢ÆD4õ5uõDuÆ ¢V6†ò"ÒU$Ã¢EtUõU$Â ¢Òãâ"Dt•D…T%õ5DUõ5TÔÔ%’ 
