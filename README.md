@@ -77,6 +77,21 @@ examples/browser-rpc-bitbucket-datacenter  Bitbucket Data Center 9.4 userscript 
 
 Adapters depend on `@remotish/adapter-sdk`, not on VS Code or core internals.
 
+
+## Install from Open VSX
+
+For Code OSS clients backed by Open VSX, install **Remotish** (`hrashton.remotish`) and
+**Remotish GitHub Provider** (`hrashton.remotish-github-provider`). The GitHub provider declares
+the host as an extension dependency. The registry build of Remotish uses only stable VS Code APIs;
+SCM History and file Timeline integration stay opt-in for controlled hosts through
+`@remotish/vscode-history`.
+
+Open a public repository with the provider URI:
+
+```text
+remotish-github://open/v1/octocat/Hello-World
+```
+
 ## Try the demo
 
 Requirements: Node.js 22 or 24, Corepack, and a Chromium-compatible environment.
