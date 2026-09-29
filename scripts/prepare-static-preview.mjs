@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
 
-export const defaultPreviewExtensions = [
+const defaultPreviewExtensions = [
   new URL('apps/demo-web/', root),
   new URL('extensions/fixture-provider/', root),
   new URL('extensions/browser-rpc-provider/', root),
@@ -46,7 +46,10 @@ async function installExtension(distPath, source) {
     throw new Error(`${manifest.publisher}.${manifest.name} is not browser-compatible.`);
   }
 
-  await requireFile(resolve(sourcePath, manifest.browser), `${manifest.publisher}.${manifest.name} browser entry`);
+  await requireFile(
+    resolve(sourcePath, manifest.browser),
+    `${manifest.publisher}.${manifest.name} browser entry`,
+  );
 
   const id = `${manifest.publisher}.${manifest.name}`;
   const target = resolve(distPath, 'extensions', id);
@@ -91,7 +94,9 @@ async function updateExtensionIndex(distPath, installed) {
 }
 
 async function updateConnectSources(distPath, connectOrigins) {
-  if (connectOrigins.length === 0) return;
+  if (connectOrigins.length === 0) {
+    return;
+  }
   for (const origin of connectOrigins) {
     const url = new URL(origin);
     if (url.protocol !== 'https:' || url.origin !== origin) {
@@ -115,7 +120,9 @@ async function updateConnectSources(distPath, connectOrigins) {
 
 async function requireFile(path, label) {
   try {
-    if ((await stat(path)).isFile()) return;
+    if ((await stat(path)).isFile()) {
+      return;
+    }
   } catch {
     // Report one stable error below.
   }
@@ -128,7 +135,9 @@ async function writeJson(path, value) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const dist = process.argv[2];
-  if (!dist) throw new Error('Usage: node scripts/prepare-static-preview.mjs <dist>');
+  if (!dist) {
+    throw new Error('Usage: node scripts/prepare-static-preview.mjs <dist>');
+  }
   const installed = await prepareStaticPreview({ dist });
   console.log(`Installed ${installed.length} Remotish extensions into ${resolve(dist)}.`);
 }
