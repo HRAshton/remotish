@@ -184,7 +184,7 @@ test('VS Code host contract keeps version, engines, types, proposals, and Web sm
   ]) {
     const script = rootManifest.scripts?.[scriptName] ?? '';
     const launches = script.split('vscode-test-web').length - 1;
-    const pins = script.split(`vscode-test-web --commit=${hostCommit}`).length - 1;
+    const pins = script.split(`vscode-test-web --quality=stable --commit=${hostCommit}`).length - 1;
     assert.ok(launches > 0, `${scriptName} does not launch Code-OSS Web`);
     assert.equal(
       pins,
