@@ -37,6 +37,7 @@ test('host manifest is WebWorker-compatible and activates for provider commands'
     'remotish.openRepository',
     'remotish.selectPreparedBranch',
     'remotish.refreshProviders',
+    'remotish.exportDiagnostics',
   ]) {
     assert.ok(activationEvents.has(`onCommand:${command}`), `Missing activation for ${command}`);
   }
@@ -59,6 +60,7 @@ test('host manifest contributes every public framework command', () => {
   assert.ok(contributed.has('remotish.openRepository'));
   assert.ok(contributed.has('remotish.selectPreparedBranch'));
   assert.ok(contributed.has('remotish.refreshProviders'));
+  assert.ok(contributed.has('remotish.exportDiagnostics'));
 });
 
 test('host activation contains no fixture or demo special cases', () => {

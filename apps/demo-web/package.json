@@ -31,7 +31,8 @@
     "onCommand:remotish.ensureRepository",
     "onCommand:remotish.openRepository",
     "onCommand:remotish.selectPreparedBranch",
-    "onCommand:remotish.refreshProviders"
+    "onCommand:remotish.refreshProviders",
+    "onCommand:remotish.exportDiagnostics"
   ],
   "capabilities": {
     "virtualWorkspaces": true,
@@ -118,6 +119,10 @@
       {
         "command": "remotish.refreshProviders",
         "title": "Remotish: Refresh Providers"
+      },
+      {
+        "command": "remotish.exportDiagnostics",
+        "title": "Remotish: Export Diagnostics"
       }
     ],
     "menus": {

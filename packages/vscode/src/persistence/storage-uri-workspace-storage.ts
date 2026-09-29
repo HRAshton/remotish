@@ -21,6 +21,15 @@ interface StoragePointer {
   readonly previous?: string;
 }
 
+export interface StorageUriWorkspaceDiagnostics {
+  readonly backend: 'storageUri';
+  readonly available: boolean;
+  readonly workspaceCount: number;
+  readonly manifestCount: number;
+  readonly blobCount: number;
+  readonly totalBytes: number;
+}
+
 /**
  * Persists workspace snapshots beneath a VS Code extension storage URI.
  *
@@ -111,6 +120,56 @@ export class StorageUriWorkspaceStorage implements WorkspaceStorage {
         throw error;
       }
     }
+  }
+
+  async getDiagnostics(): Promise<StorageUriWorkspaceDiagnostics> {
+    const namespaceRoot = vscode.Uri.joinPath(this.root, encodeURIComponent(this.namespace));
+    let repositories: [string, vscode.FileType][];
+    try {
+      repositories = await this.fileSystem.readDirectory(namespaceRoot);
+    } catch (error) {
+      if (isFileNotFound(error)) {
+        return emptyDiagnostics(true);
+      }
+      return emptyDiagnostics(false);
+    }
+
+    let workspaceCount = 0;
+    let manifestCount = 0;
+    let blobCount = 0;
+    let totalBytes = 0;
+
+    try {
+      for (const [name, type] of repositories) {
+        if (type !== vscode.FileType.Directory) {
+          continue;
+        }
+        workspaceCount += 1;
+        const repositoryRoot = vscode.Uri.joinPath(namespaceRoot, name);
+        const aggregate = await collectDirectoryStats(this.fileSystem, repositoryRoot);
+        totalBytes += aggregate.totalBytes;
+        manifestCount += aggregate.manifestCount;
+        blobCount += aggregate.blobCount;
+      }
+    } catch {
+      return {
+        backend: 'storageUri',
+        available: false,
+        workspaceCount,
+        manifestCount,
+        blobCount,
+        totalBytes,
+      };
+    }
+
+    return {
+      backend: 'storageUri',
+      available: true,
+      workspaceCount,
+      manifestCount,
+      blobCount,
+      totalBytes,
+    };
   }
 
   private async loadGeneration(
@@ -326,4 +385,52 @@ async function hashBytes(content: Uint8Array): Promise<string> {
 
 function isFileNotFound(error: unknown): boolean {
   return error instanceof vscode.FileSystemError && error.code === 'FileNotFound';
+}
+
+function emptyDiagnostics(available: boolean): StorageUriWorkspaceDiagnostics {
+  return {
+    backend: 'storageUri',
+    available,
+    workspaceCount: 0,
+    manifestCount: 0,
+    blobCount: 0,
+    totalBytes: 0,
+  };
+}
+
+async function collectDirectoryStats(
+  fileSystem: typeof vscode.workspace.fs,
+  root: vscode.Uri,
+): Promise<{ manifestCount: number; blobCount: number; totalBytes: number }> {
+  let manifestCount = 0;
+  let blobCount = 0;
+  let totalBytes = 0;
+  const pending = [root];
+
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    if (!directory) {
+      break;
+    }
+    for (const [name, type] of await fileSystem.readDirectory(directory)) {
+      const child = vscode.Uri.joinPath(directory, name);
+      if (type === vscode.FileType.Directory) {
+        pending.push(child);
+        continue;
+      }
+      if (type !== vscode.FileType.File) {
+        continue;
+      }
+      const stat = await fileSystem.stat(child);
+      totalBytes += stat.size;
+      if (directory.path.endsWith(`/${MANIFESTS_DIRECTORY}`) && name.endsWith('.json')) {
+        manifestCount += 1;
+      }
+      if (directory.path.endsWith(`/${BLOBS_DIRECTORY}`) && name.endsWith('.bin')) {
+        blobCount += 1;
+      }
+    }
+  }
+
+  return { manifestCount, blobCount, totalBytes };
 }

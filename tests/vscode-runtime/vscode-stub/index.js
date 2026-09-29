@@ -138,6 +138,7 @@ const errorMessages = [];
 const quickPickResponses = [];
 const inputBoxResponses = [];
 const warningResponses = [];
+const saveDialogResponses = [];
 const storageFiles = new Map();
 const storageDirectories = new Set();
 const configurationValues = new Map();
@@ -174,6 +175,7 @@ export const commands = {
 
 export const workspace = {
   workspaceFolders: undefined,
+  isTrusted: true,
   onDidChangeWorkspaceFolders: workspaceFoldersChanged.event,
   getConfiguration(section) {
     return {
@@ -397,10 +399,14 @@ export const window = {
     errorMessages.push(message);
     return items[0];
   },
+  async showSaveDialog() {
+    return saveDialogResponses.shift();
+  },
 };
 
 export const UIKind = Object.freeze({ Desktop: 1, Web: 2 });
-export const env = { uiKind: UIKind.Desktop };
+export const version = '1.139.1';
+export const env = { uiKind: UIKind.Desktop, appName: 'Code - OSS', appHost: 'desktop' };
 export const ConfigurationTarget = Object.freeze({ Global: 1 });
 
 export const __test = {
@@ -416,6 +422,7 @@ export const __test = {
   quickPickResponses,
   inputBoxResponses,
   warningResponses,
+  saveDialogResponses,
   logOutputChannels,
   storageFiles,
   storageDirectories,
@@ -473,6 +480,7 @@ export const __test = {
     quickPickResponses.splice(0);
     inputBoxResponses.splice(0);
     warningResponses.splice(0);
+    saveDialogResponses.splice(0);
     if (!options.preserveStorage) {
       storageFiles.clear();
       storageDirectories.clear();
@@ -484,6 +492,9 @@ export const __test = {
     workspace.workspaceFolders = undefined;
     configurationValues.clear();
     env.uiKind = UIKind.Desktop;
+    env.appName = 'Code - OSS';
+    env.appHost = 'desktop';
+    workspace.isTrusted = true;
   },
 };
 
