@@ -334,6 +334,7 @@ test('adapter SDK is configured as the only public npm package', async () => {
   assert.doesNotMatch(releaseWorkflow, /packages\/vscode.*npm publish/u);
   assert.match(releaseWorkflow, /npm pack --dry-run/u);
   assert.match(releaseWorkflow, /publish_args=\(--access public\)/u);
+  assert.match(releaseWorkflow, /publish_args\+=\(--tag next\)/u);
   assert.match(releaseWorkflow, /publish_args\+=\(--tag beta\)/u);
   assert.match(releaseWorkflow, /npm publish/u);
   assert.doesNotMatch(releaseWorkflow, /NPM_TOKEN/u);
