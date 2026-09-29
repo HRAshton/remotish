@@ -17,7 +17,7 @@ Stable VS Code types come from the local `@types/vscode` package under `types/vs
 
 ## Proposal-sensitive APIs
 
-The base `@remotish/vscode` package and the published Remotish host are proposal-free. Controlled hosts may additionally compose `@remotish/vscode-history`, which uses:
+The base `@remotish/vscode` package and the published Open VSX host are proposal-free. The repository-controlled `apps/demo-web` host additionally composes `@remotish/vscode-history`, which uses:
 
 ```text
 scmHistoryProvider
@@ -28,7 +28,7 @@ Proposal declaration files for controlled-host qualification are committed under
 
 `@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK, core, or public VS Code host. It remains available for products that control their Code OSS build and proposal policy, but it is not a dependency of the Open VSX host artifact.
 
-`pnpm test:vscode-web:stable` exercises the proposal-free base composition. Runtime-stub/history tests continue to qualify the optional history integration.
+Release packaging derives a public manifest from `apps/demo-web` with the proposal declarations and history dependency removed, then bundles `apps/demo-web/src/extension-stable.ts`. `pnpm test:vscode-web:stable` exercises the proposal-free base composition, while the controlled demo and runtime-stub/history tests continue to qualify the optional history integration.
 
 ## Updating the host version
 
