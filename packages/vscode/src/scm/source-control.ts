@@ -13,7 +13,7 @@ import * as vscode from 'vscode';
 import { createRevisionUri, createWorkingUri, resourcePath } from '../filesystem/provider.js';
 import { toScmChangeResource } from './change-resource.js';
 
-/** Stable command identifiers used by native SCM resources, menus, and action buttons. */
+/** Stable command identifiers used by native SCM resources and menus. */
 export const SCM_COMMANDS = {
   commitAndPush: 'remotish.commitAndPush',
   commitAndPushForceWithLease: 'remotish.commitAndPushForceWithLease',
@@ -67,7 +67,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     this.changes.hideWhenEmpty = false;
 
     this.workspaceSubscription = workspace.onDidChange(() => this.refreshInBackground());
-    this.refreshActionButton();
     this.refreshInBackground();
   }
 
@@ -187,7 +186,6 @@ export class RemotishSourceControl implements vscode.Disposable {
     this.stagedChanges.resourceStates = staged;
     this.changes.resourceStates = unstaged;
     this.sourceControl.count = changes.length;
-    this.refreshActionButton();
   }
 
   private currentSelection(): Set<RepoPath> {
@@ -238,55 +236,13 @@ export class RemotishSourceControl implements vscode.Disposable {
       throw error;
     }
   }
-
-  private refreshActionButton(): void {
-    const primary = command(
-      SCM_COMMANDS.commitAndPush,
-      'Commit & Push',
-      this.workspaceId,
-      'Commit & Push',
-    );
-    const secondary: vscode.Command[][] = [[primary]];
-
-    if (this.workspace.capabilities.forceWithLease) {
-      secondary.push([
-        command(
-          SCM_COMMANDS.commitAndPushForceWithLease,
-          'Commit & Push (Force with Lease)',
-          this.workspaceId,
-        ),
-      ]);
-    }
-
-    if (this.workspace.capabilities.forceWithLease && this.workspace.capabilities.amend) {
-      secondary.push([
-        command(
-          SCM_COMMANDS.amendAndPushForceWithLease,
-          'Amend & Push (Force with Lease)',
-          this.workspaceId,
-        ),
-      ]);
-    }
-
-    this.sourceControl.actionButton = {
-      command: primary,
-      secondaryCommands: secondary,
-      enabled: true,
-    };
-  }
 }
 
-function command(
-  id: string,
-  title: string,
-  workspaceId: string,
-  shortTitle?: string,
-): vscode.Command & { shortTitle?: string } {
+function command(id: string, title: string, workspaceId: string): vscode.Command {
   return {
     command: id,
     title,
     arguments: [workspaceId],
-    ...(shortTitle ? { shortTitle } : {}),
   };
 }
 

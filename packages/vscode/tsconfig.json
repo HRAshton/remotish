@@ -13,6 +13,5 @@
       "path": "../core"
     }
   ],
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "files": ["../../types/vscode-proposed/vscode.proposed.scmActionButton.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

@@ -22,7 +22,6 @@
   ],
   "browser": "./dist/extension.js",
   "enabledApiProposals": [
-    "scmActionButton",
     "scmHistoryProvider",
     "timeline"
   ],

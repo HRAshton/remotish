@@ -1,0 +1,30 @@
+{
+  "name": "remotish-stable-smoke",
+  "displayName": "Remotish Stable API Smoke",
+  "description": "Test-only Remotish host that exercises the base VS Code integration without proposed APIs.",
+  "version": "0.0.0",
+  "publisher": "hrashton",
+  "license": "0BSD",
+  "private": true,
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "browser": "./extension.js",
+  "activationEvents": [
+    "onFileSystem:remotish",
+    "onFileSystem:remotish-base",
+    "onCommand:remotish.ensureRepository",
+    "onCommand:remotish.openRepository",
+    "onCommand:remotish.selectPreparedBranch",
+    "onCommand:remotish.refreshProviders"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  }
+}

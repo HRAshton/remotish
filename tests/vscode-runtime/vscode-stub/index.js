@@ -304,7 +304,6 @@ export const scm = {
       count: undefined,
       acceptInputCommand: undefined,
       quickDiffProvider: undefined,
-      actionButton: undefined,
       historyProvider: undefined,
       createResourceGroup(groupId, groupLabel) {
         const group = {
