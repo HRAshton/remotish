@@ -58,6 +58,34 @@ test('vscode filesystem model: revision resources are immutable', async () => {
   assert.equal(await fs.isReadonly(base), true);
 });
 
+test('vscode filesystem model: local-only capability keeps the working overlay editable', async () => {
+  const inner = new FixtureAdapter();
+  const adapter = new Proxy(inner, {
+    get(target, property, receiver) {
+      if (property === 'capabilities') {
+        return { commits: false, localEdits: true };
+      }
+      if (property === 'commit') {
+        return undefined;
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const workspace = await RemotishWorkspace.open(adapter);
+  const registry = new WorkspaceRegistry();
+  registry.register('local-only', workspace);
+  const fs = new RepositoryFileSystem(registry);
+  const working = uri(workingUriParts('local-only', 'README.md'));
+
+  assert.equal(await fs.isReadonly(working), false);
+  await fs.writeFile(working, encoder.encode('local overlay\n'), {
+    create: false,
+    overwrite: true,
+  });
+  assert.equal(decoder.decode(await fs.readFile(working)), 'local overlay\n');
+});
+
 test('vscode filesystem model: URI parsing requires a pinned revision for base resources', () => {
   assert.deepEqual(parseRepositoryUri(uri(workingUriParts('fixture-demo', 'src/index.ts'))), {
     view: 'working',

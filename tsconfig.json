@@ -38,6 +38,9 @@
       "path": "./extensions/browser-rpc-provider"
     },
     {
+      "path": "./extensions/github-provider"
+    },
+    {
       "path": "./extensions/git-http-provider"
     },
     {

@@ -45,7 +45,10 @@ export class ScmManager implements vscode.Disposable {
       return;
     }
     const registration = this.registry.require(workspaceId);
-    if (!registration.workspace.capabilities.commits) {
+    if (
+      !registration.workspace.capabilities.commits &&
+      registration.workspace.capabilities.localEdits !== true
+    ) {
       return;
     }
     this.entries.set(

@@ -61,6 +61,35 @@ async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+test('source control exposes local-only changes without a publish action', async (t) => {
+  vscode.__test.reset();
+  const listeners = new Set();
+  const workspace = {
+    branch: 'main',
+    baseRevision: 'C1',
+    capabilities: { commits: false, localEdits: true },
+    onDidChange(listener) {
+      listeners.add(listener);
+      return { dispose: () => listeners.delete(listener) };
+    },
+    async getChanges() {
+      return [{ type: 'modified', path: 'local.ts' }];
+    },
+  };
+  const scm = new RemotishSourceControl('local-only', workspace);
+  t.after(() => {
+    scm.dispose();
+    vscode.__test.reset();
+  });
+
+  await settle();
+  assert.equal(scm.sourceControl.acceptInputCommand, undefined);
+  assert.deepEqual(
+    group(scm.sourceControl, 'changes').resourceStates.map((state) => state.resourceUri.path),
+    ['/local.ts'],
+  );
+});
+
 test('source control coalesces refresh bursts and never overlaps getChanges calls', async (t) => {
   vscode.__test.reset();
   const controlled = controlledWorkspace();

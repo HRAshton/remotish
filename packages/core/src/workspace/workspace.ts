@@ -394,7 +394,7 @@ export class RemotishWorkspace {
   }
 
   private requireWritable(): void {
-    if (!this.capabilities.commits) {
+    if (!this.capabilities.commits && this.capabilities.localEdits !== true) {
       throw new RemotishError('FORBIDDEN', 'This repository is read-only.');
     }
   }

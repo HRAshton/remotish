@@ -41,7 +41,7 @@ Source-file imports are implementation details and are not part of the compatibi
 
 ## 2. Implement a read-only adapter first
 
-Read-only is the safest path to a correct adapter. `commits: false` lets you omit `commit()` while you validate identity, revisions, files, branches and history.
+Read-only is the safest path to a correct adapter. `commits: false` lets you omit `commit()` while you validate identity, revisions, files, branches and history. If the backend should remain publication-free but users may keep an editable local overlay, add `localEdits: true`; that does not enable any remote write method.
 
 ```ts
 export class MyAdapter implements RemotishAdapter {
@@ -212,6 +212,8 @@ readonly capabilities = {
   deleteBranch: true,
 } as const;
 ```
+
+The optional `localEdits` flag is independent of publication and only matters when `commits` is false.
 
 Dependencies are strict:
 

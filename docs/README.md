@@ -41,6 +41,7 @@ and [provider](../extensions/git-http-provider/README.md).
 | [`@remotish/adapter-github`](../adapters/github/README.md) | Authenticated/public GitHub reference adapter |
 | [`@remotish/adapter-rpc`](../adapters/rpc/README.md) | Transport-neutral, versioned repository RPC adapter |
 | [`@remotish/adapter-git-http`](../adapters/git-http/README.md) | Generic Git smart HTTP adapter |
+| [GitHub provider](../extensions/github-provider/README.md) | Anonymous browser provider for public GitHub repositories |
 | [Git HTTP provider](../extensions/git-http-provider/README.md) | Web and desktop provider for one Git clone URL |
 | [Bitbucket Browser RPC example](../examples/browser-rpc-bitbucket/README.md) | Tampermonkey read/write endpoint for Bitbucket Cloud |
 | [Bitbucket Data Center Browser RPC example](../examples/browser-rpc-bitbucket-datacenter/README.md) | Tampermonkey read and branch management endpoint for Bitbucket Data Center 9.4 |

@@ -8,7 +8,7 @@ Adapters expose repository metadata, immutable file/tree reads, remote branches,
 import type { RemotishAdapter, RemotishCapabilities } from '@remotish/adapter-sdk';
 
 class MyAdapter implements RemotishAdapter {
-  readonly capabilities: RemotishCapabilities = { commits: false };
+  readonly capabilities: RemotishCapabilities = { commits: false, localEdits: true };
   // ...repository operations
 }
 ```

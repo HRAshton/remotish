@@ -105,6 +105,7 @@ This method describes repository history, not the current working overlay.
 ```ts
 interface RemotishCapabilities {
   commits: boolean;
+  localEdits?: boolean;
   forceWithLease?: boolean;
   amend?: boolean;
   createBranch?: boolean;
@@ -116,7 +117,8 @@ Rules:
 
 | Capability | Requirement |
 | --- | --- |
-| `commits` | `commit()` exists when true; false makes the workspace read-only |
+| `commits` | `commit()` exists when true; also enables local working-tree edits |
+| `localEdits` | when true, enables local working-tree edits even with `commits: false` |
 | `forceWithLease` | requires `commits: true` |
 | `amend` | requires `forceWithLease: true` |
 | `createBranch` | requires `createBranch()` |
@@ -124,7 +126,7 @@ Rules:
 
 `RemotishWorkspace.open()` validates these combinations.
 
-Capabilities are behavioral promises, not feature labels. Do not advertise a capability for an operation the remote can only approximate unsafely.
+Capabilities are behavioral promises, not feature labels. `localEdits` describes framework-owned overlay behavior rather than a remote mutation: it lets a read-side adapter opt into editable local state without implying publication ability. Do not advertise a remote capability for an operation the backend can only approximate unsafely.
 
 ## Commit-and-publish
 

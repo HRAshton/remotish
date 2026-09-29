@@ -13,6 +13,7 @@
     "apps/demo-web/build",
     "extensions/browser-rpc-provider/build",
     "extensions/fixture-provider/build",
+    "extensions/github-provider/build",
     "extensions/git-http-provider/build",
     "examples/browser-rpc-bitbucket/build",
     "examples/browser-rpc-bitbucket-datacenter/build"

@@ -27,12 +27,14 @@ export function decodeRpcSession(value: unknown): RpcSession {
   requireVersion(session.version);
   const valueCaps = record(session.capabilities, 'capabilities', [
     'commits',
+    'localEdits',
     'forceWithLease',
     'amend',
     'createBranch',
     'deleteBranch',
   ]);
   const commits = boolean(valueCaps.commits, 'capabilities.commits');
+  const localEdits = optionalBoolean(valueCaps.localEdits, 'capabilities.localEdits');
   const forceWithLease = optionalBoolean(valueCaps.forceWithLease, 'capabilities.forceWithLease');
   const amend = optionalBoolean(valueCaps.amend, 'capabilities.amend');
   const createBranch = optionalBoolean(valueCaps.createBranch, 'capabilities.createBranch');
@@ -44,6 +46,7 @@ export function decodeRpcSession(value: unknown): RpcSession {
     version: REMOTISH_RPC_VERSION,
     capabilities: {
       commits,
+      ...(localEdits === undefined ? {} : { localEdits }),
       ...(forceWithLease === undefined ? {} : { forceWithLease }),
       ...(amend === undefined ? {} : { amend }),
       ...(createBranch === undefined ? {} : { createBranch }),

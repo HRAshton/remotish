@@ -7,11 +7,11 @@ import { RpcAdapter } from '@remotish/adapter-rpc';
 
 const adapter = new RpcAdapter(transport, {
   version: 1,
-  capabilities: { commits: false },
+  capabilities: { commits: false, localEdits: true },
 });
 ```
 
-Session metadata is validated synchronously, before the adapter is exposed. Optional methods exist only when the endpoint advertises them. A transport must supply trustworthy metadata from its connection setup; it must not treat an arbitrary repository result as a capability grant.
+Session metadata is validated synchronously, before the adapter is exposed. The v1 capability object carries `localEdits` as well as remote mutation flags, so a read-only endpoint can explicitly allow framework-owned local overlay edits. Optional remote methods exist only when the endpoint advertises them. A transport must supply trustworthy metadata from its connection setup; it must not treat an arbitrary repository result as a capability grant.
 
 Protocol version 1 uses JSON-safe `{ version, operation, payload }` requests and `{ version, status: 'ok', result }` or `{ version, status: 'error', error: { code } }` responses. Operations are exactly `getRepository`, `readDirectory`, `readFile`, `getBranches`, `getCommits`, `getCommitChanges`, `commit`, `createBranch`, and `deleteBranch`. Empty operations use `{}` payloads; reads use `{ revision, path }`; history uses the SDK query fields; branch mutations use `{ name, revision }` or `{ name }`. `deleteBranch` success has a `null` wire result. Read-file bytes and add/modify content use `{ base64 }`; no text conversion occurs. The commit payload keeps `type`, `branch`, `baseRevision`, `message`, `changes`, and the exact normal or force-with-lease `push` shape.
 

@@ -166,9 +166,13 @@ test('force-with-lease and amend retain their distinct payloads and publication 
 test('session capabilities control optional methods and reject invalid combinations', async () => {
   const transport = { request: async () => encodeRpcSuccess('getBranches', []) };
   const readOnly = new RpcAdapter(transport, session({ commits: false }));
+  assert.equal(readOnly.capabilities.localEdits, undefined);
   assert.equal(readOnly.commit, undefined);
   assert.equal(readOnly.createBranch, undefined);
   assert.equal(readOnly.deleteBranch, undefined);
+  const localOnly = new RpcAdapter(transport, session({ commits: false, localEdits: true }));
+  assert.equal(localOnly.capabilities.localEdits, true);
+  assert.equal(localOnly.commit, undefined);
   const limited = new RpcAdapter(transport, session({ commits: true }));
   await assert.rejects(
     limited.commit({
@@ -186,6 +190,7 @@ test('session capabilities control optional methods and reject invalid combinati
     session({ commits: false, forceWithLease: true }),
     session({ commits: true, amend: true }),
     session({ commits: 'yes' }),
+    session({ commits: false, localEdits: 'yes' }),
     session({ commits: false, surprise: true }),
   ]) {
     assert.throws(() => new RpcAdapter(transport, bad), RemotishError);

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { runBrowserRpcSmoke } from './browser-rpc.js';
 import { run as runGitHttpProviderSmoke } from './git-http-provider.js';
+import { run as runGitHubProviderSmoke } from './github-provider.js';
 import { run as runWebSmoke } from './index.js';
 
 export async function run(): Promise<void> {
@@ -30,6 +31,7 @@ export async function run(): Promise<void> {
     throw new Error('Packaged Browser RPC provider is missing or activated before request.');
   }
   await runBrowserRpcSmoke();
+  await runGitHubProviderSmoke();
   await runGitHttpProviderSmoke();
   if (!browserRpc.isActive) {
     throw new Error('Packaged Browser RPC provider did not activate on bridge configuration.');
