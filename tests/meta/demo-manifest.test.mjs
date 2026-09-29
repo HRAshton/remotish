@@ -12,6 +12,13 @@ const hostSource = await readFile(
   new URL('../../apps/demo-web/src/extension.ts', import.meta.url),
   'utf8',
 );
+const stableManifest = JSON.parse(
+  await readFile(new URL('../../apps/demo-web/src/test/stable/package.json', import.meta.url)),
+);
+const stableHostSource = await readFile(
+  new URL('../../apps/demo-web/src/test/stable/extension.ts', import.meta.url),
+  'utf8',
+);
 
 test('host manifest is WebWorker-compatible and activates for provider commands', () => {
   assert.equal(Object.hasOwn(manifest, 'type'), false);
@@ -76,11 +83,15 @@ test('revert is an inline action for files in the Changes group', () => {
   assert.equal(revert?.when, 'scmProvider == remotish && scmResourceGroup == changes');
 });
 
-test('demo manifest enables the proposed SCM APIs used by Remotish', () => {
-  const proposals = new Set(manifest.enabledApiProposals ?? []);
-  assert.ok(proposals.has('scmActionButton'));
-  assert.ok(proposals.has('scmHistoryProvider'));
-  assert.ok(proposals.has('timeline'));
+test('controlled demo enables only the proposal-sensitive history APIs', () => {
+  assert.deepEqual(manifest.enabledApiProposals, ['scmHistoryProvider', 'timeline']);
+});
+
+test('stable smoke host uses the base package without proposed APIs', () => {
+  assert.equal(stableManifest.enabledApiProposals, undefined);
+  assert.equal(stableManifest.browser, './extension.js');
+  assert.match(stableHostSource, /@remotish\/vscode/u);
+  assert.doesNotMatch(stableHostSource, /@remotish\/vscode-history|RemotishHistoryHost/u);
 });
 
 test('every contributed menu command is declared', () => {

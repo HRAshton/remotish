@@ -71,8 +71,8 @@ test('vscode runtime: demo wires VFS, SCM, branch status and native history prov
 
   const sourceControl = vscode.__test.sourceControls[0];
   assert.equal(sourceControl.id, 'remotish');
-  assert.equal(sourceControl.actionButton.command.command, 'remotish.commitAndPush');
-  assert.equal(sourceControl.actionButton.secondaryCommands.length, 3);
+  assert.equal(sourceControl.acceptInputCommand.command, 'remotish.commitAndPush');
+  assert.equal(sourceControl.actionButton, undefined);
   assert.deepEqual(
     sourceControl.__groups.map((group) => group.id),
     ['staged', 'changes'],

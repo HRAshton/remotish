@@ -17,19 +17,18 @@ Stable VS Code types come from the pinned `@types/vscode` package (`1.138.0` in 
 
 ## Proposal-sensitive APIs
 
-The controlled demo also uses:
+The base `@remotish/vscode` package is proposal-free. The controlled demo additionally composes `@remotish/vscode-history`, which uses:
 
 ```text
-scmActionButton
 scmHistoryProvider
 timeline
 ```
 
 Proposal declaration files for the controlled host are committed under `types/vscode-proposed/`. Release-contract tests verify that the pinned `@types/vscode`, extension engine, enabled proposal list, and vendored declaration set stay aligned. Install and CI do not download proposal declarations.
 
-`@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK or core.
+`@remotish/vscode-history` isolates SCM history and Timeline APIs so host-version changes do not affect the adapter SDK, core, or base VS Code host.
 
-The demo enables these proposals because it targets a controlled Code-OSS/Web distribution. A normal Marketplace extension must follow Marketplace/proposed-API rules and may need to omit proposal-dependent features.
+The controlled demo enables these proposals because it targets a controlled Code-OSS/Web distribution. `pnpm test:vscode-web:stable` separately runs the base host with no `enabledApiProposals`. A normal Marketplace extension must follow Marketplace/proposed-API rules and can omit the history package while keeping the core workspace and SCM integration.
 
 ## Updating the host version
 

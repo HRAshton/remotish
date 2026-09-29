@@ -75,6 +75,7 @@ jobs:
           node-version: 24.21.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:vscode-web:stable
       - run: pnpm test:vscode-web
       - run: pnpm test:userscript-browser
       - run: pnpm test:vscode-web:vsix

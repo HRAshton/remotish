@@ -102,9 +102,9 @@ const history = new RemotishHistoryHost(host);
 context.subscriptions.push(history);
 ```
 
-`@remotish/vscode-history` uses proposal-sensitive APIs (`scmHistoryProvider` and `timeline`). The demo also uses `scmActionButton`. This is appropriate for a controlled Code-OSS distribution that enables those proposals, not an ordinary Marketplace extension without proposal access.
+`@remotish/vscode` itself uses only stable VS Code APIs. `@remotish/vscode-history` uses proposal-sensitive APIs (`scmHistoryProvider` and `timeline`). The controlled demo composes both packages and enables those two proposals; a proposal-free host can omit `@remotish/vscode-history` while retaining the core remote workspace and SCM behavior.
 
-See [Code-OSS integration](code-oss-integration.md) for versioning and distribution constraints.
+Run `pnpm test:vscode-web:stable` to exercise that base composition under Code-OSS Web with no `enabledApiProposals`. See [Code-OSS integration](code-oss-integration.md) for versioning and distribution constraints.
 
 ## Commands and SCM behavior
 

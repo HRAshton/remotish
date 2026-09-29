@@ -57,7 +57,9 @@ Tests are injected only into the unpacked smoke-test copy, not into the release 
 
 ## Proposed API distribution constraint
 
-The host intentionally uses `scmActionButton`, `scmHistoryProvider`, and `timeline`. The host release is therefore aimed at the controlled Code-OSS distribution described in [Code-OSS integration](code-oss-integration.md), not an ordinary Marketplace-compatible extension unless those proposal dependencies are removed or otherwise made compliant.
+The base `@remotish/vscode` host path uses stable APIs only and is smoke-tested without `enabledApiProposals` by `pnpm test:vscode-web:stable`.
+
+The released controlled demo host additionally composes `@remotish/vscode-history`, so that artifact still requires the `scmHistoryProvider` and `timeline` proposals and is aimed at the controlled Code-OSS distribution described in [Code-OSS integration](code-oss-integration.md). A proposal-free embedding can omit the history package while retaining the core remote workspace and SCM behavior.
 
 The current target is VS Code / Code-OSS 1.138.0. Requalify before changing that host version.
 

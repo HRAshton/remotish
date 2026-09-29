@@ -103,7 +103,10 @@ test('VS Code proposal typings use the official update tool and stay aligned wit
   const extensionManifest = JSON.parse(
     await readFile(new URL('../../apps/demo-web/package.json', import.meta.url)),
   );
-  const proposals = ['scmActionButton', 'scmHistoryProvider', 'timeline'];
+  const stableSmokeManifest = JSON.parse(
+    await readFile(new URL('../../apps/demo-web/src/test/stable/package.json', import.meta.url)),
+  );
+  const proposals = ['scmHistoryProvider', 'timeline'];
 
   assert.match(vscodeVersion ?? '', exactVersion);
   assert.equal(rootManifest.scripts?.['vscode:types'], undefined);
@@ -114,6 +117,8 @@ test('VS Code proposal typings use the official update tool and stay aligned wit
   assert.equal(rootManifest.scripts?.postinstall, undefined);
   assert.equal(extensionManifest.engines?.vscode, `^${vscodeVersion}`);
   assert.deepEqual(extensionManifest.enabledApiProposals, proposals);
+  assert.equal(stableSmokeManifest.engines?.vscode, `^${vscodeVersion}`);
+  assert.equal(stableSmokeManifest.enabledApiProposals, undefined);
 
   for (const name of proposals) {
     assert.equal(
@@ -308,6 +313,7 @@ test('CI push checks target the repository default branch', async () => {
     'utf8',
   );
   assert.match(ciWorkflow, /^ {2}push:\r?\n {4}branches:\r?\n {6}- master$/mu);
+  assert.match(ciWorkflow, /pnpm test:vscode-web:stable/u);
 });
 
 test('release scripts delegate generic infrastructure to standard tooling', async () => {
